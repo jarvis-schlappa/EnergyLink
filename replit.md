@@ -47,7 +47,7 @@ Bevorzugter Kommunikationsstil: Einfache, alltägliche Sprache.
 - RESTful API-Muster mit `/api` Präfix für alle Endpunkte
 - Routen registriert über `server/routes.ts`
 - Storage-Abstraktionsschicht über `IStorage` Interface
-- Derzeit wird `MemStorage` (In-Memory) Implementierung verwendet
+- File-basierte Persistenz: Settings werden in `data/settings.json` gespeichert
 
 **Geplanter Datenfluss**:
 - Frontend kommuniziert mit KEBA Wallbox über Backend-Proxy
@@ -67,7 +67,7 @@ Bevorzugter Kommunikationsstil: Einfache, alltägliche Sprache.
 - `Settings`: Wallbox-IP und Webhook-URLs für SmartHome-Integrationen
 - `ControlState`: Boolean-Schalter für PV-Überschuss, Nachtladung, Batteriesperrung
 
-**Aktueller Stand**: Storage-Interface definiert, aber noch nicht mit Datenbank-Persistenz implementiert. Einstellungen werden derzeit im localStorage des Frontends gespeichert.
+**Aktueller Stand**: File-basierte Persistenz implementiert. Einstellungen werden in `data/settings.json` gespeichert und überleben Server-Neustarts. Wichtig für Docker-Deployments, da Container-Neustarts sonst alle Konfigurationen zurücksetzen würden. Die Datei wird automatisch beim ersten Start mit Default-Werten erstellt.
 
 ### Authentifizierung und Autorisierung
 
@@ -109,10 +109,11 @@ Bevorzugter Kommunikationsstil: Einfache, alltägliche Sprache.
 **Wichtige Architektur-Entscheidungen**:
 
 1. **Separation of Concerns**: Gemeinsame Schema-Definitionen in `shared/` werden von Frontend und Backend für Typsicherheit verwendet
-2. **Storage-Abstraktion**: Interface-basiertes Storage-Design ermöglicht Wechsel von In-Memory zu Datenbank ohne Änderung der Business-Logik
-3. **Mobile-First PWA**: Optimiert für Touch-Geräte mit Standalone-App-Erlebnis
-4. **Webhook-Integrationsmuster**: Externe SmartHome-Systeme werden über HTTP-Callbacks statt direkter Integration gesteuert
-5. **Typsicherheit**: Zod-Schemas bieten Laufzeit-Validierung und TypeScript-Typen aus einer einzigen Quelle
+2. **File-basierte Persistenz**: Einstellungen werden in `data/settings.json` gespeichert statt In-Memory, essentiell für Docker-Container-Neustarts
+3. **Storage-Abstraktion**: Interface-basiertes Storage-Design ermöglicht Wechsel zwischen verschiedenen Persistenz-Strategien ohne Änderung der Business-Logik
+4. **Mobile-First PWA**: Optimiert für Touch-Geräte mit Standalone-App-Erlebnis
+5. **Webhook-Integrationsmuster**: Externe SmartHome-Systeme werden über HTTP-Callbacks statt direkter Integration gesteuert
+6. **Typsicherheit**: Zod-Schemas bieten Laufzeit-Validierung und TypeScript-Typen aus einer einzigen Quelle
 
 ## Technische Details
 
@@ -235,7 +236,18 @@ Bevorzugter Kommunikationsstil: Einfache, alltägliche Sprache.
 
 ## Letzte Änderungen
 
-**2025-11-09**:
+**2025-11-09 (Nachmittags)**:
+- **File-basierte Persistenz für Settings**: Kritischer Bugfix für Docker-Deployments
+  - Einstellungen werden jetzt in `data/settings.json` gespeichert statt in RAM
+  - Beim Server-Start werden Einstellungen aus der Datei geladen (falls vorhanden)
+  - Beim Speichern werden Einstellungen in die Datei geschrieben
+  - **Löst das Problem**: Nachtladungs-Scheduler läuft jetzt mit persistierten Einstellungen nach Container-Neustarts
+  - Automatische Erstellung des `data/` Verzeichnisses beim ersten Start
+  - Default-Einstellungen werden automatisch angelegt wenn keine Datei existiert
+  - Logging zeigt: "Einstellungen geladen aus: data/settings.json"
+  - **End-to-End getestet**: Einstellungen bleiben nach Server-Neustart erhalten, Scheduler startet zur konfigurierten Zeit
+
+**2025-11-09 (Vormittags)**:
 - **Interne Nachtladungs-Zeitsteuerung**: Vollständig neue Implementierung
   - Ersetzt FHEM-Webhook-basierte Nachtladung durch internen minutenbasierten Scheduler
   - Backend-Scheduler läuft alle 60 Sekunden und prüft Zeitfenster automatisch
