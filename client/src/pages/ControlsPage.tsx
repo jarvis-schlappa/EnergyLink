@@ -39,29 +39,6 @@ export default function ControlsPage() {
     });
   };
 
-  const handleNightChargingChange = (checked: boolean) => {
-    updateControlsMutation.mutate({
-      pvSurplus: controlState?.pvSurplus || false,
-      nightCharging: checked,
-      batteryLock: controlState?.batteryLock || false,
-    }, {
-      onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey: ["/api/controls"] });
-        if (checked) {
-          toast({
-            title: "Nachtladung aktiviert",
-            description: "Der Ladestrom wird automatisch auf Maximum gesetzt.",
-          });
-        } else {
-          toast({
-            title: "Nachtladung deaktiviert",
-            description: "Die SmartHome-Funktion wurde erfolgreich geändert.",
-          });
-        }
-      }
-    });
-  };
-
   const handleBatteryLockChange = (checked: boolean) => {
     updateControlsMutation.mutate({
       pvSurplus: controlState?.pvSurplus || false,
@@ -91,20 +68,18 @@ export default function ControlsPage() {
             />
 
             <ToggleListItem
-              id="night-charging"
-              label="Nachtladung"
-              description="Zeitgesteuertes Laden in der Nacht"
-              checked={controlState?.nightCharging || false}
-              onCheckedChange={handleNightChargingChange}
-            />
-
-            <ToggleListItem
               id="battery-lock"
               label="Batterie entladen sperren"
               description="Verhindert Entladung der Hausbatterie"
               checked={controlState?.batteryLock || false}
               onCheckedChange={handleBatteryLockChange}
             />
+          </div>
+          
+          <div className="mt-4 p-4 bg-muted rounded-lg">
+            <p className="text-sm text-muted-foreground">
+              <strong>Hinweis:</strong> Die Nachtladung wird jetzt über die Zeitsteuerung in den Einstellungen konfiguriert.
+            </p>
           </div>
         </div>
       </div>

@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import {
   Accordion,
   AccordionContent,
@@ -30,10 +31,13 @@ export default function SettingsPage() {
       wallboxIp: "192.168.40.16",
       pvSurplusOnUrl: "http://192.168.40.11:8083/fhem?detail=autoWallboxPV&cmd.autoWallboxPV=set%20autoWallboxPV%20on",
       pvSurplusOffUrl: "http://192.168.40.11:8083/fhem?detail=autoWallboxPV&cmd.autoWallboxPV=set%20autoWallboxPV%20off",
-      nightChargingOnUrl: "http://192.168.40.11:8083/fhem?detail=steckdoseAutoNachtladung&cmd.steckdoseAutoNachtladung=set%20steckdoseAutoNachtladung%20on",
-      nightChargingOffUrl: "http://192.168.40.11:8083/fhem?detail=steckdoseAutoNachtladung&cmd.steckdoseAutoNachtladung=set%20steckdoseAutoNachtladung%20off",
       batteryLockOnUrl: "http://192.168.40.11:8083/fhem?detail=s10EntladenSperren&cmd.s10EntladenSperren=set%20s10EntladenSperren%20on",
       batteryLockOffUrl: "http://192.168.40.11:8083/fhem?detail=s10EntladenSperren&cmd.s10EntladenSperren=set%20s10EntladenSperren%20off",
+      nightChargingSchedule: {
+        enabled: false,
+        startTime: "00:00",
+        endTime: "05:00",
+      },
     },
   });
 
@@ -134,36 +138,56 @@ export default function SettingsPage() {
 
               <AccordionItem value="night-charging">
                 <AccordionTrigger className="text-base font-medium">
-                  Nachtladung URLs
+                  Nachtladung Zeitsteuerung
                 </AccordionTrigger>
                 <AccordionContent>
                   <div className="space-y-4 pt-2">
-                    <div className="space-y-2">
-                      <Label htmlFor="night-on" className="text-sm font-medium">
-                        URL zum Einschalten
-                      </Label>
-                      <Input
-                        id="night-on"
-                        type="url"
-                        placeholder="https://smarthome.local/night/on"
-                        {...form.register("nightChargingOnUrl")}
-                        className="h-12"
-                        data-testid="input-night-on"
+                    <div className="flex items-center justify-between">
+                      <div className="space-y-0.5">
+                        <Label htmlFor="night-enabled" className="text-sm font-medium">
+                          Automatische Nachtladung aktivieren
+                        </Label>
+                        <p className="text-xs text-muted-foreground">
+                          Lädt automatisch im konfigurierten Zeitfenster
+                        </p>
+                      </div>
+                      <Switch
+                        id="night-enabled"
+                        checked={form.watch("nightChargingSchedule.enabled")}
+                        onCheckedChange={(checked) => 
+                          form.setValue("nightChargingSchedule.enabled", checked)
+                        }
+                        data-testid="switch-night-enabled"
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="night-off" className="text-sm font-medium">
-                        URL zum Ausschalten
+                      <Label htmlFor="night-start" className="text-sm font-medium">
+                        Startzeit
                       </Label>
                       <Input
-                        id="night-off"
-                        type="url"
-                        placeholder="https://smarthome.local/night/off"
-                        {...form.register("nightChargingOffUrl")}
+                        id="night-start"
+                        type="time"
+                        {...form.register("nightChargingSchedule.startTime")}
                         className="h-12"
-                        data-testid="input-night-off"
+                        data-testid="input-night-start"
                       />
                     </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="night-end" className="text-sm font-medium">
+                        Endzeit
+                      </Label>
+                      <Input
+                        id="night-end"
+                        type="time"
+                        {...form.register("nightChargingSchedule.endTime")}
+                        className="h-12"
+                        data-testid="input-night-end"
+                      />
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Die Wallbox startet automatisch zur Startzeit und stoppt zur Endzeit.
+                      Zeitfenster können über Mitternacht gehen (z.B. 22:00 - 06:00).
+                    </p>
                   </div>
                 </AccordionContent>
               </AccordionItem>

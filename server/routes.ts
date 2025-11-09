@@ -602,6 +602,80 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Scheduler für automatische Nachtladung
+  let nightChargingSchedulerInterval: NodeJS.Timeout | null = null;
+  
+  const checkNightChargingSchedule = async () => {
+    try {
+      const settings = storage.getSettings();
+      const schedule = settings?.nightChargingSchedule;
+      const currentState = storage.getControlState();
+      
+      // Wenn Scheduler deaktiviert wurde, aber Wallbox noch lädt -> stoppen
+      if (!schedule?.enabled) {
+        if (currentState.nightCharging) {
+          log("info", "system", `Nachtladung: Zeitsteuerung deaktiviert - stoppe Laden`);
+          
+          if (settings?.wallboxIp) {
+            await sendUdpCommand(settings.wallboxIp, "ena 0");
+          }
+          
+          storage.saveControlState({ ...currentState, nightCharging: false });
+        }
+        return;
+      }
+      
+      const now = new Date();
+      const currentTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+      
+      const isInTimeWindow = isTimeInRange(currentTime, schedule.startTime, schedule.endTime);
+      
+      if (isInTimeWindow && !currentState.nightCharging) {
+        log("info", "system", `Nachtladung: Zeitfenster erreicht (${schedule.startTime}-${schedule.endTime}) - starte Laden`);
+        
+        if (settings?.wallboxIp) {
+          await sendUdpCommand(settings.wallboxIp, "ena 1");
+        }
+        
+        storage.saveControlState({ ...currentState, nightCharging: true });
+      } else if (!isInTimeWindow && currentState.nightCharging) {
+        log("info", "system", `Nachtladung: Zeitfenster beendet - stoppe Laden`);
+        
+        if (settings?.wallboxIp) {
+          await sendUdpCommand(settings.wallboxIp, "ena 0");
+        }
+        
+        storage.saveControlState({ ...currentState, nightCharging: false });
+      }
+    } catch (error) {
+      log("error", "system", "Fehler beim Nachtladungs-Scheduler", String(error));
+    }
+  };
+  
+  // Hilfsfunktion um zu prüfen ob eine Zeit in einem Zeitfenster liegt
+  const isTimeInRange = (current: string, start: string, end: string): boolean => {
+    const [currentH, currentM] = current.split(':').map(Number);
+    const [startH, startM] = start.split(':').map(Number);
+    const [endH, endM] = end.split(':').map(Number);
+    
+    const currentMinutes = currentH * 60 + currentM;
+    const startMinutes = startH * 60 + startM;
+    const endMinutes = endH * 60 + endM;
+    
+    // Handle overnight time windows (e.g., 23:00 - 05:00)
+    if (endMinutes < startMinutes) {
+      return currentMinutes >= startMinutes || currentMinutes < endMinutes;
+    }
+    
+    return currentMinutes >= startMinutes && currentMinutes < endMinutes;
+  };
+  
+  // Starte Scheduler (prüfe jede Minute)
+  nightChargingSchedulerInterval = setInterval(checkNightChargingSchedule, 60 * 1000);
+  
+  // Initiale Prüfung beim Start
+  checkNightChargingSchedule();
+
   const httpServer = createServer(app);
 
   return httpServer;
