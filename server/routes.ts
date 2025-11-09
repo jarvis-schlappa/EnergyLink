@@ -611,6 +611,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const schedule = settings?.nightChargingSchedule;
       const currentState = storage.getControlState();
       
+      const now = new Date();
+      const currentTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+      
+      log("info", "system", `Nachtladungs-Scheduler läuft - Aktuelle Zeit: ${currentTime}, Zeitsteuerung aktiviert: ${schedule?.enabled}, Zeitfenster: ${schedule?.startTime}-${schedule?.endTime}`);
+      
       // Wenn Scheduler deaktiviert wurde, aber Wallbox noch lädt -> stoppen
       if (!schedule?.enabled) {
         if (currentState.nightCharging) {
@@ -624,9 +629,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
         return;
       }
-      
-      const now = new Date();
-      const currentTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
       
       const isInTimeWindow = isTimeInRange(currentTime, schedule.startTime, schedule.endTime);
       
@@ -671,6 +673,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   };
   
   // Starte Scheduler (prüfe jede Minute)
+  log("info", "system", "Nachtladungs-Scheduler wird gestartet - prüft alle 60 Sekunden");
   nightChargingSchedulerInterval = setInterval(checkNightChargingSchedule, 60 * 1000);
   
   // Initiale Prüfung beim Start
