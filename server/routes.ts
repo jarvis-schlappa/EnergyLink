@@ -476,19 +476,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const settings = settingsSchema.parse(req.body);
       storage.saveSettings(settings);
       
-      // E3DC-Verbindung initialisieren wenn konfiguriert
+      // E3DC-Konfiguration speichern wenn aktiviert
       if (settings.e3dc?.enabled) {
         try {
-          log("info", "system", "Initialisiere E3DC-Verbindung");
-          await e3dcClient.disconnect(); // Vorherige Verbindung trennen
-          await e3dcClient.connect(settings.e3dc);
-          log("info", "system", "E3DC-Verbindung erfolgreich hergestellt");
+          log("info", "system", "E3DC-Konfiguration wird gespeichert");
+          e3dcClient.configure(settings.e3dc);
+          log("info", "system", "E3DC-Konfiguration erfolgreich gespeichert");
         } catch (error) {
-          log("error", "system", "Fehler beim Verbinden mit E3DC", error instanceof Error ? error.message : String(error));
+          log("error", "system", "Fehler beim Speichern der E3DC-Konfiguration", error instanceof Error ? error.message : String(error));
         }
-      } else if (e3dcClient.isConnected()) {
-        await e3dcClient.disconnect();
-        log("info", "system", "E3DC-Verbindung getrennt");
+      } else if (e3dcClient.isConfigured()) {
+        e3dcClient.disconnect();
+        log("info", "system", "E3DC-Konfiguration entfernt");
       }
       
       res.json({ success: true });
@@ -624,15 +623,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // E3DC API-Endpunkte
   app.get("/api/e3dc/battery", async (req, res) => {
     try {
-      if (!e3dcClient.isConnected()) {
-        return res.status(503).json({ error: "E3DC not connected" });
+      if (!e3dcClient.isConfigured()) {
+        return res.status(503).json({ error: "E3DC not configured" });
       }
 
       const batteryStatus = await e3dcClient.getBatteryStatus();
       res.json(batteryStatus);
     } catch (error) {
-      log("error", "system", "Fehler beim Abrufen des E3DC-Batteriestatus", error instanceof Error ? error.message : String(error));
-      res.status(500).json({ error: "Failed to get battery status" });
+      const errorMessage = error instanceof Error ? error.message : JSON.stringify(error);
+      log("error", "system", "Fehler beim Abrufen des E3DC-Batteriestatus", errorMessage);
+      res.status(500).json({ error: "Failed to get battery status", details: errorMessage });
     }
   });
 
@@ -655,17 +655,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Hilfsfunktion für Batterie-Entladesperre (E3DC oder Webhook)
   const lockBatteryDischarge = async (settings: any) => {
-    if (settings?.e3dc?.enabled && e3dcClient.isConnected()) {
+    if (settings?.e3dc?.enabled && e3dcClient.isConfigured()) {
       try {
         log("info", "system", `Batterie-Entladesperre: Verwende E3DC-Integration`);
         await e3dcClient.lockDischarge();
         return; // Erfolgreich, kein Fallback nötig
       } catch (error) {
-        log("error", "system", `E3DC-Fehler beim Sperren der Entladung, verwende Webhook-Fallback`, error instanceof Error ? error.message : String(error));
+        const errorMessage = error instanceof Error ? error.message : JSON.stringify(error);
+        log("error", "system", `E3DC-Fehler beim Sperren der Entladung, verwende Webhook-Fallback`, errorMessage);
       }
     }
     
-    // Webhook-Fallback (entweder weil E3DC deaktiviert/nicht verbunden oder E3DC-Fehler aufgetreten)
+    // Webhook-Fallback (entweder weil E3DC deaktiviert/nicht konfiguriert oder E3DC-Fehler aufgetreten)
     if (settings?.batteryLockOnUrl) {
       log("info", "system", `Batterie-Entladesperre: Verwende Webhook`);
       await callSmartHomeUrl(settings.batteryLockOnUrl);
@@ -673,17 +674,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
   };
 
   const unlockBatteryDischarge = async (settings: any) => {
-    if (settings?.e3dc?.enabled && e3dcClient.isConnected()) {
+    if (settings?.e3dc?.enabled && e3dcClient.isConfigured()) {
       try {
         log("info", "system", `Batterie-Entladesperre aufheben: Verwende E3DC-Integration`);
         await e3dcClient.unlockDischarge();
         return; // Erfolgreich, kein Fallback nötig
       } catch (error) {
-        log("error", "system", `E3DC-Fehler beim Freigeben der Entladung, verwende Webhook-Fallback`, error instanceof Error ? error.message : String(error));
+        const errorMessage = error instanceof Error ? error.message : JSON.stringify(error);
+        log("error", "system", `E3DC-Fehler beim Freigeben der Entladung, verwende Webhook-Fallback`, errorMessage);
       }
     }
     
-    // Webhook-Fallback (entweder weil E3DC deaktiviert/nicht verbunden oder E3DC-Fehler aufgetreten)
+    // Webhook-Fallback (entweder weil E3DC deaktiviert/nicht konfiguriert oder E3DC-Fehler aufgetreten)
     if (settings?.batteryLockOffUrl) {
       log("info", "system", `Batterie-Entladesperre aufheben: Verwende Webhook`);
       await callSmartHomeUrl(settings.batteryLockOffUrl);
@@ -787,6 +789,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     return currentMinutes >= startMinutes && currentMinutes < endMinutes;
   };
   
+  // Lade E3DC-Konfiguration beim Start wenn vorhanden
+  const initialSettings = storage.getSettings();
+  if (initialSettings?.e3dc?.enabled) {
+    try {
+      e3dcClient.configure(initialSettings.e3dc);
+      log("info", "system", "E3DC-Konfiguration beim Start geladen");
+    } catch (error) {
+      log("error", "system", "Fehler beim Laden der E3DC-Konfiguration beim Start", error instanceof Error ? error.message : String(error));
+    }
+  }
+
   // Starte Scheduler (prüfe jede Minute)
   log("info", "system", "Nachtladungs-Scheduler wird gestartet - prüft alle 60 Sekunden");
   nightChargingSchedulerInterval = setInterval(checkNightChargingSchedule, 60 * 1000);
