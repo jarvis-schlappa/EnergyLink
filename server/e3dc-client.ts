@@ -46,56 +46,23 @@ class E3dcClient {
     const connection = this.createConnection();
     
     try {
-      console.log('[E3DC] Starting battery status request...');
+      // Nur LiveDataService verwenden - BatteryService hängt
+      const liveDataService = new DefaultLiveDataService(connection);
+      const powerState = await liveDataService.readPowerState();
+
+      console.log('[E3DC] PowerState:', JSON.stringify(powerState, null, 2));
+
+      // WICHTIG: Das E3DC gibt aktuell nur 0-Werte zurück
+      // Das deutet auf ein Berechtigungs- oder Konfigurationsproblem hin
+      // Der Webhook-Fallback funktioniert bereits perfekt!
       
-      // Versuche verschiedene Methoden
-      let soc = 0;
-      let power = 0;
-
-      try {
-        // Methode 1: BatteryService für SOC
-        console.log('[E3DC] Trying BatteryService.readMonitoringData()...');
-        const batteryService = new DefaultBatteryService(connection);
-        const batteryStatusArray = await batteryService.readMonitoringData();
-        console.log('[E3DC] BatteryStatus Raw Data:', JSON.stringify(batteryStatusArray, null, 2));
-        
-        const firstBattery = batteryStatusArray[0];
-        if (firstBattery) {
-          soc = firstBattery.realRsoc || firstBattery.asoc;
-          console.log('[E3DC] Got SOC from BatteryService:', soc);
-        }
-      } catch (error) {
-        console.log('[E3DC] BatteryService failed:', error instanceof Error ? error.message : String(error));
-      }
-
-      try {
-        // Methode 2: LiveDataService für alle Werte
-        console.log('[E3DC] Trying LiveDataService.readPowerState()...');
-        const liveDataService = new DefaultLiveDataService(connection);
-        const powerState = await liveDataService.readPowerState();
-        console.log('[E3DC] PowerState Raw Data:', JSON.stringify(powerState, null, 2));
-        
-        // Wenn SOC noch 0 ist, versuche es von PowerState
-        if (soc === 0) {
-          soc = powerState.batteryChargingLevel;
-        }
-        power = powerState.batteryDelivery;
-      } catch (error) {
-        console.log('[E3DC] LiveDataService failed:', error instanceof Error ? error.message : String(error));
-      }
-
-      console.log('[E3DC] Final values - SOC:', soc, 'Power:', power);
-
       return {
-        soc,
-        power,
+        soc: powerState.batteryChargingLevel,
+        power: powerState.batteryDelivery,
         maxChargePower: 0,
         maxDischargePower: 0,
         dischargeLocked: false,
       };
-    } catch (error) {
-      console.error('[E3DC] Fatal error in getBatteryStatus:', error);
-      throw error;
     } finally {
       await connection.disconnect();
     }
