@@ -549,18 +549,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const pvDeviceName = extractDeviceNameFromUrl(settings?.pvSurplusOnUrl);
       const pvBaseUrl = extractBaseUrlFromUrl(settings?.pvSurplusOnUrl);
       
-      const batteryDeviceName = extractDeviceNameFromUrl(settings?.batteryLockOnUrl);
-      const batteryBaseUrl = extractBaseUrlFromUrl(settings?.batteryLockOnUrl);
+      // WICHTIG: Wenn E3DC aktiviert ist, NICHT FHEM für Batterie-Status verwenden!
+      const useE3dcForBattery = settings?.e3dc?.enabled && e3dcClient.isConfigured();
+      const batteryDeviceName = useE3dcForBattery ? null : extractDeviceNameFromUrl(settings?.batteryLockOnUrl);
+      const batteryBaseUrl = useE3dcForBattery ? null : extractBaseUrlFromUrl(settings?.batteryLockOnUrl);
       
       // Warne wenn Gerätename oder Basis-URL nicht extrahiert werden konnte
       if (settings?.pvSurplusOnUrl && (!pvDeviceName || !pvBaseUrl)) {
         log("warning", "system", "PV-Überschuss URL konnte nicht geparst werden", `URL: ${settings.pvSurplusOnUrl}`);
       }
-      if (settings?.batteryLockOnUrl && (!batteryDeviceName || !batteryBaseUrl)) {
+      if (!useE3dcForBattery && settings?.batteryLockOnUrl && (!batteryDeviceName || !batteryBaseUrl)) {
         log("warning", "system", "Batteriesperrung URL konnte nicht geparst werden", `URL: ${settings.batteryLockOnUrl}`);
       }
       
       // Frage externe Status ab (parallel für bessere Performance)
+      // Batterie-Status nur von FHEM holen, wenn E3DC NICHT aktiviert ist
       const [pvState, batteryState] = await Promise.all([
         pvDeviceName && pvBaseUrl ? getFhemDeviceState(pvBaseUrl, pvDeviceName) : Promise.resolve(null),
         batteryDeviceName && batteryBaseUrl ? getFhemDeviceState(batteryBaseUrl, batteryDeviceName) : Promise.resolve(null),
@@ -576,7 +579,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         log("info", "system", `PV-Überschussladung extern geändert auf ${pvState ? "ein" : "aus"}`);
       }
       
-      if (batteryState !== null && batteryState !== currentState.batteryLock) {
+      // Batterie-Status nur aktualisieren, wenn NICHT E3DC verwendet wird
+      if (!useE3dcForBattery && batteryState !== null && batteryState !== currentState.batteryLock) {
         newState.batteryLock = batteryState;
         hasChanges = true;
         log("info", "system", `Batterie entladen sperren extern geändert auf ${batteryState ? "ein" : "aus"}`);
