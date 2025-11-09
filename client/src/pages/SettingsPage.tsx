@@ -46,6 +46,13 @@ export default function SettingsPage() {
         endTime: "05:00",
       },
       timezone: "Europe/Berlin",
+      e3dc: {
+        enabled: false,
+        ipAddress: "",
+        rscpPassword: "",
+        portalUsername: "",
+        portalPassword: "",
+      },
     },
   });
 
@@ -133,6 +140,114 @@ export default function SettingsPage() {
             </div>
 
             <Accordion type="single" collapsible className="w-full">
+              <AccordionItem value="e3dc">
+                <AccordionTrigger className="text-base font-medium">
+                  E3DC Integration (RSCP)
+                </AccordionTrigger>
+                <AccordionContent>
+                  <div className="space-y-4 pt-2">
+                    <div className="flex items-center justify-between">
+                      <div className="space-y-0.5">
+                        <Label htmlFor="e3dc-enabled" className="text-sm font-medium">
+                          E3DC-Integration aktivieren
+                        </Label>
+                        <p className="text-xs text-muted-foreground">
+                          Direkte Steuerung der Batterie-Entladesperre über RSCP
+                        </p>
+                      </div>
+                      <Switch
+                        id="e3dc-enabled"
+                        checked={form.watch("e3dc.enabled")}
+                        onCheckedChange={(checked) => 
+                          form.setValue("e3dc.enabled", checked)
+                        }
+                        data-testid="switch-e3dc-enabled"
+                      />
+                    </div>
+                    
+                    {form.watch("e3dc.enabled") && (
+                      <>
+                        <div className="space-y-2">
+                          <Label htmlFor="e3dc-ip" className="text-sm font-medium">
+                            E3DC IP-Adresse
+                          </Label>
+                          <Input
+                            id="e3dc-ip"
+                            type="text"
+                            placeholder="192.168.1.50"
+                            {...form.register("e3dc.ipAddress")}
+                            className="h-12"
+                            data-testid="input-e3dc-ip"
+                          />
+                          <p className="text-xs text-muted-foreground">
+                            IP-Adresse des E3DC-Systems im lokalen Netzwerk
+                          </p>
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label htmlFor="e3dc-rscp" className="text-sm font-medium">
+                            RSCP Passwort
+                          </Label>
+                          <Input
+                            id="e3dc-rscp"
+                            type="password"
+                            placeholder="RSCP-Passwort"
+                            {...form.register("e3dc.rscpPassword")}
+                            className="h-12"
+                            data-testid="input-e3dc-rscp"
+                          />
+                          <p className="text-xs text-muted-foreground">
+                            RSCP-Passwort aus dem E3DC-System (nicht Portal-Passwort)
+                          </p>
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label htmlFor="e3dc-portal-user" className="text-sm font-medium">
+                            Portal Benutzername
+                          </Label>
+                          <Input
+                            id="e3dc-portal-user"
+                            type="text"
+                            placeholder="username@example.com"
+                            {...form.register("e3dc.portalUsername")}
+                            className="h-12"
+                            data-testid="input-e3dc-portal-user"
+                          />
+                          <p className="text-xs text-muted-foreground">
+                            E3DC Portal Benutzername (E-Mail)
+                          </p>
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label htmlFor="e3dc-portal-pass" className="text-sm font-medium">
+                            Portal Passwort
+                          </Label>
+                          <Input
+                            id="e3dc-portal-pass"
+                            type="password"
+                            placeholder="Portal-Passwort"
+                            {...form.register("e3dc.portalPassword")}
+                            className="h-12"
+                            data-testid="input-e3dc-portal-pass"
+                          />
+                          <p className="text-xs text-muted-foreground">
+                            E3DC Portal Passwort
+                          </p>
+                        </div>
+
+                        <div className="p-3 rounded-md bg-muted">
+                          <p className="text-xs text-muted-foreground">
+                            <strong>Hinweis:</strong> Bei aktivierter E3DC-Integration wird die 
+                            Batterie-Entladesperre direkt über das E3DC-System gesteuert. 
+                            Die konfigurierten Webhook-URLs dienen dann nur noch als Fallback.
+                          </p>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </AccordionContent>
+              </AccordionItem>
+
               <AccordionItem value="pv-surplus">
                 <AccordionTrigger className="text-base font-medium">
                   PV Überschussladung URLs

@@ -2,7 +2,8 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { createSocket, type Socket } from "dgram";
-import { settingsSchema, controlStateSchema, logSettingsSchema, type LogLevel } from "@shared/schema";
+import { settingsSchema, controlStateSchema, logSettingsSchema, type LogLevel, e3dcBatteryStatusSchema } from "@shared/schema";
+import { e3dcClient } from "./e3dc-client";
 
 const UDP_PORT = 7090;
 const UDP_TIMEOUT = 6000;
@@ -470,10 +471,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json(settings);
   });
 
-  app.post("/api/settings", (req, res) => {
+  app.post("/api/settings", async (req, res) => {
     try {
       const settings = settingsSchema.parse(req.body);
       storage.saveSettings(settings);
+      
+      // E3DC-Verbindung initialisieren wenn konfiguriert
+      if (settings.e3dc?.enabled) {
+        try {
+          log("info", "system", "Initialisiere E3DC-Verbindung");
+          await e3dcClient.disconnect(); // Vorherige Verbindung trennen
+          await e3dcClient.connect(settings.e3dc);
+          log("info", "system", "E3DC-Verbindung erfolgreich hergestellt");
+        } catch (error) {
+          log("error", "system", "Fehler beim Verbinden mit E3DC", error instanceof Error ? error.message : String(error));
+        }
+      } else if (e3dcClient.isConnected()) {
+        await e3dcClient.disconnect();
+        log("info", "system", "E3DC-Verbindung getrennt");
+      }
+      
       res.json({ success: true });
     } catch (error) {
       res.status(400).json({ error: "Invalid settings data" });
@@ -504,9 +521,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       if (state.batteryLock !== previousState.batteryLock) {
         log("info", "system", `Batterie entladen sperren ${state.batteryLock ? "aktiviert" : "deaktiviert"}`);
-        await callSmartHomeUrl(
-          state.batteryLock ? settings?.batteryLockOnUrl : settings?.batteryLockOffUrl
-        );
+        if (state.batteryLock) {
+          await lockBatteryDischarge(settings);
+        } else {
+          await unlockBatteryDischarge(settings);
+        }
       }
 
       storage.saveControlState(state);
@@ -602,6 +621,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // E3DC API-Endpunkte
+  app.get("/api/e3dc/battery", async (req, res) => {
+    try {
+      if (!e3dcClient.isConnected()) {
+        return res.status(503).json({ error: "E3DC not connected" });
+      }
+
+      const batteryStatus = await e3dcClient.getBatteryStatus();
+      res.json(batteryStatus);
+    } catch (error) {
+      log("error", "system", "Fehler beim Abrufen des E3DC-Batteriestatus", error instanceof Error ? error.message : String(error));
+      res.status(500).json({ error: "Failed to get battery status" });
+    }
+  });
+
   // Hilfsfunktion um aktuelle Zeit in der konfigurierten Zeitzone zu erhalten
   const getCurrentTimeInTimezone = (timezone: string = "Europe/Berlin"): string => {
     const now = new Date();
@@ -617,6 +651,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const minutes = parts.find(p => p.type === 'minute')?.value || '00';
     
     return `${hours}:${minutes}`;
+  };
+
+  // Hilfsfunktion für Batterie-Entladesperre (E3DC oder Webhook)
+  const lockBatteryDischarge = async (settings: any) => {
+    if (settings?.e3dc?.enabled && e3dcClient.isConnected()) {
+      try {
+        log("info", "system", `Batterie-Entladesperre: Verwende E3DC-Integration`);
+        await e3dcClient.lockDischarge();
+        return; // Erfolgreich, kein Fallback nötig
+      } catch (error) {
+        log("error", "system", `E3DC-Fehler beim Sperren der Entladung, verwende Webhook-Fallback`, error instanceof Error ? error.message : String(error));
+      }
+    }
+    
+    // Webhook-Fallback (entweder weil E3DC deaktiviert/nicht verbunden oder E3DC-Fehler aufgetreten)
+    if (settings?.batteryLockOnUrl) {
+      log("info", "system", `Batterie-Entladesperre: Verwende Webhook`);
+      await callSmartHomeUrl(settings.batteryLockOnUrl);
+    }
+  };
+
+  const unlockBatteryDischarge = async (settings: any) => {
+    if (settings?.e3dc?.enabled && e3dcClient.isConnected()) {
+      try {
+        log("info", "system", `Batterie-Entladesperre aufheben: Verwende E3DC-Integration`);
+        await e3dcClient.unlockDischarge();
+        return; // Erfolgreich, kein Fallback nötig
+      } catch (error) {
+        log("error", "system", `E3DC-Fehler beim Freigeben der Entladung, verwende Webhook-Fallback`, error instanceof Error ? error.message : String(error));
+      }
+    }
+    
+    // Webhook-Fallback (entweder weil E3DC deaktiviert/nicht verbunden oder E3DC-Fehler aufgetreten)
+    if (settings?.batteryLockOffUrl) {
+      log("info", "system", `Batterie-Entladesperre aufheben: Verwende Webhook`);
+      await callSmartHomeUrl(settings.batteryLockOffUrl);
+    }
   };
 
   // Scheduler für automatische Nachtladung
@@ -648,10 +719,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
           
           // Deaktiviere Batterie-Entladesperre beim Deaktivieren des Schedulers (immer)
-          if (settings?.batteryLockOffUrl) {
-            log("info", "system", `Nachtladung: Deaktiviere Batterie-Entladesperre (Scheduler deaktiviert)`);
-            await callSmartHomeUrl(settings.batteryLockOffUrl);
-          }
+          log("info", "system", `Nachtladung: Deaktiviere Batterie-Entladesperre (Scheduler deaktiviert)`);
+          await unlockBatteryDischarge(settings);
           
           storage.saveControlState({ ...currentState, nightCharging: false, batteryLock: false });
         }
@@ -664,10 +733,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         log("info", "system", `Nachtladung: Zeitfenster erreicht (${schedule.startTime}-${schedule.endTime}) - starte Laden`);
         
         // Aktiviere Batterie-Entladesperre beim Start der Nachtladung (ZUERST!)
-        if (settings?.batteryLockOnUrl) {
-          log("info", "system", `Nachtladung: Aktiviere Batterie-Entladesperre`);
-          await callSmartHomeUrl(settings.batteryLockOnUrl);
-        }
+        log("info", "system", `Nachtladung: Aktiviere Batterie-Entladesperre`);
+        await lockBatteryDischarge(settings);
         
         // Dann starte die Wallbox (kann fehlschlagen, aber Batterie-Sperre ist bereits aktiv)
         if (settings?.wallboxIp) {
@@ -692,10 +759,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
         
         // Deaktiviere Batterie-Entladesperre beim Ende der Nachtladung (immer)
-        if (settings?.batteryLockOffUrl) {
-          log("info", "system", `Nachtladung: Deaktiviere Batterie-Entladesperre`);
-          await callSmartHomeUrl(settings.batteryLockOffUrl);
-        }
+        log("info", "system", `Nachtladung: Deaktiviere Batterie-Entladesperre`);
+        await unlockBatteryDischarge(settings);
         
         storage.saveControlState({ ...currentState, nightCharging: false, batteryLock: false });
       }

@@ -24,6 +24,16 @@ export const nightChargingScheduleSchema = z.object({
 
 export type NightChargingSchedule = z.infer<typeof nightChargingScheduleSchema>;
 
+export const e3dcConfigSchema = z.object({
+  enabled: z.boolean(),
+  ipAddress: z.string().optional(),
+  rscpPassword: z.string().optional(),
+  portalUsername: z.string().optional(),
+  portalPassword: z.string().optional(),
+});
+
+export type E3dcConfig = z.infer<typeof e3dcConfigSchema>;
+
 export const settingsSchema = z.object({
   wallboxIp: z.string(),
   pvSurplusOnUrl: z.string().optional(),
@@ -32,6 +42,7 @@ export const settingsSchema = z.object({
   batteryLockOffUrl: z.string().optional(),
   nightChargingSchedule: nightChargingScheduleSchema.optional(),
   timezone: z.string().optional(),
+  e3dc: e3dcConfigSchema.optional(),
 });
 
 export type Settings = z.infer<typeof settingsSchema>;
@@ -63,3 +74,13 @@ export const logSettingsSchema = z.object({
 });
 
 export type LogSettings = z.infer<typeof logSettingsSchema>;
+
+export const e3dcBatteryStatusSchema = z.object({
+  soc: z.number(),
+  power: z.number(),
+  maxChargePower: z.number(),
+  maxDischargePower: z.number(),
+  dischargeLocked: z.boolean(),
+});
+
+export type E3dcBatteryStatus = z.infer<typeof e3dcBatteryStatusSchema>;

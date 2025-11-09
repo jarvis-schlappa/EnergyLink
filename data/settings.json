@@ -9,5 +9,12 @@
     "startTime": "14:10",
     "endTime": "05:00"
   },
-  "timezone": "Europe/Berlin"
+  "timezone": "Europe/Berlin",
+  "e3dc": {
+    "enabled": true,
+    "ipAddress": "192.168.1.50",
+    "rscpPassword": "test-rscp-pass",
+    "portalUsername": "test@example.com",
+    "portalPassword": "test-portal-pass"
+  }
 }
