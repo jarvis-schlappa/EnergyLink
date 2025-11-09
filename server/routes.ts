@@ -500,9 +500,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       if (state.nightCharging !== previousState.nightCharging) {
         log("info", "system", `Nachtladung ${state.nightCharging ? "aktiviert" : "deaktiviert"}`);
-        await callSmartHomeUrl(
-          state.nightCharging ? settings?.nightChargingOnUrl : settings?.nightChargingOffUrl
-        );
       }
 
       if (state.batteryLock !== previousState.batteryLock) {
@@ -525,7 +522,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const currentState = storage.getControlState();
       
       // Prüfe ob URLs konfiguriert sind
-      if (!settings?.pvSurplusOnUrl && !settings?.nightChargingOnUrl && !settings?.batteryLockOnUrl) {
+      if (!settings?.pvSurplusOnUrl && !settings?.batteryLockOnUrl) {
         log("warning", "system", "Keine SmartHome-URLs konfiguriert - Status-Synchronisation übersprungen");
         return res.json(currentState);
       }
@@ -534,9 +531,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const pvDeviceName = extractDeviceNameFromUrl(settings?.pvSurplusOnUrl);
       const pvBaseUrl = extractBaseUrlFromUrl(settings?.pvSurplusOnUrl);
       
-      const nightDeviceName = extractDeviceNameFromUrl(settings?.nightChargingOnUrl);
-      const nightBaseUrl = extractBaseUrlFromUrl(settings?.nightChargingOnUrl);
-      
       const batteryDeviceName = extractDeviceNameFromUrl(settings?.batteryLockOnUrl);
       const batteryBaseUrl = extractBaseUrlFromUrl(settings?.batteryLockOnUrl);
       
@@ -544,17 +538,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (settings?.pvSurplusOnUrl && (!pvDeviceName || !pvBaseUrl)) {
         log("warning", "system", "PV-Überschuss URL konnte nicht geparst werden", `URL: ${settings.pvSurplusOnUrl}`);
       }
-      if (settings?.nightChargingOnUrl && (!nightDeviceName || !nightBaseUrl)) {
-        log("warning", "system", "Nachtladung URL konnte nicht geparst werden", `URL: ${settings.nightChargingOnUrl}`);
-      }
       if (settings?.batteryLockOnUrl && (!batteryDeviceName || !batteryBaseUrl)) {
         log("warning", "system", "Batteriesperrung URL konnte nicht geparst werden", `URL: ${settings.batteryLockOnUrl}`);
       }
       
       // Frage externe Status ab (parallel für bessere Performance)
-      const [pvState, nightState, batteryState] = await Promise.all([
+      const [pvState, batteryState] = await Promise.all([
         pvDeviceName && pvBaseUrl ? getFhemDeviceState(pvBaseUrl, pvDeviceName) : Promise.resolve(null),
-        nightDeviceName && nightBaseUrl ? getFhemDeviceState(nightBaseUrl, nightDeviceName) : Promise.resolve(null),
         batteryDeviceName && batteryBaseUrl ? getFhemDeviceState(batteryBaseUrl, batteryDeviceName) : Promise.resolve(null),
       ]);
       
@@ -566,12 +556,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         newState.pvSurplus = pvState;
         hasChanges = true;
         log("info", "system", `PV-Überschussladung extern geändert auf ${pvState ? "ein" : "aus"}`);
-      }
-      
-      if (nightState !== null && nightState !== currentState.nightCharging) {
-        newState.nightCharging = nightState;
-        hasChanges = true;
-        log("info", "system", `Nachtladung extern geändert auf ${nightState ? "ein" : "aus"}`);
       }
       
       if (batteryState !== null && batteryState !== currentState.batteryLock) {

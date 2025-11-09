@@ -16,14 +16,21 @@ export const wallboxStatusSchema = z.object({
 
 export type WallboxStatus = z.infer<typeof wallboxStatusSchema>;
 
+export const nightChargingScheduleSchema = z.object({
+  enabled: z.boolean(),
+  startTime: z.string(),
+  endTime: z.string(),
+});
+
+export type NightChargingSchedule = z.infer<typeof nightChargingScheduleSchema>;
+
 export const settingsSchema = z.object({
   wallboxIp: z.string(),
   pvSurplusOnUrl: z.string().optional(),
   pvSurplusOffUrl: z.string().optional(),
-  nightChargingOnUrl: z.string().optional(),
-  nightChargingOffUrl: z.string().optional(),
   batteryLockOnUrl: z.string().optional(),
   batteryLockOffUrl: z.string().optional(),
+  nightChargingSchedule: nightChargingScheduleSchema.optional(),
 });
 
 export type Settings = z.infer<typeof settingsSchema>;

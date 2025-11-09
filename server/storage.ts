@@ -17,10 +17,13 @@ export class MemStorage implements IStorage {
     wallboxIp: "192.168.40.16",
     pvSurplusOnUrl: "http://192.168.40.11:8083/fhem?detail=autoWallboxPV&cmd.autoWallboxPV=set%20autoWallboxPV%20on",
     pvSurplusOffUrl: "http://192.168.40.11:8083/fhem?detail=autoWallboxPV&cmd.autoWallboxPV=set%20autoWallboxPV%20off",
-    nightChargingOnUrl: "http://192.168.40.11:8083/fhem?detail=steckdoseAutoNachtladung&cmd.steckdoseAutoNachtladung=set%20steckdoseAutoNachtladung%20on",
-    nightChargingOffUrl: "http://192.168.40.11:8083/fhem?detail=steckdoseAutoNachtladung&cmd.steckdoseAutoNachtladung=set%20steckdoseAutoNachtladung%20off",
     batteryLockOnUrl: "http://192.168.40.11:8083/fhem?detail=s10EntladenSperren&cmd.s10EntladenSperren=set%20s10EntladenSperren%20on",
     batteryLockOffUrl: "http://192.168.40.11:8083/fhem?detail=s10EntladenSperren&cmd.s10EntladenSperren=set%20s10EntladenSperren%20off",
+    nightChargingSchedule: {
+      enabled: false,
+      startTime: "00:00",
+      endTime: "05:00",
+    },
   };
   private controlState: ControlState = {
     pvSurplus: false,
