@@ -49,6 +49,9 @@ class E3dcClient {
       const liveDataService = new DefaultLiveDataService(connection);
       const powerState = await liveDataService.readPowerState();
 
+      // Debug-Logging
+      console.log('[E3DC] PowerState Raw Data:', JSON.stringify(powerState, null, 2));
+
       return {
         soc: powerState.batteryChargingLevel,
         power: powerState.batteryDelivery,
