@@ -1,4 +1,6 @@
 import type { Settings, ControlState, LogEntry, LogSettings, LogLevel } from "@shared/schema";
+import { readFileSync, writeFileSync, existsSync, mkdirSync } from "fs";
+import { join } from "path";
 
 export interface IStorage {
   getSettings(): Settings | null;
@@ -13,18 +15,8 @@ export interface IStorage {
 }
 
 export class MemStorage implements IStorage {
-  private settings: Settings | null = {
-    wallboxIp: "192.168.40.16",
-    pvSurplusOnUrl: "http://192.168.40.11:8083/fhem?detail=autoWallboxPV&cmd.autoWallboxPV=set%20autoWallboxPV%20on",
-    pvSurplusOffUrl: "http://192.168.40.11:8083/fhem?detail=autoWallboxPV&cmd.autoWallboxPV=set%20autoWallboxPV%20off",
-    batteryLockOnUrl: "http://192.168.40.11:8083/fhem?detail=s10EntladenSperren&cmd.s10EntladenSperren=set%20s10EntladenSperren%20on",
-    batteryLockOffUrl: "http://192.168.40.11:8083/fhem?detail=s10EntladenSperren&cmd.s10EntladenSperren=set%20s10EntladenSperren%20off",
-    nightChargingSchedule: {
-      enabled: false,
-      startTime: "00:00",
-      endTime: "05:00",
-    },
-  };
+  private settingsFilePath = join(process.cwd(), "data", "settings.json");
+  private settings: Settings | null = null;
   private controlState: ControlState = {
     pvSurplus: false,
     nightCharging: false,
@@ -36,7 +28,56 @@ export class MemStorage implements IStorage {
   };
   private maxLogs = 1000;
 
-  constructor() {}
+  constructor() {
+    // Erstelle data-Verzeichnis falls nicht vorhanden
+    const dataDir = join(process.cwd(), "data");
+    if (!existsSync(dataDir)) {
+      mkdirSync(dataDir, { recursive: true });
+    }
+
+    // Lade Settings aus Datei oder verwende Defaults
+    this.settings = this.loadSettingsFromFile();
+  }
+
+  private loadSettingsFromFile(): Settings {
+    if (existsSync(this.settingsFilePath)) {
+      try {
+        const data = readFileSync(this.settingsFilePath, "utf-8");
+        const loaded = JSON.parse(data);
+        console.log("[Storage] Einstellungen geladen aus:", this.settingsFilePath);
+        return loaded;
+      } catch (error) {
+        console.error("[Storage] Fehler beim Laden der Einstellungen:", error);
+      }
+    }
+
+    // Default-Einstellungen
+    const defaults: Settings = {
+      wallboxIp: "192.168.40.16",
+      pvSurplusOnUrl: "http://192.168.40.11:8083/fhem?detail=autoWallboxPV&cmd.autoWallboxPV=set%20autoWallboxPV%20on",
+      pvSurplusOffUrl: "http://192.168.40.11:8083/fhem?detail=autoWallboxPV&cmd.autoWallboxPV=set%20autoWallboxPV%20off",
+      batteryLockOnUrl: "http://192.168.40.11:8083/fhem?detail=s10EntladenSperren&cmd.s10EntladenSperren=set%20s10EntladenSperren%20on",
+      batteryLockOffUrl: "http://192.168.40.11:8083/fhem?detail=s10EntladenSperren&cmd.s10EntladenSperren=set%20s10EntladenSperren%20off",
+      nightChargingSchedule: {
+        enabled: false,
+        startTime: "00:00",
+        endTime: "05:00",
+      },
+    };
+    
+    // Speichere Defaults in Datei
+    this.saveSettingsToFile(defaults);
+    return defaults;
+  }
+
+  private saveSettingsToFile(settings: Settings): void {
+    try {
+      writeFileSync(this.settingsFilePath, JSON.stringify(settings, null, 2), "utf-8");
+      console.log("[Storage] Einstellungen gespeichert in:", this.settingsFilePath);
+    } catch (error) {
+      console.error("[Storage] Fehler beim Speichern der Einstellungen:", error);
+    }
+  }
 
   getSettings(): Settings | null {
     return this.settings;
@@ -44,6 +85,7 @@ export class MemStorage implements IStorage {
 
   saveSettings(settings: Settings): void {
     this.settings = settings;
+    this.saveSettingsToFile(settings);
   }
 
   getControlState(): ControlState {
