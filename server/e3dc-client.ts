@@ -47,17 +47,14 @@ class E3dcClient {
     
     try {
       const liveDataService = new DefaultLiveDataService(connection);
-      const chargingService = new DefaultChargingService(connection);
-
       const powerState = await liveDataService.readPowerState();
-      const chargingConfig = await chargingService.readConfiguration();
 
       return {
         soc: powerState.batteryChargingLevel,
         power: powerState.batteryDelivery,
-        maxChargePower: chargingConfig.currentLimitations.maxCurrentChargingPower,
-        maxDischargePower: chargingConfig.currentLimitations.maxCurrentDischargingPower,
-        dischargeLocked: chargingConfig.currentLimitations.maxCurrentDischargingPower === 0,
+        maxChargePower: 0, // Wird später über Charging-Limits ermittelt
+        maxDischargePower: 0, // Wird später über Charging-Limits ermittelt
+        dischargeLocked: false, // Wird über lockDischarge/unlockDischarge gesteuert
       };
     } finally {
       await connection.disconnect();
