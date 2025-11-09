@@ -34,6 +34,8 @@ class E3dcClient {
       portalUser: this.config.portalUsername!,
       portalPassword: this.config.portalPassword!,
       rscpPassword: this.config.rscpPassword!,
+      connectionTimeoutMillis: 10000,
+      readTimeoutMillis: 30000,
     };
 
     const aesFactory = new RijndaelJsAESCipherFactory(this.config.rscpPassword!);
