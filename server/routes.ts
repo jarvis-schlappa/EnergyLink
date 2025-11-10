@@ -516,6 +516,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       if (state.nightCharging !== previousState.nightCharging) {
         log("info", "system", `Nachtladung ${state.nightCharging ? "aktiviert" : "deaktiviert"}`);
+        if (state.nightCharging) {
+          // Starte Wallbox
+          if (settings?.wallboxIp) {
+            try {
+              await sendUdpCommand(settings.wallboxIp, "ena 1");
+              log("info", "wallbox", "Wallbox gestartet (manuelle Nachtladung)");
+            } catch (error) {
+              log("error", "wallbox", "Fehler beim Starten der Wallbox (manuelle Nachtladung)", error instanceof Error ? error.message : String(error));
+            }
+          }
+        } else {
+          // Stoppe Wallbox
+          if (settings?.wallboxIp) {
+            try {
+              await sendUdpCommand(settings.wallboxIp, "ena 0");
+              log("info", "wallbox", "Wallbox gestoppt (manuelle Nachtladung)");
+            } catch (error) {
+              log("error", "wallbox", "Fehler beim Stoppen der Wallbox (manuelle Nachtladung)", error instanceof Error ? error.message : String(error));
+            }
+          }
+        }
       }
 
       if (state.batteryLock !== previousState.batteryLock) {
@@ -524,6 +545,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
           await lockBatteryDischarge(settings);
         } else {
           await unlockBatteryDischarge(settings);
+        }
+      }
+
+      if (state.gridCharging !== previousState.gridCharging) {
+        log("info", "system", `Netzstrom-Laden ${state.gridCharging ? "aktiviert" : "deaktiviert"}`);
+        if (state.gridCharging) {
+          await enableGridCharging(settings);
+        } else {
+          await disableGridCharging(settings);
         }
       }
 
@@ -678,6 +708,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if (settings?.batteryLockOffUrl) {
       log("info", "system", `Batterie-Entladesperre aufheben: Verwende Webhook`);
       await callSmartHomeUrl(settings.batteryLockOffUrl);
+    }
+  };
+
+  // Hilfsfunktion für Netzstrom-Laden (E3DC)
+  const enableGridCharging = async (settings: any) => {
+    if (settings?.e3dc?.enabled && e3dcClient.isConfigured()) {
+      try {
+        log("info", "system", `Netzstrom-Laden: Verwende E3DC-Integration`);
+        await e3dcClient.enableGridCharge();
+        return;
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : JSON.stringify(error);
+        log("error", "system", `E3DC-Fehler beim Aktivieren des Netzstrom-Ladens`, errorMessage);
+      }
+    } else {
+      log("warning", "system", `Netzstrom-Laden: E3DC nicht konfiguriert`);
+    }
+  };
+
+  const disableGridCharging = async (settings: any) => {
+    if (settings?.e3dc?.enabled && e3dcClient.isConfigured()) {
+      try {
+        log("info", "system", `Netzstrom-Laden deaktivieren: Verwende E3DC-Integration`);
+        await e3dcClient.disableGridCharge();
+        return;
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : JSON.stringify(error);
+        log("error", "system", `E3DC-Fehler beim Deaktivieren des Netzstrom-Ladens`, errorMessage);
+      }
+    } else {
+      log("warning", "system", `Netzstrom-Laden deaktivieren: E3DC nicht konfiguriert`);
     }
   };
 
