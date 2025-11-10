@@ -6,15 +6,15 @@
   "batteryLockOffUrl": "http://192.168.40.11:8083/fhem?detail=s10EntladenSperren&cmd.s10EntladenSperren=set%20s10EntladenSperren%20off",
   "nightChargingSchedule": {
     "enabled": true,
-    "startTime": "14:10",
+    "startTime": "00:00",
     "endTime": "05:00"
   },
   "timezone": "Europe/Berlin",
   "e3dc": {
     "enabled": true,
-    "ipAddress": "192.168.1.50",
-    "rscpPassword": "test-rscp-pass",
-    "portalUsername": "test@example.com",
-    "portalPassword": "test-portal-pass"
+    "dischargeLockEnableCommand": "/opt/keba-wallbox/e3dcset -p /opt/keba-wallbox/e3dcset.config -d 1",
+    "dischargeLockDisableCommand": "/opt/keba-wallbox/e3dcset -p /opt/keba-wallbox/e3dcset.config -a",
+    "gridChargeEnableCommand": "/opt/keba-wallbox/e3dcset -p /opt/keba-wallbox/e3dcset.config -c 2500 -d 1 -e 6000",
+    "gridChargeDisableCommand": "",
+    "gridChargeDuringNightCharging": false
   }
-}
