@@ -624,21 +624,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // E3DC API-Endpunkte
-  app.get("/api/e3dc/battery", async (req, res) => {
-    try {
-      if (!e3dcClient.isConfigured()) {
-        return res.status(503).json({ error: "E3DC not configured" });
-      }
-
-      const batteryStatus = await e3dcClient.getBatteryStatus();
-      res.json(batteryStatus);
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : JSON.stringify(error);
-      log("error", "system", "Fehler beim Abrufen des E3DC-Batteriestatus", errorMessage);
-      res.status(500).json({ error: "Failed to get battery status", details: errorMessage });
-    }
-  });
 
   // Hilfsfunktion um aktuelle Zeit in der konfigurierten Zeitzone zu erhalten
   const getCurrentTimeInTimezone = (timezone: string = "Europe/Berlin"): string => {
@@ -728,6 +713,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
           log("info", "system", `Nachtladung: Deaktiviere Batterie-Entladesperre (Scheduler deaktiviert)`);
           await unlockBatteryDischarge(settings);
           
+          // Deaktiviere Netzstrom-Laden falls aktiviert
+          if (e3dcClient.isConfigured() && e3dcClient.isGridChargeDuringNightChargingEnabled()) {
+            try {
+              log("info", "system", `Nachtladung: Deaktiviere Netzstrom-Laden (Scheduler deaktiviert)`);
+              await e3dcClient.disableGridCharge();
+            } catch (error) {
+              log("error", "system", "Fehler beim Deaktivieren des Netzstrom-Ladens", error instanceof Error ? error.message : String(error));
+            }
+          }
+          
           storage.saveControlState({ ...currentState, nightCharging: false, batteryLock: false });
         }
         return;
@@ -741,6 +736,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Aktiviere Batterie-Entladesperre beim Start der Nachtladung (ZUERST!)
         log("info", "system", `Nachtladung: Aktiviere Batterie-Entladesperre`);
         await lockBatteryDischarge(settings);
+        
+        // Aktiviere Netzstrom-Laden falls konfiguriert
+        if (e3dcClient.isConfigured() && e3dcClient.isGridChargeDuringNightChargingEnabled()) {
+          try {
+            log("info", "system", `Nachtladung: Aktiviere Netzstrom-Laden`);
+            await e3dcClient.enableGridCharge();
+          } catch (error) {
+            log("error", "system", "Fehler beim Aktivieren des Netzstrom-Ladens", error instanceof Error ? error.message : String(error));
+          }
+        }
         
         // Dann starte die Wallbox (kann fehlschlagen, aber Batterie-Sperre ist bereits aktiv)
         if (settings?.wallboxIp) {
@@ -767,6 +772,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Deaktiviere Batterie-Entladesperre beim Ende der Nachtladung (immer)
         log("info", "system", `Nachtladung: Deaktiviere Batterie-Entladesperre`);
         await unlockBatteryDischarge(settings);
+        
+        // Deaktiviere Netzstrom-Laden falls aktiviert
+        if (e3dcClient.isConfigured() && e3dcClient.isGridChargeDuringNightChargingEnabled()) {
+          try {
+            log("info", "system", `Nachtladung: Deaktiviere Netzstrom-Laden`);
+            await e3dcClient.disableGridCharge();
+          } catch (error) {
+            log("error", "system", "Fehler beim Deaktivieren des Netzstrom-Ladens", error instanceof Error ? error.message : String(error));
+          }
+        }
         
         storage.saveControlState({ ...currentState, nightCharging: false, batteryLock: false });
       }

@@ -5,8 +5,6 @@ import { QueryClientProvider, useMutation } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import StatusPage from "@/pages/StatusPage";
-import E3dcPage from "@/pages/E3dcPage";
-import ControlsPage from "@/pages/ControlsPage";
 import SettingsPage from "@/pages/SettingsPage";
 import LogsPage from "@/pages/LogsPage";
 import BottomNav from "@/components/BottomNav";
@@ -16,8 +14,6 @@ function Router() {
   return (
     <Switch>
       <Route path="/" component={StatusPage} />
-      <Route path="/e3dc" component={E3dcPage} />
-      <Route path="/steuerung" component={ControlsPage} />
       <Route path="/logs" component={LogsPage} />
       <Route path="/einstellungen" component={SettingsPage} />
     </Switch>

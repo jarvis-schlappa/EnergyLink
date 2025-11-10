@@ -16,30 +16,34 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
+import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { settingsSchema } from "@shared/schema";
-import type { Settings } from "@shared/schema";
-import { z } from "zod";
+import { settingsSchema, controlStateSchema } from "@shared/schema";
+import type { Settings, ControlState } from "@shared/schema";
 
 export default function SettingsPage() {
   const { toast } = useToast();
 
-  const { data: settings, isLoading } = useQuery<Settings>({
+  const { data: settings, isLoading: isLoadingSettings } = useQuery<Settings>({
     queryKey: ["/api/settings"],
+  });
+
+  const { data: controlState, isLoading: isLoadingControls } = useQuery<ControlState>({
+    queryKey: ["/api/controls"],
   });
 
   const form = useForm<Settings>({
     resolver: zodResolver(settingsSchema),
     defaultValues: {
       wallboxIp: "192.168.40.16",
-      pvSurplusOnUrl: "http://192.168.40.11:8083/fhem?detail=autoWallboxPV&cmd.autoWallboxPV=set%20autoWallboxPV%20on",
-      pvSurplusOffUrl: "http://192.168.40.11:8083/fhem?detail=autoWallboxPV&cmd.autoWallboxPV=set%20autoWallboxPV%20off",
-      batteryLockOnUrl: "http://192.168.40.11:8083/fhem?detail=s10EntladenSperren&cmd.s10EntladenSperren=set%20s10EntladenSperren%20on",
-      batteryLockOffUrl: "http://192.168.40.11:8083/fhem?detail=s10EntladenSperren&cmd.s10EntladenSperren=set%20s10EntladenSperren%20off",
+      pvSurplusOnUrl: "",
+      pvSurplusOffUrl: "",
+      batteryLockOnUrl: "",
+      batteryLockOffUrl: "",
       nightChargingSchedule: {
         enabled: false,
         startTime: "00:00",
@@ -48,11 +52,21 @@ export default function SettingsPage() {
       timezone: "Europe/Berlin",
       e3dc: {
         enabled: false,
-        ipAddress: "",
-        rscpPassword: "",
-        portalUsername: "",
-        portalPassword: "",
+        dischargeLockEnableCommand: "",
+        dischargeLockDisableCommand: "",
+        gridChargeEnableCommand: "",
+        gridChargeDisableCommand: "",
+        gridChargeDuringNightCharging: false,
       },
+    },
+  });
+
+  const controlForm = useForm<ControlState>({
+    resolver: zodResolver(controlStateSchema),
+    defaultValues: {
+      pvSurplus: false,
+      nightCharging: false,
+      batteryLock: false,
     },
   });
 
@@ -61,6 +75,12 @@ export default function SettingsPage() {
       form.reset(settings);
     }
   }, [settings, form]);
+
+  useEffect(() => {
+    if (controlState) {
+      controlForm.reset(controlState);
+    }
+  }, [controlState, controlForm]);
 
   const saveSettingsMutation = useMutation({
     mutationFn: (data: Settings) =>
@@ -81,8 +101,37 @@ export default function SettingsPage() {
     },
   });
 
+  const updateControlsMutation = useMutation({
+    mutationFn: (newState: ControlState) =>
+      apiRequest("POST", "/api/controls", newState),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/controls"] });
+      toast({
+        title: "Steuerung aktualisiert",
+        description: "Die SmartHome-Funktion wurde erfolgreich geändert.",
+      });
+    },
+    onError: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/controls"] });
+      toast({
+        title: "Fehler",
+        description: "Die Steuerung konnte nicht aktualisiert werden.",
+        variant: "destructive",
+      });
+    },
+  });
+
   const handleSave = (data: Settings) => {
     saveSettingsMutation.mutate(data);
+  };
+
+  const handleControlChange = (field: keyof ControlState, value: boolean) => {
+    const currentState = controlForm.getValues();
+    controlForm.setValue(field, value);
+    updateControlsMutation.mutate({
+      ...currentState,
+      [field]: value,
+    });
   };
 
   return (
@@ -92,301 +141,380 @@ export default function SettingsPage() {
           <div>
             <h1 className="text-2xl font-bold mb-2">Einstellungen</h1>
             <p className="text-sm text-muted-foreground">
-              Wallbox-IP und SmartHome-URLs konfigurieren
+              Wallbox-Konfiguration und SmartHome-Steuerung
             </p>
           </div>
 
-          <form onSubmit={form.handleSubmit(handleSave)} className="space-y-6">
-            <div className="space-y-2">
-              <Label htmlFor="wallbox-ip" className="text-sm font-medium">
-                Wallbox IP-Adresse
-              </Label>
-              <Input
-                id="wallbox-ip"
-                type="text"
-                placeholder="192.168.40.16"
-                {...form.register("wallboxIp")}
-                className="h-12"
-                data-testid="input-wallbox-ip"
-              />
-              <p className="text-xs text-muted-foreground">
-                IP-Adresse Ihrer KEBA Wallbox im lokalen Netzwerk
-              </p>
+          <div className="space-y-6">
+            <div className="space-y-4">
+              <h2 className="text-lg font-semibold">SmartHome-Steuerung</h2>
+              
+              <div className="flex items-center justify-between p-4 border rounded-lg">
+                <div className="space-y-0.5">
+                  <Label htmlFor="pv-surplus-control" className="text-sm font-medium">
+                    PV Überschussladung
+                  </Label>
+                  <p className="text-xs text-muted-foreground">
+                    Automatisches Laden bei Solarstrom-Überschuss
+                  </p>
+                </div>
+                <Switch
+                  id="pv-surplus-control"
+                  checked={controlForm.watch("pvSurplus")}
+                  onCheckedChange={(checked) => handleControlChange("pvSurplus", checked)}
+                  disabled={isLoadingControls || updateControlsMutation.isPending}
+                  data-testid="switch-pv-surplus"
+                />
+              </div>
+
+              <div className="flex items-center justify-between p-4 border rounded-lg">
+                <div className="space-y-0.5">
+                  <Label htmlFor="battery-lock-control" className="text-sm font-medium">
+                    Batterie entladen sperren
+                  </Label>
+                  <p className="text-xs text-muted-foreground">
+                    Verhindert Entladung der Hausbatterie
+                  </p>
+                </div>
+                <Switch
+                  id="battery-lock-control"
+                  checked={controlForm.watch("batteryLock")}
+                  onCheckedChange={(checked) => handleControlChange("batteryLock", checked)}
+                  disabled={isLoadingControls || updateControlsMutation.isPending}
+                  data-testid="switch-battery-lock"
+                />
+              </div>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="timezone" className="text-sm font-medium">
-                Zeitzone
-              </Label>
-              <Select
-                value={form.watch("timezone") || "Europe/Berlin"}
-                onValueChange={(value) => form.setValue("timezone", value)}
+            <Separator />
+
+            <form onSubmit={form.handleSubmit(handleSave)} className="space-y-6">
+              <h2 className="text-lg font-semibold">Wallbox-Konfiguration</h2>
+
+              <div className="space-y-2">
+                <Label htmlFor="wallbox-ip" className="text-sm font-medium">
+                  Wallbox IP-Adresse
+                </Label>
+                <Input
+                  id="wallbox-ip"
+                  type="text"
+                  placeholder="192.168.40.16"
+                  {...form.register("wallboxIp")}
+                  className="h-12"
+                  data-testid="input-wallbox-ip"
+                />
+                <p className="text-xs text-muted-foreground">
+                  IP-Adresse Ihrer KEBA Wallbox im lokalen Netzwerk
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="timezone" className="text-sm font-medium">
+                  Zeitzone
+                </Label>
+                <Select
+                  value={form.watch("timezone") || "Europe/Berlin"}
+                  onValueChange={(value) => form.setValue("timezone", value)}
+                >
+                  <SelectTrigger className="h-12" data-testid="select-timezone">
+                    <SelectValue placeholder="Zeitzone auswählen" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Europe/Berlin">Europa/Berlin (MEZ/MESZ)</SelectItem>
+                    <SelectItem value="Europe/Vienna">Europa/Wien (MEZ/MESZ)</SelectItem>
+                    <SelectItem value="Europe/Zurich">Europa/Zürich (MEZ/MESZ)</SelectItem>
+                    <SelectItem value="Europe/London">Europa/London (GMT/BST)</SelectItem>
+                    <SelectItem value="Europe/Paris">Europa/Paris (MEZ/MESZ)</SelectItem>
+                    <SelectItem value="UTC">UTC (Koordinierte Weltzeit)</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  Zeitzone für die Nachtladungs-Zeitsteuerung
+                </p>
+              </div>
+
+              <Separator />
+
+              <Accordion type="single" collapsible className="w-full">
+                <AccordionItem value="e3dc">
+                  <AccordionTrigger className="text-base font-medium">
+                    E3DC Integration (CLI)
+                  </AccordionTrigger>
+                  <AccordionContent>
+                    <div className="space-y-4 pt-2">
+                      <div className="flex items-center justify-between">
+                        <div className="space-y-0.5">
+                          <Label htmlFor="e3dc-enabled" className="text-sm font-medium">
+                            E3DC-Integration aktivieren
+                          </Label>
+                          <p className="text-xs text-muted-foreground">
+                            Steuerung über e3dcset CLI-Tool
+                          </p>
+                        </div>
+                        <Switch
+                          id="e3dc-enabled"
+                          checked={form.watch("e3dc.enabled")}
+                          onCheckedChange={(checked) => 
+                            form.setValue("e3dc.enabled", checked)
+                          }
+                          data-testid="switch-e3dc-enabled"
+                        />
+                      </div>
+                      
+                      {form.watch("e3dc.enabled") && (
+                        <>
+                          <div className="p-3 rounded-md bg-muted">
+                            <p className="text-xs text-muted-foreground">
+                              <strong>Hinweis:</strong> Geben Sie die vollständigen Befehlszeilen ein, 
+                              die zum Steuern des E3DC-Systems ausgeführt werden sollen. 
+                              Das e3dcset Tool muss im PATH verfügbar sein.
+                            </p>
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label htmlFor="e3dc-discharge-lock-enable" className="text-sm font-medium">
+                              Entladesperre aktivieren (Befehl)
+                            </Label>
+                            <Input
+                              id="e3dc-discharge-lock-enable"
+                              type="text"
+                              placeholder="e3dcset --lock-discharge"
+                              {...form.register("e3dc.dischargeLockEnableCommand")}
+                              className="h-12 font-mono text-sm"
+                              data-testid="input-e3dc-discharge-lock-enable"
+                            />
+                            <p className="text-xs text-muted-foreground">
+                              Befehl zum Aktivieren der Entladesperre
+                            </p>
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label htmlFor="e3dc-discharge-lock-disable" className="text-sm font-medium">
+                              Entladesperre deaktivieren (Befehl)
+                            </Label>
+                            <Input
+                              id="e3dc-discharge-lock-disable"
+                              type="text"
+                              placeholder="e3dcset --unlock-discharge"
+                              {...form.register("e3dc.dischargeLockDisableCommand")}
+                              className="h-12 font-mono text-sm"
+                              data-testid="input-e3dc-discharge-lock-disable"
+                            />
+                            <p className="text-xs text-muted-foreground">
+                              Befehl zum Deaktivieren der Entladesperre
+                            </p>
+                          </div>
+
+                          <Separator />
+
+                          <div className="space-y-4">
+                            <div className="flex items-center justify-between">
+                              <div className="space-y-0.5">
+                                <Label htmlFor="e3dc-grid-charge" className="text-sm font-medium">
+                                  Netzstrom-Laden während Nachtladung
+                                </Label>
+                                <p className="text-xs text-muted-foreground">
+                                  Ermöglicht Laden des Hausspeichers mit Netzstrom im Nachtladungsintervall
+                                </p>
+                              </div>
+                              <Switch
+                                id="e3dc-grid-charge"
+                                checked={form.watch("e3dc.gridChargeDuringNightCharging")}
+                                onCheckedChange={(checked) => 
+                                  form.setValue("e3dc.gridChargeDuringNightCharging", checked)
+                                }
+                                data-testid="switch-e3dc-grid-charge"
+                              />
+                            </div>
+
+                            <div className="space-y-2">
+                              <Label htmlFor="e3dc-grid-charge-enable" className="text-sm font-medium">
+                                Netzstrom-Laden aktivieren (Befehl)
+                              </Label>
+                              <Input
+                                id="e3dc-grid-charge-enable"
+                                type="text"
+                                placeholder="e3dcset --enable-grid-charge"
+                                {...form.register("e3dc.gridChargeEnableCommand")}
+                                className="h-12 font-mono text-sm"
+                                data-testid="input-e3dc-grid-charge-enable"
+                              />
+                              <p className="text-xs text-muted-foreground">
+                                Befehl zum Aktivieren des Netzstrom-Ladens
+                              </p>
+                            </div>
+
+                            <div className="space-y-2">
+                              <Label htmlFor="e3dc-grid-charge-disable" className="text-sm font-medium">
+                                Netzstrom-Laden deaktivieren (Befehl)
+                              </Label>
+                              <Input
+                                id="e3dc-grid-charge-disable"
+                                type="text"
+                                placeholder="e3dcset --disable-grid-charge"
+                                {...form.register("e3dc.gridChargeDisableCommand")}
+                                className="h-12 font-mono text-sm"
+                                data-testid="input-e3dc-grid-charge-disable"
+                              />
+                              <p className="text-xs text-muted-foreground">
+                                Befehl zum Deaktivieren des Netzstrom-Ladens
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="p-3 rounded-md bg-muted">
+                            <p className="text-xs text-muted-foreground">
+                              <strong>Hinweis:</strong> Bei aktivierter E3DC-Integration wird die 
+                              Batterie-Entladesperre direkt über das e3dcset CLI-Tool gesteuert. 
+                              Die konfigurierten Webhook-URLs dienen dann nur noch als Fallback.
+                            </p>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  </AccordionContent>
+                </AccordionItem>
+
+                <AccordionItem value="pv-surplus">
+                  <AccordionTrigger className="text-base font-medium">
+                    PV Überschussladung URLs
+                  </AccordionTrigger>
+                  <AccordionContent>
+                    <div className="space-y-4 pt-2">
+                      <div className="space-y-2">
+                        <Label htmlFor="pv-on" className="text-sm font-medium">
+                          URL zum Einschalten
+                        </Label>
+                        <Input
+                          id="pv-on"
+                          type="url"
+                          placeholder="https://smarthome.local/pv/on"
+                          {...form.register("pvSurplusOnUrl")}
+                          className="h-12"
+                          data-testid="input-pv-on"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="pv-off" className="text-sm font-medium">
+                          URL zum Ausschalten
+                        </Label>
+                        <Input
+                          id="pv-off"
+                          type="url"
+                          placeholder="https://smarthome.local/pv/off"
+                          {...form.register("pvSurplusOffUrl")}
+                          className="h-12"
+                          data-testid="input-pv-off"
+                        />
+                      </div>
+                    </div>
+                  </AccordionContent>
+                </AccordionItem>
+
+                <AccordionItem value="night-charging">
+                  <AccordionTrigger className="text-base font-medium">
+                    Nachtladung Zeitsteuerung
+                  </AccordionTrigger>
+                  <AccordionContent>
+                    <div className="space-y-4 pt-2">
+                      <div className="flex items-center justify-between">
+                        <div className="space-y-0.5">
+                          <Label htmlFor="night-enabled" className="text-sm font-medium">
+                            Automatische Nachtladung aktivieren
+                          </Label>
+                          <p className="text-xs text-muted-foreground">
+                            Lädt automatisch im konfigurierten Zeitfenster
+                          </p>
+                        </div>
+                        <Switch
+                          id="night-enabled"
+                          checked={form.watch("nightChargingSchedule.enabled")}
+                          onCheckedChange={(checked) => 
+                            form.setValue("nightChargingSchedule.enabled", checked)
+                          }
+                          data-testid="switch-night-enabled"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="night-start" className="text-sm font-medium">
+                          Startzeit
+                        </Label>
+                        <Input
+                          id="night-start"
+                          type="time"
+                          {...form.register("nightChargingSchedule.startTime")}
+                          className="h-12"
+                          data-testid="input-night-start"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="night-end" className="text-sm font-medium">
+                          Endzeit
+                        </Label>
+                        <Input
+                          id="night-end"
+                          type="time"
+                          {...form.register("nightChargingSchedule.endTime")}
+                          className="h-12"
+                          data-testid="input-night-end"
+                        />
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        Die Wallbox startet automatisch zur Startzeit und stoppt zur Endzeit.
+                        Zeitfenster können über Mitternacht gehen (z.B. 22:00 - 06:00).
+                      </p>
+                    </div>
+                  </AccordionContent>
+                </AccordionItem>
+
+                <AccordionItem value="battery-lock">
+                  <AccordionTrigger className="text-base font-medium">
+                    Batterie entladen sperren URLs
+                  </AccordionTrigger>
+                  <AccordionContent>
+                    <div className="space-y-4 pt-2">
+                      <div className="space-y-2">
+                        <Label htmlFor="battery-on" className="text-sm font-medium">
+                          URL zum Einschalten
+                        </Label>
+                        <Input
+                          id="battery-on"
+                          type="url"
+                          placeholder="https://smarthome.local/battery/lock"
+                          {...form.register("batteryLockOnUrl")}
+                          className="h-12"
+                          data-testid="input-battery-on"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="battery-off" className="text-sm font-medium">
+                          URL zum Ausschalten
+                        </Label>
+                        <Input
+                          id="battery-off"
+                          type="url"
+                          placeholder="https://smarthome.local/battery/unlock"
+                          {...form.register("batteryLockOffUrl")}
+                          className="h-12"
+                          data-testid="input-battery-off"
+                        />
+                      </div>
+                    </div>
+                  </AccordionContent>
+                </AccordionItem>
+              </Accordion>
+
+              <Button
+                type="submit"
+                size="lg"
+                className="w-full h-12 text-base font-medium"
+                data-testid="button-save-settings"
+                disabled={isLoadingSettings || saveSettingsMutation.isPending}
               >
-                <SelectTrigger className="h-12" data-testid="select-timezone">
-                  <SelectValue placeholder="Zeitzone auswählen" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Europe/Berlin">Europa/Berlin (MEZ/MESZ)</SelectItem>
-                  <SelectItem value="Europe/Vienna">Europa/Wien (MEZ/MESZ)</SelectItem>
-                  <SelectItem value="Europe/Zurich">Europa/Zürich (MEZ/MESZ)</SelectItem>
-                  <SelectItem value="Europe/London">Europa/London (GMT/BST)</SelectItem>
-                  <SelectItem value="Europe/Paris">Europa/Paris (MEZ/MESZ)</SelectItem>
-                  <SelectItem value="UTC">UTC (Koordinierte Weltzeit)</SelectItem>
-                </SelectContent>
-              </Select>
-              <p className="text-xs text-muted-foreground">
-                Zeitzone für die Nachtladungs-Zeitsteuerung
-              </p>
-            </div>
-
-            <Accordion type="single" collapsible className="w-full">
-              <AccordionItem value="e3dc">
-                <AccordionTrigger className="text-base font-medium">
-                  E3DC Integration (RSCP)
-                </AccordionTrigger>
-                <AccordionContent>
-                  <div className="space-y-4 pt-2">
-                    <div className="flex items-center justify-between">
-                      <div className="space-y-0.5">
-                        <Label htmlFor="e3dc-enabled" className="text-sm font-medium">
-                          E3DC-Integration aktivieren
-                        </Label>
-                        <p className="text-xs text-muted-foreground">
-                          Direkte Steuerung der Batterie-Entladesperre über RSCP
-                        </p>
-                      </div>
-                      <Switch
-                        id="e3dc-enabled"
-                        checked={form.watch("e3dc.enabled")}
-                        onCheckedChange={(checked) => 
-                          form.setValue("e3dc.enabled", checked)
-                        }
-                        data-testid="switch-e3dc-enabled"
-                      />
-                    </div>
-                    
-                    {form.watch("e3dc.enabled") && (
-                      <>
-                        <div className="space-y-2">
-                          <Label htmlFor="e3dc-ip" className="text-sm font-medium">
-                            E3DC IP-Adresse
-                          </Label>
-                          <Input
-                            id="e3dc-ip"
-                            type="text"
-                            placeholder="192.168.1.50"
-                            {...form.register("e3dc.ipAddress")}
-                            className="h-12"
-                            data-testid="input-e3dc-ip"
-                          />
-                          <p className="text-xs text-muted-foreground">
-                            IP-Adresse des E3DC-Systems im lokalen Netzwerk
-                          </p>
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label htmlFor="e3dc-rscp" className="text-sm font-medium">
-                            RSCP Passwort
-                          </Label>
-                          <Input
-                            id="e3dc-rscp"
-                            type="password"
-                            placeholder="RSCP-Passwort"
-                            {...form.register("e3dc.rscpPassword")}
-                            className="h-12"
-                            data-testid="input-e3dc-rscp"
-                          />
-                          <p className="text-xs text-muted-foreground">
-                            RSCP-Passwort aus dem E3DC-System (nicht Portal-Passwort)
-                          </p>
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label htmlFor="e3dc-portal-user" className="text-sm font-medium">
-                            Portal Benutzername
-                          </Label>
-                          <Input
-                            id="e3dc-portal-user"
-                            type="text"
-                            placeholder="username@example.com"
-                            {...form.register("e3dc.portalUsername")}
-                            className="h-12"
-                            data-testid="input-e3dc-portal-user"
-                          />
-                          <p className="text-xs text-muted-foreground">
-                            E3DC Portal Benutzername (E-Mail)
-                          </p>
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label htmlFor="e3dc-portal-pass" className="text-sm font-medium">
-                            Portal Passwort
-                          </Label>
-                          <Input
-                            id="e3dc-portal-pass"
-                            type="password"
-                            placeholder="Portal-Passwort"
-                            {...form.register("e3dc.portalPassword")}
-                            className="h-12"
-                            data-testid="input-e3dc-portal-pass"
-                          />
-                          <p className="text-xs text-muted-foreground">
-                            E3DC Portal Passwort
-                          </p>
-                        </div>
-
-                        <div className="p-3 rounded-md bg-muted">
-                          <p className="text-xs text-muted-foreground">
-                            <strong>Hinweis:</strong> Bei aktivierter E3DC-Integration wird die 
-                            Batterie-Entladesperre direkt über das E3DC-System gesteuert. 
-                            Die konfigurierten Webhook-URLs dienen dann nur noch als Fallback.
-                          </p>
-                        </div>
-                      </>
-                    )}
-                  </div>
-                </AccordionContent>
-              </AccordionItem>
-
-              <AccordionItem value="pv-surplus">
-                <AccordionTrigger className="text-base font-medium">
-                  PV Überschussladung URLs
-                </AccordionTrigger>
-                <AccordionContent>
-                  <div className="space-y-4 pt-2">
-                    <div className="space-y-2">
-                      <Label htmlFor="pv-on" className="text-sm font-medium">
-                        URL zum Einschalten
-                      </Label>
-                      <Input
-                        id="pv-on"
-                        type="url"
-                        placeholder="https://smarthome.local/pv/on"
-                        {...form.register("pvSurplusOnUrl")}
-                        className="h-12"
-                        data-testid="input-pv-on"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="pv-off" className="text-sm font-medium">
-                        URL zum Ausschalten
-                      </Label>
-                      <Input
-                        id="pv-off"
-                        type="url"
-                        placeholder="https://smarthome.local/pv/off"
-                        {...form.register("pvSurplusOffUrl")}
-                        className="h-12"
-                        data-testid="input-pv-off"
-                      />
-                    </div>
-                  </div>
-                </AccordionContent>
-              </AccordionItem>
-
-              <AccordionItem value="night-charging">
-                <AccordionTrigger className="text-base font-medium">
-                  Nachtladung Zeitsteuerung
-                </AccordionTrigger>
-                <AccordionContent>
-                  <div className="space-y-4 pt-2">
-                    <div className="flex items-center justify-between">
-                      <div className="space-y-0.5">
-                        <Label htmlFor="night-enabled" className="text-sm font-medium">
-                          Automatische Nachtladung aktivieren
-                        </Label>
-                        <p className="text-xs text-muted-foreground">
-                          Lädt automatisch im konfigurierten Zeitfenster
-                        </p>
-                      </div>
-                      <Switch
-                        id="night-enabled"
-                        checked={form.watch("nightChargingSchedule.enabled")}
-                        onCheckedChange={(checked) => 
-                          form.setValue("nightChargingSchedule.enabled", checked)
-                        }
-                        data-testid="switch-night-enabled"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="night-start" className="text-sm font-medium">
-                        Startzeit
-                      </Label>
-                      <Input
-                        id="night-start"
-                        type="time"
-                        {...form.register("nightChargingSchedule.startTime")}
-                        className="h-12"
-                        data-testid="input-night-start"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="night-end" className="text-sm font-medium">
-                        Endzeit
-                      </Label>
-                      <Input
-                        id="night-end"
-                        type="time"
-                        {...form.register("nightChargingSchedule.endTime")}
-                        className="h-12"
-                        data-testid="input-night-end"
-                      />
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      Die Wallbox startet automatisch zur Startzeit und stoppt zur Endzeit.
-                      Zeitfenster können über Mitternacht gehen (z.B. 22:00 - 06:00).
-                    </p>
-                  </div>
-                </AccordionContent>
-              </AccordionItem>
-
-              <AccordionItem value="battery-lock">
-                <AccordionTrigger className="text-base font-medium">
-                  Batterie entladen sperren URLs
-                </AccordionTrigger>
-                <AccordionContent>
-                  <div className="space-y-4 pt-2">
-                    <div className="space-y-2">
-                      <Label htmlFor="battery-on" className="text-sm font-medium">
-                        URL zum Einschalten
-                      </Label>
-                      <Input
-                        id="battery-on"
-                        type="url"
-                        placeholder="https://smarthome.local/battery/lock"
-                        {...form.register("batteryLockOnUrl")}
-                        className="h-12"
-                        data-testid="input-battery-on"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="battery-off" className="text-sm font-medium">
-                        URL zum Ausschalten
-                      </Label>
-                      <Input
-                        id="battery-off"
-                        type="url"
-                        placeholder="https://smarthome.local/battery/unlock"
-                        {...form.register("batteryLockOffUrl")}
-                        className="h-12"
-                        data-testid="input-battery-off"
-                      />
-                    </div>
-                  </div>
-                </AccordionContent>
-              </AccordionItem>
-            </Accordion>
-
-            <Button
-              type="submit"
-              size="lg"
-              className="w-full h-12 text-base font-medium"
-              data-testid="button-save-settings"
-              disabled={isLoading || saveSettingsMutation.isPending}
-            >
-              {saveSettingsMutation.isPending ? "Wird gespeichert..." : "Einstellungen speichern"}
-            </Button>
-          </form>
+                {saveSettingsMutation.isPending ? "Wird gespeichert..." : "Einstellungen speichern"}
+              </Button>
+            </form>
+          </div>
         </div>
       </div>
     </div>

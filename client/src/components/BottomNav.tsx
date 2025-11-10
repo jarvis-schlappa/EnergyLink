@@ -1,4 +1,4 @@
-import { Home, Sliders, Settings, FileText, Battery } from "lucide-react";
+import { Home, Settings, FileText } from "lucide-react";
 import { Link, useLocation } from "wouter";
 
 export default function BottomNav() {
@@ -6,8 +6,6 @@ export default function BottomNav() {
 
   const navItems = [
     { path: "/", icon: Home, label: "Status" },
-    { path: "/e3dc", icon: Battery, label: "E3DC" },
-    { path: "/steuerung", icon: Sliders, label: "Steuerung" },
     { path: "/logs", icon: FileText, label: "Logs" },
     { path: "/einstellungen", icon: Settings, label: "Einstellungen" },
   ];

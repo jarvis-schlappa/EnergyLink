@@ -26,10 +26,11 @@ export type NightChargingSchedule = z.infer<typeof nightChargingScheduleSchema>;
 
 export const e3dcConfigSchema = z.object({
   enabled: z.boolean(),
-  ipAddress: z.string().optional(),
-  rscpPassword: z.string().optional(),
-  portalUsername: z.string().optional(),
-  portalPassword: z.string().optional(),
+  dischargeLockEnableCommand: z.string().optional(),
+  dischargeLockDisableCommand: z.string().optional(),
+  gridChargeEnableCommand: z.string().optional(),
+  gridChargeDisableCommand: z.string().optional(),
+  gridChargeDuringNightCharging: z.boolean().optional(),
 });
 
 export type E3dcConfig = z.infer<typeof e3dcConfigSchema>;

@@ -1,20 +1,15 @@
-import {
-  DefaultHomePowerPlantConnection,
-  E3dcConnectionData,
-  RijndaelJsAESCipherFactory,
-  DefaultBatteryService,
-  DefaultChargingService,
-  DefaultLiveDataService,
-  ChargingLimits,
-} from 'easy-rscp';
-import type { E3dcConfig, E3dcBatteryStatus } from '@shared/schema';
+import { exec } from 'child_process';
+import { promisify } from 'util';
+import type { E3dcConfig } from '@shared/schema';
+
+const execAsync = promisify(exec);
 
 class E3dcClient {
   private config: E3dcConfig | null = null;
 
   configure(config: E3dcConfig): void {
-    if (!config.enabled || !config.ipAddress || !config.rscpPassword || !config.portalUsername || !config.portalPassword) {
-      throw new Error('E3DC configuration incomplete');
+    if (!config.enabled) {
+      throw new Error('E3DC not enabled');
     }
     this.config = config;
   }
@@ -23,112 +18,137 @@ class E3dcClient {
     this.config = null;
   }
 
-  private createConnection(): DefaultHomePowerPlantConnection {
-    if (!this.config) {
-      throw new Error('E3DC not configured');
-    }
+  private sanitizeOutput(value: string, command: string, extraSecrets: string[]): string {
+    let sanitized = value;
 
-    const connectionData: E3dcConnectionData = {
-      address: this.config.ipAddress!,
-      port: 5033,
-      portalUser: this.config.portalUsername!,
-      portalPassword: this.config.portalPassword!,
-      rscpPassword: this.config.rscpPassword!,
-      connectionTimeoutMillis: 10000,
-      readTimeoutMillis: 30000,
-    };
+    sanitized = sanitized.replace(new RegExp(command.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'), '[COMMAND REDACTED]');
 
-    const aesFactory = new RijndaelJsAESCipherFactory(this.config.rscpPassword!);
-    return new DefaultHomePowerPlantConnection(connectionData, aesFactory);
+    const sensitivePatterns = [
+      /--password[=\s]+\S+/gi,
+      /--pass[=\s]+\S+/gi,
+      /--token[=\s]+\S+/gi,
+      /--auth[=\s]+\S+/gi,
+      /--apikey[=\s]+\S+/gi,
+      /--api-key[=\s]+\S+/gi,
+      /--secret[=\s]+\S+/gi,
+      /-p[=\s]+\S+/gi,
+      /\b(password|pass|token|auth|apikey|api-key|secret|key)[=:]\S+/gi,
+    ];
+
+    sensitivePatterns.forEach(pattern => {
+      sanitized = sanitized.replace(pattern, '[REDACTED]');
+    });
+
+    extraSecrets.forEach(secret => {
+      if (secret && secret.trim() !== '') {
+        sanitized = sanitized.replace(new RegExp(secret.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'), '***');
+      }
+    });
+
+    return sanitized;
   }
 
-  async getBatteryStatus(): Promise<E3dcBatteryStatus> {
-    const connection = this.createConnection();
+  private getSensitiveValues(): string[] {
+    if (!this.config) return [];
     
+    const values: string[] = [];
+    
+    if (this.config.dischargeLockEnableCommand) {
+      values.push(this.config.dischargeLockEnableCommand);
+    }
+    if (this.config.dischargeLockDisableCommand) {
+      values.push(this.config.dischargeLockDisableCommand);
+    }
+    if (this.config.gridChargeEnableCommand) {
+      values.push(this.config.gridChargeEnableCommand);
+    }
+    if (this.config.gridChargeDisableCommand) {
+      values.push(this.config.gridChargeDisableCommand);
+    }
+    
+    return values;
+  }
+
+  private async executeCommand(command: string | undefined, commandName: string): Promise<void> {
+    if (!command || command.trim() === '') {
+      console.log(`[E3DC] ${commandName} - Kein Befehl konfiguriert, überspringe`);
+      return;
+    }
+
+    const isDevelopment = process.env.NODE_ENV !== 'production';
+    const sensitiveValues = this.getSensitiveValues();
+
     try {
-      console.log('[E3DC] Connecting to:', this.config?.ipAddress);
-      console.log('[E3DC] Portal User:', this.config?.portalUsername);
-      console.log('[E3DC] RSCP Password length:', this.config?.rscpPassword?.length);
-
-      const liveDataService = new DefaultLiveDataService(connection);
-      console.log('[E3DC] Calling readPowerState()...');
-      const powerState = await liveDataService.readPowerState();
-
-      console.log('[E3DC] PowerState received - FULL DUMP:');
-      console.log('[E3DC] All keys:', Object.keys(powerState));
-      console.log('[E3DC] batteryChargingLevel:', powerState.batteryChargingLevel);
-      console.log('[E3DC] batteryDelivery:', powerState.batteryDelivery);
-      console.log('[E3DC] Full object:', JSON.stringify(powerState, null, 2));
+      console.log(`[E3DC] Führe aus: ${commandName}`);
       
-      // Prüfe ob alle Werte 0 sind (deutet auf Auth-Problem hin)
-      const allZero = Object.values(powerState).every(v => typeof v === 'number' && v === 0);
-      if (allZero) {
-        console.warn('[E3DC] WARNING: All values are 0 - possible authentication issue!');
-        console.warn('[E3DC] This library does NOT validate credentials properly!');
+      const { stdout, stderr } = await execAsync(command);
+      
+      if (isDevelopment) {
+        if (stdout) {
+          const sanitized = this.sanitizeOutput(stdout, command, sensitiveValues);
+          console.log(`[E3DC] ${commandName} - Ausgabe [sanitized preview ${stdout.length} chars]:`, sanitized.slice(0, 200));
+        }
+        if (stderr) {
+          const sanitized = this.sanitizeOutput(stderr, command, sensitiveValues);
+          console.error(`[E3DC] ${commandName} - Fehler-Ausgabe [sanitized preview ${stderr.length} chars]:`, sanitized.slice(0, 200));
+        }
+      } else {
+        if (stdout) {
+          console.log(`[E3DC] ${commandName} - Ausgabe erhalten (${stdout.length} Zeichen)`);
+        }
+        if (stderr) {
+          console.error(`[E3DC] ${commandName} - Fehler-Ausgabe erhalten (${stderr.length} Zeichen)`);
+        }
       }
       
-      return {
-        soc: powerState.batteryChargingLevel,
-        power: powerState.batteryDelivery,
-        maxChargePower: 0,
-        maxDischargePower: 0,
-        dischargeLocked: false,
-      };
+      console.log(`[E3DC] ${commandName} erfolgreich ausgeführt`);
     } catch (error) {
-      console.error('[E3DC] Error in getBatteryStatus:', error);
-      throw error;
-    } finally {
-      console.log('[E3DC] Disconnecting...');
-      await connection.disconnect();
-      console.log('[E3DC] Disconnected');
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      const sanitizedError = this.sanitizeOutput(errorMessage, command, sensitiveValues);
+      
+      if (isDevelopment) {
+        console.error(`[E3DC] ${commandName} fehlgeschlagen:`, sanitizedError.slice(0, 200));
+      } else {
+        console.error(`[E3DC] Befehlsausführung fehlgeschlagen für: ${commandName}`);
+      }
+      throw new Error(`Failed to execute ${commandName}`);
     }
   }
 
   async lockDischarge(): Promise<void> {
-    const connection = this.createConnection();
-    
-    try {
-      const chargingService = new DefaultChargingService(connection);
-
-      // Setze nur Entladeleistung auf 0, ohne vorher readConfiguration() zu rufen
-      const newLimits: ChargingLimits = {
-        maxCurrentChargingPower: 4600, // Typischer Wert für E3DC S10
-        maxCurrentDischargingPower: 0, // Entladung sperren
-        dischargeStartPower: 65, // Typischer Wert
-        chargingLimitationsEnabled: true,
-      };
-
-      await chargingService.writeLimits(newLimits);
-    } finally {
-      await connection.disconnect();
+    if (!this.config) {
+      throw new Error('E3DC not configured');
     }
+    await this.executeCommand(this.config.dischargeLockEnableCommand, 'Entladesperre aktivieren');
   }
 
-  async unlockDischarge(maxDischargePower: number = 5000): Promise<void> {
-    const connection = this.createConnection();
-    
-    try {
-      const chargingService = new DefaultChargingService(connection);
-      
-      // Hole aktuelle Konfiguration
-      const currentConfig = await chargingService.readConfiguration();
-
-      // Entferne Entladesperre
-      const newLimits: ChargingLimits = {
-        maxCurrentChargingPower: currentConfig.currentLimitations.maxCurrentChargingPower,
-        maxCurrentDischargingPower: maxDischargePower,
-        dischargeStartPower: currentConfig.currentLimitations.dischargeStartPower,
-        chargingLimitationsEnabled: true,
-      };
-
-      await chargingService.writeLimits(newLimits);
-    } finally {
-      await connection.disconnect();
+  async unlockDischarge(): Promise<void> {
+    if (!this.config) {
+      throw new Error('E3DC not configured');
     }
+    await this.executeCommand(this.config.dischargeLockDisableCommand, 'Entladesperre deaktivieren');
+  }
+
+  async enableGridCharge(): Promise<void> {
+    if (!this.config) {
+      throw new Error('E3DC not configured');
+    }
+    await this.executeCommand(this.config.gridChargeEnableCommand, 'Netzstrom-Laden aktivieren');
+  }
+
+  async disableGridCharge(): Promise<void> {
+    if (!this.config) {
+      throw new Error('E3DC not configured');
+    }
+    await this.executeCommand(this.config.gridChargeDisableCommand, 'Netzstrom-Laden deaktivieren');
   }
 
   isConfigured(): boolean {
     return this.config !== null && this.config.enabled === true;
+  }
+
+  isGridChargeDuringNightChargingEnabled(): boolean {
+    return this.config?.gridChargeDuringNightCharging === true;
   }
 }
 
