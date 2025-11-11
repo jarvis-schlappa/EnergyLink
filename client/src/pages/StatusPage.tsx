@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from "react";
-import { Battery, Plug, Zap, AlertCircle, Gauge, Sun, Moon, ShieldOff, PlugZap } from "lucide-react";
+import { Battery, Plug, Zap, AlertCircle, Gauge, Sun, Moon, ShieldOff, PlugZap, Clock, Check, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Slider } from "@/components/ui/slider";
@@ -9,6 +9,16 @@ import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { WallboxStatus, ControlState, Settings } from "@shared/schema";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import {
+  Drawer,
+  DrawerClose,
+  DrawerContent,
+  DrawerDescription,
+  DrawerFooter,
+  DrawerHeader,
+  DrawerTitle,
+} from "@/components/ui/drawer";
+import { Separator } from "@/components/ui/separator";
 
 export default function StatusPage() {
   const { toast } = useToast();
@@ -18,6 +28,7 @@ export default function StatusPage() {
   const previousNightChargingRef = useRef<boolean | undefined>(undefined);
   const [waitingForConfirmation, setWaitingForConfirmation] = useState(false);
   const [showTotalEnergy, setShowTotalEnergy] = useState(false);
+  const [showDetailsDrawer, setShowDetailsDrawer] = useState(false);
 
   const { data: status, isLoading, error } = useQuery<WallboxStatus>({
     queryKey: ["/api/wallbox/status"],
@@ -254,6 +265,27 @@ export default function StatusPage() {
     return icons;
   };
 
+  const formatTime = (timeString: string) => {
+    try {
+      const [hours, minutes] = timeString.split(':');
+      const date = new Date();
+      date.setHours(parseInt(hours), parseInt(minutes));
+      return new Intl.DateTimeFormat('de-DE', {
+        hour: '2-digit',
+        minute: '2-digit'
+      }).format(date);
+    } catch {
+      return timeString;
+    }
+  };
+
+  const getScheduleTimeRange = () => {
+    if (!settings?.nightChargingSchedule) return '';
+    const start = formatTime(settings.nightChargingSchedule.startTime);
+    const end = formatTime(settings.nightChargingSchedule.endTime);
+    return `${start} - ${end}`;
+  };
+
   return (
     <div className="flex flex-col h-full">
       <div className="flex-1 overflow-y-auto pb-24 pt-6">
@@ -281,6 +313,7 @@ export default function StatusPage() {
               badge={isLoading ? "..." : waitingForConfirmation ? "Warte auf Bestätigung" : getStatusBadge(status?.state || 0)}
               additionalInfo={getPhaseInfo()}
               statusIcons={getStatusIcons()}
+              onClick={() => setShowDetailsDrawer(true)}
             />
 
             <Card data-testid="card-current-control">
@@ -351,6 +384,157 @@ export default function StatusPage() {
           </div>
         </div>
       </div>
+
+      <Drawer open={showDetailsDrawer} onOpenChange={setShowDetailsDrawer}>
+        <DrawerContent data-testid="drawer-charging-details">
+          <DrawerHeader>
+            <DrawerTitle>SmartHome-Funktionen</DrawerTitle>
+            <DrawerDescription>
+              Übersicht über aktive Automatisierungen
+            </DrawerDescription>
+          </DrawerHeader>
+          <div className="px-4 pb-4 space-y-4">
+            {/* Nachtladung Scheduler */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between" data-testid="section-night-charging">
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center justify-center w-10 h-10 rounded-full bg-blue-500/10 dark:bg-blue-400/10">
+                    <Moon className="w-5 h-5 text-blue-500 dark:text-blue-400" />
+                  </div>
+                  <div>
+                    <p className="font-medium">Automatische Nachtladung</p>
+                    {settings?.nightChargingSchedule?.enabled && (
+                      <p className="text-sm text-muted-foreground" data-testid="text-night-charging-time">
+                        <Clock className="w-3 h-3 inline mr-1" />
+                        {getScheduleTimeRange()}
+                      </p>
+                    )}
+                  </div>
+                </div>
+                <div className="flex items-center">
+                  {settings?.nightChargingSchedule?.enabled ? (
+                    <div className="flex items-center gap-1.5 text-green-600 dark:text-green-400" data-testid="status-night-charging-enabled">
+                      <Check className="w-5 h-5" />
+                      <span className="text-sm font-medium">Ein</span>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-1.5 text-muted-foreground" data-testid="status-night-charging-disabled">
+                      <X className="w-5 h-5" />
+                      <span className="text-sm font-medium">Aus</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <Separator />
+
+            {/* PV Überschussladung */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between" data-testid="section-pv-surplus">
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center justify-center w-10 h-10 rounded-full bg-yellow-500/10 dark:bg-yellow-400/10">
+                    <Sun className="w-5 h-5 text-yellow-500 dark:text-yellow-400" />
+                  </div>
+                  <div>
+                    <p className="font-medium">PV-Überschussladung</p>
+                    <p className="text-sm text-muted-foreground">
+                      Laden mit Solarstrom
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center">
+                  {controlState?.pvSurplus ? (
+                    <div className="flex items-center gap-1.5 text-green-600 dark:text-green-400" data-testid="status-pv-surplus-enabled">
+                      <Check className="w-5 h-5" />
+                      <span className="text-sm font-medium">Aktiv</span>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-1.5 text-muted-foreground" data-testid="status-pv-surplus-disabled">
+                      <X className="w-5 h-5" />
+                      <span className="text-sm font-medium">Inaktiv</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* E3DC-abhängige Funktionen nur anzeigen wenn E3DC aktiviert */}
+            {settings?.e3dc?.enabled && (
+              <>
+                <Separator />
+
+                {/* Batterie-Entladesperre */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between" data-testid="section-battery-lock">
+                    <div className="flex items-center gap-3">
+                      <div className="flex items-center justify-center w-10 h-10 rounded-full bg-orange-500/10 dark:bg-orange-400/10">
+                        <ShieldOff className="w-5 h-5 text-orange-500 dark:text-orange-400" />
+                      </div>
+                      <div>
+                        <p className="font-medium">Batterie-Entladesperre</p>
+                        <p className="text-sm text-muted-foreground">
+                          E3DC-Batterie geschützt
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center">
+                      {controlState?.batteryLock ? (
+                        <div className="flex items-center gap-1.5 text-green-600 dark:text-green-400" data-testid="status-battery-lock-enabled">
+                          <Check className="w-5 h-5" />
+                          <span className="text-sm font-medium">Aktiv</span>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-1.5 text-muted-foreground" data-testid="status-battery-lock-disabled">
+                          <X className="w-5 h-5" />
+                          <span className="text-sm font-medium">Inaktiv</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                <Separator />
+
+                {/* Netzstrom-Laden */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between" data-testid="section-grid-charging">
+                    <div className="flex items-center gap-3">
+                      <div className="flex items-center justify-center w-10 h-10 rounded-full bg-purple-500/10 dark:bg-purple-400/10">
+                        <PlugZap className="w-5 h-5 text-purple-500 dark:text-purple-400" />
+                      </div>
+                      <div>
+                        <p className="font-medium">Netzstrom-Laden</p>
+                        <p className="text-sm text-muted-foreground">
+                          Batterie aus Netz laden
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center">
+                      {controlState?.gridCharging ? (
+                        <div className="flex items-center gap-1.5 text-green-600 dark:text-green-400" data-testid="status-grid-charging-enabled">
+                          <Check className="w-5 h-5" />
+                          <span className="text-sm font-medium">Aktiv</span>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-1.5 text-muted-foreground" data-testid="status-grid-charging-disabled">
+                          <X className="w-5 h-5" />
+                          <span className="text-sm font-medium">Inaktiv</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+          <DrawerFooter>
+            <DrawerClose asChild>
+              <Button variant="outline" data-testid="button-close-drawer">Schließen</Button>
+            </DrawerClose>
+          </DrawerFooter>
+        </DrawerContent>
+      </Drawer>
     </div>
   );
 }
