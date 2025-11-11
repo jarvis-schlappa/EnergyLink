@@ -213,7 +213,7 @@ export default function SettingsPage() {
                 
                 {form.watch("nightChargingSchedule.enabled") && (
                   <div className="grid grid-cols-2 gap-2 pt-1">
-                    <div className="space-y-2 min-w-0">
+                    <div className="space-y-1 min-w-0">
                       <Label htmlFor="night-start" className="text-xs font-medium">
                         Startzeit
                       </Label>
@@ -221,11 +221,11 @@ export default function SettingsPage() {
                         id="night-start"
                         type="time"
                         {...form.register("nightChargingSchedule.startTime")}
-                        className="h-10 text-sm border-0 bg-muted/30"
+                        className="h-10 text-sm border-0 bg-transparent px-0"
                         data-testid="input-night-start"
                       />
                     </div>
-                    <div className="space-y-2 min-w-0">
+                    <div className="space-y-1 min-w-0">
                       <Label htmlFor="night-end" className="text-xs font-medium">
                         Endzeit
                       </Label>
@@ -233,7 +233,7 @@ export default function SettingsPage() {
                         id="night-end"
                         type="time"
                         {...form.register("nightChargingSchedule.endTime")}
-                        className="h-10 text-sm border-0 bg-muted/30"
+                        className="h-10 text-sm border-0 bg-transparent px-0"
                         data-testid="input-night-end"
                       />
                     </div>
