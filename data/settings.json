@@ -1,5 +1,6 @@
 {
   "wallboxIp": "192.168.40.16",
+  "e3dcIp": "192.168.49.200",
   "pvSurplusOnUrl": "http://192.168.40.11:8083/fhem?detail=autoWallboxPV&cmd.autoWallboxPV=set%20autoWallboxPV%20on",
   "pvSurplusOffUrl": "http://192.168.40.11:8083/fhem?detail=autoWallboxPV&cmd.autoWallboxPV=set%20autoWallboxPV%20off",
   "nightChargingSchedule": {
