@@ -146,7 +146,10 @@ export default function E3dcPage() {
             {/* Hausbatterie - Große Kachel */}
             <Card>
               <CardHeader>
-                <CardTitle className="text-base">Hausbatterie</CardTitle>
+                <div className="flex items-center gap-2">
+                  <Battery className="w-5 h-5 text-muted-foreground" />
+                  <CardTitle className="text-base">Hausbatterie</CardTitle>
+                </div>
               </CardHeader>
               <CardContent>
                 {isLoading ? (
@@ -154,7 +157,6 @@ export default function E3dcPage() {
                 ) : e3dcData ? (
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                      <Battery className="w-8 h-8 text-muted-foreground" />
                       <div>
                         <div className="text-sm text-muted-foreground">Ladezustand</div>
                         <div className="text-3xl font-bold" data-testid="text-battery-soc">
