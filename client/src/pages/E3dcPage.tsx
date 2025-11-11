@@ -2,7 +2,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Battery, Home as HomeIcon, Zap, Grid3x3, TrendingUp, TrendingDown, AlertCircle } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import type { E3dcLiveData, Settings } from "@shared/schema";
-import EnergyFlowDiagram from "@/components/EnergyFlowDiagram";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -19,6 +18,15 @@ export default function E3dcPage() {
     refetchInterval: 5000, // Aktualisiere alle 5 Sekunden
     enabled: !!settings?.e3dcIp, // Nur abfragen wenn E3DC IP konfiguriert ist
   });
+
+  // Formatiere Leistungswerte: Unter 10 kW in Watt, ab 10 kW in kW
+  const formatPower = (watts: number) => {
+    if (watts === 0) return "0 W";
+    if (Math.abs(watts) >= 10000) {
+      return `${(watts / 1000).toFixed(1)} kW`;
+    }
+    return `${Math.round(watts)} W`;
+  };
 
   // Settings werden noch geladen
   if (isLoadingSettings) {
@@ -117,6 +125,10 @@ export default function E3dcPage() {
     );
   }
 
+  // Berechne ob Batterie lädt oder entlädt
+  const isBatteryCharging = (e3dcData?.batteryPower || 0) > 100;
+  const isBatteryDischarging = (e3dcData?.batteryPower || 0) < -100;
+
   return (
     <div className="flex flex-col h-screen pb-16 overflow-y-auto">
       {/* Header */}
@@ -128,29 +140,70 @@ export default function E3dcPage() {
       </header>
 
       <main className="flex-1 p-4 space-y-4">
-        {/* Energieflussdiagramm */}
+        {/* Status Card - Große Kachel wie bei Wallbox */}
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Energiefluss</CardTitle>
+            <CardTitle className="text-base">E3DC Status</CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-4">
             {isLoading ? (
-              <div className="space-y-2">
-                <Skeleton className="h-32 w-full" />
-              </div>
+              <>
+                <Skeleton className="h-24 w-full" />
+                <Skeleton className="h-16 w-full" />
+              </>
             ) : e3dcData ? (
-              <EnergyFlowDiagram data={e3dcData} />
+              <>
+                {/* Batterie - Hauptanzeige */}
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <Battery className="w-8 h-8 text-muted-foreground" />
+                    <div>
+                      <div className="text-sm text-muted-foreground">Batterie</div>
+                      <div className="text-3xl font-bold" data-testid="text-battery-soc">
+                        {e3dcData.batterySoc}%
+                      </div>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-sm text-muted-foreground">Leistung</div>
+                    <div className="flex items-center gap-1">
+                      {isBatteryCharging && <TrendingUp className="w-4 h-4 text-muted-foreground" />}
+                      {isBatteryDischarging && <TrendingDown className="w-4 h-4 text-muted-foreground" />}
+                      <span className="text-xl font-semibold" data-testid="text-battery-power">
+                        {formatPower(Math.abs(e3dcData.batteryPower))}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Haus & Netz */}
+                <div className="grid grid-cols-2 gap-4 pt-2 border-t">
+                  <div>
+                    <div className="text-xs text-muted-foreground">Hausverbrauch</div>
+                    <div className="text-lg font-semibold" data-testid="text-house-power">
+                      {formatPower(e3dcData.housePower)}
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-xs text-muted-foreground">
+                      {e3dcData.gridPower < 0 ? "Einspeisung" : "Netzbezug"}
+                    </div>
+                    <div className="text-lg font-semibold" data-testid="text-grid-power">
+                      {formatPower(Math.abs(e3dcData.gridPower))}
+                    </div>
+                  </div>
+                </div>
+              </>
             ) : null}
           </CardContent>
         </Card>
 
-        {/* Leistungswerte */}
+        {/* PV & Wallbox */}
         <div className="grid grid-cols-2 gap-3">
-          {/* PV-Leistung */}
           <Card>
             <CardHeader className="pb-2">
               <div className="flex items-center gap-2">
-                <Zap className="w-4 h-4 text-yellow-500" />
+                <Zap className="w-4 h-4 text-muted-foreground" />
                 <CardTitle className="text-sm">PV-Leistung</CardTitle>
               </div>
             </CardHeader>
@@ -159,77 +212,25 @@ export default function E3dcPage() {
                 <Skeleton className="h-8 w-20" />
               ) : e3dcData ? (
                 <div className="text-2xl font-bold" data-testid="text-pv-power">
-                  {(e3dcData.pvPower / 1000).toFixed(1)} kW
+                  {formatPower(e3dcData.pvPower)}
                 </div>
               ) : null}
             </CardContent>
           </Card>
 
-          {/* Batterie */}
           <Card>
             <CardHeader className="pb-2">
               <div className="flex items-center gap-2">
-                <Battery className="w-4 h-4 text-primary" />
-                <CardTitle className="text-sm">Batterie</CardTitle>
-              </div>
-            </CardHeader>
-            <CardContent>
-              {isLoading ? (
-                <Skeleton className="h-8 w-24" />
-              ) : e3dcData ? (
-                <div className="flex items-baseline gap-2">
-                  <span className="text-2xl font-bold" data-testid="text-battery-soc">{e3dcData.batterySoc}%</span>
-                  <span className="text-sm text-muted-foreground" data-testid="text-battery-power">
-                    {e3dcData.batteryPower < 0 ? (
-                      <TrendingDown className="inline w-4 h-4 text-orange-500" />
-                    ) : (
-                      <TrendingUp className="inline w-4 h-4 text-green-500" />
-                    )}
-                    {Math.abs(e3dcData.batteryPower / 1000).toFixed(1)} kW
-                  </span>
-                </div>
-              ) : null}
-            </CardContent>
-          </Card>
-
-          {/* Hausverbrauch */}
-          <Card>
-            <CardHeader className="pb-2">
-              <div className="flex items-center gap-2">
-                <HomeIcon className="w-4 h-4 text-blue-500" />
-                <CardTitle className="text-sm">Hausverbrauch</CardTitle>
+                <Grid3x3 className="w-4 h-4 text-muted-foreground" />
+                <CardTitle className="text-sm">Wallbox</CardTitle>
               </div>
             </CardHeader>
             <CardContent>
               {isLoading ? (
                 <Skeleton className="h-8 w-20" />
               ) : e3dcData ? (
-                <div className="text-2xl font-bold" data-testid="text-house-power">
-                  {(e3dcData.housePower / 1000).toFixed(1)} kW
-                </div>
-              ) : null}
-            </CardContent>
-          </Card>
-
-          {/* Netz */}
-          <Card>
-            <CardHeader className="pb-2">
-              <div className="flex items-center gap-2">
-                <Grid3x3 className="w-4 h-4 text-purple-500" />
-                <CardTitle className="text-sm">Netz</CardTitle>
-              </div>
-            </CardHeader>
-            <CardContent>
-              {isLoading ? (
-                <Skeleton className="h-8 w-24" />
-              ) : e3dcData ? (
-                <div className="flex items-baseline gap-2">
-                  <span className="text-2xl font-bold" data-testid="text-grid-power">
-                    {Math.abs(e3dcData.gridPower / 1000).toFixed(1)} kW
-                  </span>
-                  <span className="text-xs text-muted-foreground" data-testid="text-grid-direction">
-                    {e3dcData.gridPower < 0 ? "Einspeisung" : "Bezug"}
-                  </span>
+                <div className="text-2xl font-bold" data-testid="text-wallbox-power">
+                  {formatPower(e3dcData.wallboxPower)}
                 </div>
               ) : null}
             </CardContent>
