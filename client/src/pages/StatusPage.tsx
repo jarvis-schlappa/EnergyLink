@@ -32,6 +32,7 @@ export default function StatusPage() {
   const [showDetailsDrawer, setShowDetailsDrawer] = useState(false);
   const [showCableDrawer, setShowCableDrawer] = useState(false);
   const [showEnergyDrawer, setShowEnergyDrawer] = useState(false);
+  const [relativeUpdateTime, setRelativeUpdateTime] = useState<string>("");
 
   const { data: status, isLoading, error } = useQuery<WallboxStatus>({
     queryKey: ["/api/wallbox/status"],
@@ -312,6 +313,42 @@ export default function StatusPage() {
     };
   };
 
+  const formatRelativeTime = (timestamp: string) => {
+    const now = new Date();
+    const then = new Date(timestamp);
+    const diffInSeconds = Math.floor((now.getTime() - then.getTime()) / 1000);
+
+    if (diffInSeconds < 60) {
+      return `vor ${diffInSeconds} Sekunde${diffInSeconds !== 1 ? 'n' : ''}`;
+    } else if (diffInSeconds < 3600) {
+      const minutes = Math.floor(diffInSeconds / 60);
+      return `vor ${minutes} Minute${minutes !== 1 ? 'n' : ''}`;
+    } else if (diffInSeconds < 86400) {
+      const hours = Math.floor(diffInSeconds / 3600);
+      return `vor ${hours} Stunde${hours !== 1 ? 'n' : ''}`;
+    } else {
+      const days = Math.floor(diffInSeconds / 86400);
+      return `vor ${days} Tag${days !== 1 ? 'en' : ''}`;
+    }
+  };
+
+  // Update relative time every second
+  useEffect(() => {
+    if (!status?.lastUpdated) {
+      setRelativeUpdateTime("");
+      return;
+    }
+
+    const updateRelativeTime = () => {
+      setRelativeUpdateTime(formatRelativeTime(status.lastUpdated!));
+    };
+
+    updateRelativeTime();
+    const interval = setInterval(updateRelativeTime, 1000);
+
+    return () => clearInterval(interval);
+  }, [status?.lastUpdated]);
+
   return (
     <div className="flex flex-col h-full">
       <div className="flex-1 overflow-y-auto pb-24 pt-6">
@@ -408,6 +445,12 @@ export default function StatusPage() {
                 ? "Laden stoppen"
                 : "Laden starten"}
             </Button>
+
+            {status?.lastUpdated && relativeUpdateTime && (
+              <div className="text-xs text-center text-muted-foreground" data-testid="text-last-update">
+                Letztes Update: {format(new Date(status.lastUpdated), 'HH:mm:ss', { locale: de })} ({relativeUpdateTime})
+              </div>
+            )}
           </div>
         </div>
       </div>
