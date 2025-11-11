@@ -19,6 +19,8 @@ import {
   DrawerTitle,
 } from "@/components/ui/drawer";
 import { Separator } from "@/components/ui/separator";
+import { formatDistanceToNow, format } from "date-fns";
+import { de } from "date-fns/locale";
 
 export default function StatusPage() {
   const { toast } = useToast();
@@ -29,6 +31,9 @@ export default function StatusPage() {
   const [waitingForConfirmation, setWaitingForConfirmation] = useState(false);
   const [showTotalEnergy, setShowTotalEnergy] = useState(false);
   const [showDetailsDrawer, setShowDetailsDrawer] = useState(false);
+  const [showCableDrawer, setShowCableDrawer] = useState(false);
+  const [lastPlugChange, setLastPlugChange] = useState<Date | null>(null);
+  const previousPlugStatusRef = useRef<number | undefined>(undefined);
 
   const { data: status, isLoading, error } = useQuery<WallboxStatus>({
     queryKey: ["/api/wallbox/status"],
@@ -82,6 +87,17 @@ export default function StatusPage() {
     }
     previousNightChargingRef.current = controlState?.nightCharging;
   }, [controlState?.nightCharging, status]);
+
+  // Tracke Änderungen des Kabelstatus
+  useEffect(() => {
+    if (status?.plug !== undefined) {
+      // Nur tracken wenn sich der Status tatsächlich geändert hat
+      if (previousPlugStatusRef.current !== undefined && previousPlugStatusRef.current !== status.plug) {
+        setLastPlugChange(new Date());
+      }
+      previousPlugStatusRef.current = status.plug;
+    }
+  }, [status?.plug]);
 
   const startChargingMutation = useMutation({
     mutationFn: () => apiRequest("POST", "/api/wallbox/start"),
@@ -286,6 +302,22 @@ export default function StatusPage() {
     return `${start} - ${end}`;
   };
 
+  const getLastChangeFormatted = () => {
+    if (!lastPlugChange) return null;
+    
+    const relativeTime = formatDistanceToNow(lastPlugChange, { 
+      addSuffix: true, 
+      locale: de 
+    });
+    
+    const absoluteTime = format(lastPlugChange, 'dd.MM.yyyy, HH:mm', { locale: de });
+    
+    return {
+      relative: relativeTime,
+      absolute: absoluteTime
+    };
+  };
+
   return (
     <div className="flex flex-col h-full">
       <div className="flex-1 overflow-y-auto pb-24 pt-6">
@@ -365,6 +397,7 @@ export default function StatusPage() {
               value={isLoading ? "..." : getPlugStatus(status?.plug || 0)}
               status={isCharging ? "charging" : isPluggedIn ? "ready" : "stopped"}
               compact={true}
+              onClick={() => setShowCableDrawer(true)}
             />
 
             <Button
@@ -531,6 +564,66 @@ export default function StatusPage() {
           <DrawerFooter>
             <DrawerClose asChild>
               <Button variant="outline" data-testid="button-close-drawer">Schließen</Button>
+            </DrawerClose>
+          </DrawerFooter>
+        </DrawerContent>
+      </Drawer>
+
+      <Drawer open={showCableDrawer} onOpenChange={setShowCableDrawer}>
+        <DrawerContent data-testid="drawer-cable-details">
+          <DrawerHeader>
+            <DrawerTitle>Kabelverbindung</DrawerTitle>
+            <DrawerDescription>
+              Status der Kabelverbindung an der Wallbox
+            </DrawerDescription>
+          </DrawerHeader>
+          <div className="px-4 pb-4 space-y-4">
+            {/* Aktueller Status */}
+            <div className="space-y-3">
+              <div className="flex items-center gap-3">
+                <div className="flex items-center justify-center w-12 h-12 rounded-full bg-primary/10">
+                  <Plug className="w-6 h-6 text-primary" />
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Aktueller Status</p>
+                  <p className="text-lg font-semibold" data-testid="text-current-cable-status">
+                    {getPlugStatus(status?.plug || 0)}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <Separator />
+
+            {/* Letzter Statuswechsel */}
+            <div className="space-y-3">
+              <div className="flex items-center gap-3">
+                <div className="flex items-center justify-center w-12 h-12 rounded-full bg-blue-500/10 dark:bg-blue-400/10">
+                  <Clock className="w-6 h-6 text-blue-500 dark:text-blue-400" />
+                </div>
+                <div className="flex-1">
+                  <p className="text-sm text-muted-foreground">Letzter Statuswechsel</p>
+                  {getLastChangeFormatted() ? (
+                    <div data-testid="section-last-change">
+                      <p className="text-lg font-semibold" data-testid="text-last-change-relative">
+                        {getLastChangeFormatted()?.relative}
+                      </p>
+                      <p className="text-sm text-muted-foreground" data-testid="text-last-change-absolute">
+                        {getLastChangeFormatted()?.absolute} Uhr
+                      </p>
+                    </div>
+                  ) : (
+                    <p className="text-base text-muted-foreground" data-testid="text-no-change-tracked">
+                      Kein Wechsel seit App-Start erfasst
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+          <DrawerFooter>
+            <DrawerClose asChild>
+              <Button variant="outline" data-testid="button-close-cable-drawer">Schließen</Button>
             </DrawerClose>
           </DrawerFooter>
         </DrawerContent>
