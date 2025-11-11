@@ -3,7 +3,7 @@
   "pvSurplusOnUrl": "http://192.168.40.11:8083/fhem?detail=autoWallboxPV&cmd.autoWallboxPV=set%20autoWallboxPV%20on",
   "pvSurplusOffUrl": "http://192.168.40.11:8083/fhem?detail=autoWallboxPV&cmd.autoWallboxPV=set%20autoWallboxPV%20off",
   "nightChargingSchedule": {
-    "enabled": false,
+    "enabled": true,
     "startTime": "00:00",
     "endTime": "05:00"
   },
