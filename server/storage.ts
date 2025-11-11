@@ -1,4 +1,4 @@
-import type { Settings, ControlState, LogEntry, LogSettings, LogLevel } from "@shared/schema";
+import type { Settings, ControlState, LogEntry, LogSettings, LogLevel, PlugStatusTracking } from "@shared/schema";
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from "fs";
 import { join } from "path";
 
@@ -8,6 +8,8 @@ export interface IStorage {
   getControlState(): ControlState;
   saveControlState(state: ControlState): void;
   updateControlState(updates: Partial<ControlState>): void;
+  getPlugStatusTracking(): PlugStatusTracking;
+  savePlugStatusTracking(tracking: PlugStatusTracking): void;
   getLogs(): LogEntry[];
   addLog(entry: Omit<LogEntry, "id" | "timestamp">): void;
   clearLogs(): void;
@@ -18,6 +20,7 @@ export interface IStorage {
 export class MemStorage implements IStorage {
   private settingsFilePath = join(process.cwd(), "data", "settings.json");
   private controlStateFilePath = join(process.cwd(), "data", "control-state.json");
+  private plugTrackingFilePath = join(process.cwd(), "data", "plug-tracking.json");
   private settings: Settings | null = null;
   private controlState: ControlState = {
     pvSurplus: false,
@@ -25,6 +28,7 @@ export class MemStorage implements IStorage {
     batteryLock: false,
     gridCharging: false,
   };
+  private plugStatusTracking: PlugStatusTracking = {};
   private logs: LogEntry[] = [];
   private logSettings: LogSettings = {
     level: "info" as LogLevel,
@@ -43,6 +47,9 @@ export class MemStorage implements IStorage {
     
     // Lade Control State aus Datei
     this.controlState = this.loadControlStateFromFile();
+    
+    // Lade Plug Status Tracking aus Datei
+    this.plugStatusTracking = this.loadPlugTrackingFromFile();
   }
 
   private loadSettingsFromFile(): Settings {
@@ -62,8 +69,6 @@ export class MemStorage implements IStorage {
       wallboxIp: "192.168.40.16",
       pvSurplusOnUrl: "http://192.168.40.11:8083/fhem?detail=autoWallboxPV&cmd.autoWallboxPV=set%20autoWallboxPV%20on",
       pvSurplusOffUrl: "http://192.168.40.11:8083/fhem?detail=autoWallboxPV&cmd.autoWallboxPV=set%20autoWallboxPV%20off",
-      batteryLockOnUrl: "http://192.168.40.11:8083/fhem?detail=s10EntladenSperren&cmd.s10EntladenSperren=set%20s10EntladenSperren%20on",
-      batteryLockOffUrl: "http://192.168.40.11:8083/fhem?detail=s10EntladenSperren&cmd.s10EntladenSperren=set%20s10EntladenSperren%20off",
       nightChargingSchedule: {
         enabled: false,
         startTime: "00:00",
@@ -123,6 +128,31 @@ export class MemStorage implements IStorage {
     }
   }
 
+  private loadPlugTrackingFromFile(): PlugStatusTracking {
+    if (existsSync(this.plugTrackingFilePath)) {
+      try {
+        const data = readFileSync(this.plugTrackingFilePath, "utf-8");
+        const loaded = JSON.parse(data);
+        console.log("[Storage] Plug Tracking geladen aus:", this.plugTrackingFilePath);
+        return loaded;
+      } catch (error) {
+        console.error("[Storage] Fehler beim Laden des Plug Trackings:", error);
+      }
+    }
+    
+    // Default Plug Tracking (leer)
+    return {};
+  }
+
+  private savePlugTrackingToFile(tracking: PlugStatusTracking): void {
+    try {
+      writeFileSync(this.plugTrackingFilePath, JSON.stringify(tracking, null, 2), "utf-8");
+      console.log("[Storage] Plug Tracking gespeichert in:", this.plugTrackingFilePath);
+    } catch (error) {
+      console.error("[Storage] Fehler beim Speichern des Plug Trackings:", error);
+    }
+  }
+
   getSettings(): Settings | null {
     return this.settings;
   }
@@ -159,6 +189,16 @@ export class MemStorage implements IStorage {
       ...updates,
     };
     this.saveControlStateToFile(this.controlState);
+  }
+
+  getPlugStatusTracking(): PlugStatusTracking {
+    // Defensive Kopie um Race Conditions zu vermeiden
+    return { ...this.plugStatusTracking };
+  }
+
+  savePlugStatusTracking(tracking: PlugStatusTracking): void {
+    this.plugStatusTracking = tracking;
+    this.savePlugTrackingToFile(tracking);
   }
 
   getLogs(): LogEntry[] {

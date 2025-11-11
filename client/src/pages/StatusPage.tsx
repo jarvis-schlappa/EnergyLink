@@ -7,7 +7,7 @@ import StatusCard from "@/components/StatusCard";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import type { WallboxStatus, ControlState, Settings } from "@shared/schema";
+import type { WallboxStatus, ControlState, Settings, PlugStatusTracking } from "@shared/schema";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   Drawer,
@@ -32,17 +32,6 @@ export default function StatusPage() {
   const [showTotalEnergy, setShowTotalEnergy] = useState(false);
   const [showDetailsDrawer, setShowDetailsDrawer] = useState(false);
   const [showCableDrawer, setShowCableDrawer] = useState(false);
-  const [lastPlugChange, setLastPlugChange] = useState<Date | null>(() => {
-    // Beim Initialisieren aus LocalStorage lesen
-    try {
-      const stored = localStorage.getItem('lastPlugChange');
-      return stored ? new Date(stored) : null;
-    } catch {
-      // Fallback wenn LocalStorage nicht verfügbar (z.B. Privacy Mode)
-      return null;
-    }
-  });
-  const previousPlugStatusRef = useRef<number | undefined>(undefined);
 
   const { data: status, isLoading, error } = useQuery<WallboxStatus>({
     queryKey: ["/api/wallbox/status"],
@@ -59,6 +48,11 @@ export default function StatusPage() {
     refetchInterval: 5000, // Automatisch aktualisieren wie controlState
     refetchOnMount: true, // Immer neu laden wenn Seite gemountet wird
     refetchOnWindowFocus: true, // Neu laden wenn Fenster Fokus bekommt
+  });
+
+  const { data: plugTracking } = useQuery<PlugStatusTracking>({
+    queryKey: ["/api/wallbox/plug-tracking"],
+    refetchInterval: 5000, // Synchron mit Status-Updates
   });
 
   useEffect(() => {
@@ -96,24 +90,6 @@ export default function StatusPage() {
     }
     previousNightChargingRef.current = controlState?.nightCharging;
   }, [controlState?.nightCharging, status]);
-
-  // Tracke Änderungen des Kabelstatus
-  useEffect(() => {
-    if (status?.plug !== undefined) {
-      // Nur tracken wenn sich der Status tatsächlich geändert hat
-      if (previousPlugStatusRef.current !== undefined && previousPlugStatusRef.current !== status.plug) {
-        const now = new Date();
-        setLastPlugChange(now);
-        // In LocalStorage speichern
-        try {
-          localStorage.setItem('lastPlugChange', now.toISOString());
-        } catch {
-          // Ignorieren wenn LocalStorage nicht verfügbar
-        }
-      }
-      previousPlugStatusRef.current = status.plug;
-    }
-  }, [status?.plug]);
 
   const startChargingMutation = useMutation({
     mutationFn: () => apiRequest("POST", "/api/wallbox/start"),
@@ -319,14 +295,15 @@ export default function StatusPage() {
   };
 
   const getLastChangeFormatted = () => {
-    if (!lastPlugChange) return null;
+    if (!plugTracking?.lastPlugChange) return null;
     
-    const relativeTime = formatDistanceToNow(lastPlugChange, { 
+    const lastChange = new Date(plugTracking.lastPlugChange);
+    const relativeTime = formatDistanceToNow(lastChange, { 
       addSuffix: true, 
       locale: de 
     });
     
-    const absoluteTime = format(lastPlugChange, 'dd.MM.yyyy, HH:mm', { locale: de });
+    const absoluteTime = format(lastChange, 'dd.MM.yyyy, HH:mm', { locale: de });
     
     return {
       relative: relativeTime,

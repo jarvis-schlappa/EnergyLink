@@ -54,6 +54,13 @@ export const controlStateSchema = z.object({
 
 export type ControlState = z.infer<typeof controlStateSchema>;
 
+export const plugStatusTrackingSchema = z.object({
+  lastPlugStatus: z.number().optional(),
+  lastPlugChange: z.string().optional(), // ISO timestamp
+});
+
+export type PlugStatusTracking = z.infer<typeof plugStatusTrackingSchema>;
+
 export const logLevelSchema = z.enum(["debug", "info", "warning", "error"]);
 export type LogLevel = z.infer<typeof logLevelSchema>;
 

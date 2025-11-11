@@ -363,6 +363,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
         i3: report3?.["I3"] ? report3["I3"] / 1000 : undefined,
       };
 
+      // Tracke Änderungen des Kabelstatus im Hintergrund (nur bei gültigen Werten)
+      if (typeof status.plug === "number") {
+        const tracking = storage.getPlugStatusTracking();
+        if (tracking.lastPlugStatus !== undefined && tracking.lastPlugStatus !== status.plug) {
+          // Status hat sich geändert - speichere Zeitstempel
+          storage.savePlugStatusTracking({
+            lastPlugStatus: status.plug,
+            lastPlugChange: new Date().toISOString(),
+          });
+          console.log(`[Wallbox] Kabelstatus geändert: ${tracking.lastPlugStatus} -> ${status.plug}`);
+        } else if (tracking.lastPlugStatus === undefined) {
+          // Erster Aufruf - initialisiere ohne Zeitstempel
+          storage.savePlugStatusTracking({
+            lastPlugStatus: status.plug,
+          });
+        }
+      }
+
       res.json(status);
     } catch (error) {
       console.error("Failed to get wallbox status:", error);
@@ -499,6 +517,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/controls", (req, res) => {
     const state = storage.getControlState();
     res.json(state);
+  });
+
+  app.get("/api/wallbox/plug-tracking", (req, res) => {
+    const tracking = storage.getPlugStatusTracking();
+    res.json(tracking);
   });
 
   app.post("/api/controls", async (req, res) => {
