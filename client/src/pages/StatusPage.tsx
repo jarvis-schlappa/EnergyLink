@@ -452,7 +452,7 @@ export default function StatusPage() {
             </Button>
 
             {status?.lastUpdated && relativeUpdateTime && (
-              <div className="text-xs text-center text-muted-foreground" data-testid="text-last-update">
+              <div className="text-xs text-left text-muted-foreground" data-testid="text-last-update">
                 Letztes Update: {format(new Date(status.lastUpdated), 'HH:mm:ss', { locale: de })} ({relativeUpdateTime})
               </div>
             )}
