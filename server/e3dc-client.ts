@@ -1,6 +1,7 @@
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import type { E3dcConfig } from '@shared/schema';
+import { log } from './routes';
 
 const execAsync = promisify(exec);
 
@@ -103,9 +104,10 @@ class E3dcClient {
     const sensitiveValues = this.getSensitiveValues();
 
     try {
-      const sanitizedCommand = this.sanitizeOutput(command, command, sensitiveValues);
+      // Command ohne Sanitization loggen (Credentials sind in externer Datei)
       console.log(`[E3DC] Führe aus: ${commandName}`);
-      console.log(`[E3DC] Befehl: ${sanitizedCommand}`);
+      console.log(`[E3DC] Befehl: ${command}`);
+      log('info', 'system', `E3DC: ${commandName}`, `Befehl: ${command}`);
       
       const { stdout, stderr } = await execAsync(command);
       
@@ -113,23 +115,27 @@ class E3dcClient {
         const sanitized = this.sanitizeOutput(stdout, command, sensitiveValues);
         console.log(`[E3DC] ${commandName} - Ausgabe (${stdout.length} Zeichen):`);
         console.log(sanitized);
+        log('info', 'system', `E3DC: ${commandName} - Ausgabe`, sanitized);
       }
       
       if (stderr) {
         const sanitized = this.sanitizeOutput(stderr, command, sensitiveValues);
         console.error(`[E3DC] ${commandName} - Fehler-Ausgabe (${stderr.length} Zeichen):`);
         console.error(sanitized);
+        log('warning', 'system', `E3DC: ${commandName} - Fehler-Ausgabe`, sanitized);
       }
       
       // Zeitpunkt des letzten Befehls aktualisieren
       this.lastCommandTime = Date.now();
       console.log(`[E3DC] ${commandName} erfolgreich ausgeführt`);
+      log('info', 'system', `E3DC: ${commandName} erfolgreich ausgeführt`);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       const sanitizedError = this.sanitizeOutput(errorMessage, command, sensitiveValues);
       
       console.error(`[E3DC] ${commandName} fehlgeschlagen:`);
       console.error(sanitizedError);
+      log('error', 'system', `E3DC: ${commandName} fehlgeschlagen`, sanitizedError);
       throw new Error(`Failed to execute ${commandName}`);
     }
   }
