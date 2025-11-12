@@ -379,23 +379,8 @@ const modbusVector = {
   }
 };
 
-// @ts-ignore - ServerTCP existiert, aber Type Definition ist unvollständig
-const modbusServer = new ModbusRTU.ServerTCP(modbusVector, {
-  host: HOST,
-  port: E3DC_MODBUS_PORT,
-  debug: false,
-  unitID: 1
-});
-
-// Modbus Server Event-Handler
-modbusServer.on('socketError', (err: Error) => {
-  console.error('[E3DC-Modbus] Socket Error:', err.message);
-});
-
-modbusServer.on('initialized', () => {
-  console.log(`✅ [E3DC-Modbus] E3DC S10 Mock läuft auf ${HOST}:${E3DC_MODBUS_PORT}`);
-  console.log(`   Register 40067-40083 (Holding Registers) verfügbar`);
-});
+// Modbus Server Variable (wird bei startUnifiedMock() erstellt)
+let modbusServer: any = null;
 
 // =============================================================================
 // SERVER LIFECYCLE (Start / Stop)
@@ -431,7 +416,24 @@ export async function startUnifiedMock(): Promise<void> {
     });
   });
 
-  // Modbus Server ist bereits beim Import gestartet (automatisch bei Erstellung)
+  // Modbus Server erstellen und starten
+  // @ts-ignore - ServerTCP existiert, aber Type Definition ist unvollständig
+  modbusServer = new ModbusRTU.ServerTCP(modbusVector, {
+    host: HOST,
+    port: E3DC_MODBUS_PORT,
+    debug: false,
+    unitID: 1
+  });
+
+  // Modbus Server Event-Handler
+  modbusServer.on('socketError', (err: Error) => {
+    console.error('[E3DC-Modbus] Socket Error:', err.message);
+  });
+
+  modbusServer.on('initialized', () => {
+    console.log(`✅ [E3DC-Modbus] E3DC S10 Mock läuft auf ${HOST}:${E3DC_MODBUS_PORT}`);
+    console.log(`   Register 40067-40083 (Holding Registers) verfügbar`);
+  });
 
   console.log('\n📋 Demo-Modus Konfiguration:');
   console.log('   1. Wallbox IP: 127.0.0.1 (UDP Port 7090)');
@@ -455,7 +457,7 @@ export async function stopUnifiedMock(): Promise<void> {
   
   console.log('\n🛑 [Unified-Mock] Server wird heruntergefahren...');
   
-  await Promise.all([
+  const promises: Promise<void>[] = [
     new Promise<void>((resolve) => {
       udpServer.close(() => {
         console.log('   ✅ Wallbox UDP Server gestoppt');
@@ -467,14 +469,23 @@ export async function stopUnifiedMock(): Promise<void> {
         console.log('   ✅ FHEM HTTP Server gestoppt');
         resolve();
       });
-    }),
-    new Promise<void>((resolve) => {
-      modbusServer.close(() => {
-        console.log('   ✅ E3DC Modbus Server gestoppt');
-        resolve();
-      });
     })
-  ]);
+  ];
+  
+  // Modbus Server nur stoppen wenn er existiert (wurde bei startUnifiedMock erstellt)
+  if (modbusServer) {
+    promises.push(
+      new Promise<void>((resolve) => {
+        modbusServer.close(() => {
+          console.log('   ✅ E3DC Modbus Server gestoppt');
+          modbusServer = null;
+          resolve();
+        });
+      })
+    );
+  }
+  
+  await Promise.all(promises);
   
   isRunning = false;
 }
