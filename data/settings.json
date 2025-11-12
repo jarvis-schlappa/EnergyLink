@@ -8,8 +8,8 @@
   "pvSurplusOffUrlBackup": "http://127.0.0.1:8083/fhem?cmd.autoWallboxPV=off",
   "nightChargingSchedule": {
     "enabled": true,
-    "startTime": "19:33",
-    "endTime": "19:35"
+    "startTime": "00:00",
+    "endTime": "05:00"
   },
   "e3dc": {
     "enabled": true,
@@ -17,7 +17,7 @@
     "dischargeLockEnableCommand": "-d 1",
     "dischargeLockDisableCommand": "-a",
     "gridChargeEnableCommand": "-c 2500 -e 6000",
-    "gridChargeDisableCommand": "-e 0",
+    "gridChargeDisableCommand": "-a -e 0",
     "gridChargeDuringNightCharging": false
   },
   "demoMode": false
