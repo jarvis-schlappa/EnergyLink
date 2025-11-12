@@ -20,5 +20,5 @@
     "gridChargeDisableCommand": "-e 0",
     "gridChargeDuringNightCharging": false
   },
-  "demoMode": true
+  "demoMode": false
 }
