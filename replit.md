@@ -8,6 +8,24 @@ Preferred communication style: Simple, everyday language.
 
 Deployment Target: Local operation (home server/Raspberry Pi/Docker) in private network. Application communicates via HTTP in development; HTTPS not required for local-only deployment but recommended if accessible from internet.
 
+## Deployment Options
+
+### Replit Autoscale (Demo/Showcase)
+- **Quick Start:** See `README-AUTOSCALE.md`
+- **Full Guide:** See `DEPLOYMENT.md`
+- **Environment Variables Required:**
+  - `DEMO_AUTOSTART=true` (starts unified mock server)
+  - `NODE_ENV=production`
+- **Cost:** ~$3-6/month for low traffic demo
+- **Note:** No persistent storage - settings reset on redeploy
+
+### Local Production (Real Hardware)
+- **Target:** Raspberry Pi, home server, Docker
+- **Guide:** See `DEPLOYMENT.md` (Section: "Lokales Production Deployment")
+- **Settings:** Real IPs (192.168.40.x network)
+- **Cost:** Free (self-hosted)
+- **Note:** Persistent storage via filesystem
+
 ## System Architecture
 
 ### Frontend
