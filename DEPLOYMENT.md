@@ -64,6 +64,8 @@ Nach dem Deployment:
    ✅ KEBA Wallbox UDP Mock Server gestartet auf Port 7090
    ✅ E3DC S10 Modbus Mock Server gestartet auf Port 5502
    ✅ FHEM HTTP Mock Server gestartet auf Port 8083
+   
+   serving on port 5000
    ```
 
 3. **Testen Sie die Features:**
@@ -100,7 +102,7 @@ Autoscale Deployments werden nach **Compute Units** berechnet:
 | Feature | Development (Workspace) | Deployed (Autoscale) |
 |---------|------------------------|---------------------|
 | Mock Server | Nur wenn `demoMode=true` in Settings | Automatisch via `DEMO_AUTOSTART=true` |
-| Port | 5000 (Vite dev server) | 8080 (Production Express) |
+| Port | 5000 (Vite dev server) | 5000 (Production Express) |
 | Storage | Persistent in Workspace | **NICHT persistent** (nur in-memory) |
 | URL | `*.replit.dev` | `*.replit.app` |
 
@@ -149,8 +151,10 @@ Für echte KEBA Wallbox & E3DC Hardware:
 
 5. **Starten Sie den Production Server:**
    ```bash
-   NODE_ENV=production node dist/index.js
+   NODE_ENV=production PORT=8080 node dist/index.js
    ```
+   
+   **Hinweis:** Der Server verwendet Port 5000 per Default. Für lokales Deployment können Sie einen anderen Port via `PORT` Environment Variable setzen.
 
 6. **Systemd Service (Optional):**
    ```bash
