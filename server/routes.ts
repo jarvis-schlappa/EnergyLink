@@ -154,8 +154,10 @@ function initWallboxSocket(): void {
     log("error", "wallbox", "UDP-Socket-Fehler", error instanceof Error ? error.message : String(error));
   });
 
-  // Kein bind() nötig - UDP-Client nutzt ephemeral port vom OS
-  log("info", "system", "Wallbox UDP-Client initialisiert (ephemeral port)");
+  // Binde an Port 7090 - notwendig damit Wallbox Antworten an diesen Port zurücksendet
+  wallboxSocket.bind(UDP_PORT, () => {
+    log("info", "system", `Wallbox UDP-Client initialisiert auf Port ${UDP_PORT}`);
+  });
 }
 
 function processCommandQueue(): void {
