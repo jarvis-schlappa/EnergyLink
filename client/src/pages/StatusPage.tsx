@@ -3,12 +3,16 @@ import { Battery, Plug, Zap, AlertCircle, Gauge, Sun, Moon, ShieldOff, PlugZap, 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Slider } from "@/components/ui/slider";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import StatusCard from "@/components/StatusCard";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { WallboxStatus, ControlState, Settings, PlugStatusTracking } from "@shared/schema";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
 import {
   Drawer,
   DrawerClose,
@@ -32,6 +36,7 @@ export default function StatusPage() {
   const [showDetailsDrawer, setShowDetailsDrawer] = useState(false);
   const [showCableDrawer, setShowCableDrawer] = useState(false);
   const [showEnergyDrawer, setShowEnergyDrawer] = useState(false);
+  const [showChargingControlDrawer, setShowChargingControlDrawer] = useState(false);
   const [relativeUpdateTime, setRelativeUpdateTime] = useState<string>("");
 
   const { data: status, isLoading, error } = useQuery<WallboxStatus>({
@@ -77,12 +82,12 @@ export default function StatusPage() {
     }
   }, [status, error, waitingForConfirmation]);
 
-  // Wenn Nachtladung aktiviert wird, setze Strom auf Maximum
+  // Wenn zeitgesteuerte Ladung aktiviert wird, setze Strom auf Maximum
   useEffect(() => {
     // Nur reagieren, wenn wir bereits einen vorherigen Wert haben (nicht beim ersten Laden)
     if (previousNightChargingRef.current !== undefined) {
       if (controlState && status && controlState.nightCharging && !previousNightChargingRef.current) {
-        // Nachtladung wurde gerade aktiviert (Wechsel von false auf true)
+        // Zeitgesteuerte Ladung wurde gerade aktiviert (Wechsel von false auf true)
         const maxAllowed = status.phases === 3 ? 16 : 32;
         setCurrentAmpere(maxAllowed);
         // Sende Befehl an Wallbox
@@ -97,10 +102,6 @@ export default function StatusPage() {
     onSuccess: () => {
       setWaitingForConfirmation(true);
       queryClient.invalidateQueries({ queryKey: ["/api/wallbox/status"] });
-      toast({
-        title: "Ladevorgang gestartet",
-        description: "Die Wallbox wurde erfolgreich aktiviert.",
-      });
     },
     onError: () => {
       setWaitingForConfirmation(false);
@@ -116,10 +117,6 @@ export default function StatusPage() {
     mutationFn: () => apiRequest("POST", "/api/wallbox/stop"),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/wallbox/status"] });
-      toast({
-        title: "Ladevorgang gestoppt",
-        description: "Die Wallbox wurde erfolgreich deaktiviert.",
-      });
     },
     onError: () => {
       toast({
@@ -134,10 +131,6 @@ export default function StatusPage() {
     mutationFn: (current: number) => apiRequest("POST", "/api/wallbox/current", { current }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/wallbox/status"] });
-      toast({
-        title: "Ladestrom geändert",
-        description: `Neuer Ladestrom: ${currentAmpere}A`,
-      });
     },
     onError: () => {
       if (status?.maxCurr) {
@@ -148,6 +141,28 @@ export default function StatusPage() {
         description: "Ladestrom konnte nicht geändert werden.",
         variant: "destructive",
       });
+    },
+  });
+
+  const updateSettingsMutation = useMutation({
+    mutationFn: (newSettings: Settings) =>
+      apiRequest("POST", "/api/settings", newSettings),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/settings"] });
+    },
+    onError: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/settings"] });
+    },
+  });
+
+  const updateControlsMutation = useMutation({
+    mutationFn: (newState: ControlState) =>
+      apiRequest("POST", "/api/controls", newState),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/controls"] });
+    },
+    onError: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/controls"] });
     },
   });
 
@@ -166,6 +181,49 @@ export default function StatusPage() {
 
   const handleCurrentCommit = () => {
     setCurrentMutation.mutate(currentAmpere);
+  };
+
+  const handleNightChargingToggle = (enabled: boolean) => {
+    if (!settings) return;
+    
+    const updatedSettings: Settings = {
+      ...settings,
+      nightChargingSchedule: {
+        enabled,
+        startTime: settings.nightChargingSchedule?.startTime || "00:00",
+        endTime: settings.nightChargingSchedule?.endTime || "05:00",
+      },
+    };
+    
+    updateSettingsMutation.mutate(updatedSettings);
+  };
+
+  const handleNightTimeChange = (field: 'startTime' | 'endTime', value: string) => {
+    if (!settings) return;
+    
+    const updatedSettings: Settings = {
+      ...settings,
+      nightChargingSchedule: {
+        enabled: settings.nightChargingSchedule?.enabled || false,
+        startTime: field === 'startTime' ? value : (settings.nightChargingSchedule?.startTime || "00:00"),
+        endTime: field === 'endTime' ? value : (settings.nightChargingSchedule?.endTime || "05:00"),
+      },
+    };
+    
+    updateSettingsMutation.mutate(updatedSettings);
+  };
+
+  const handlePvSurplusToggle = (enabled: boolean) => {
+    if (!controlState) return;
+    
+    const updatedControls: ControlState = {
+      pvSurplus: enabled,
+      nightCharging: controlState.nightCharging,
+      batteryLock: controlState.batteryLock,
+      gridCharging: controlState.gridCharging,
+    };
+    
+    updateControlsMutation.mutate(updatedControls);
   };
 
   const calculatePower = (ampere: number, phases: number) => {
@@ -201,9 +259,9 @@ export default function StatusPage() {
       case 1:
         return "Nicht bereit";
       case 2:
-        return "Lädt";
+        return "Bereit";  // State 2 = Ready (Kabel gesteckt, bereit zum Laden)
       case 3:
-        return "Lädt";
+        return "Lädt";    // State 3 = Charging (aktiv ladend)
       case 4:
         return "Fehler";
       case 5:
@@ -232,7 +290,7 @@ export default function StatusPage() {
     return `${phases}-phasig`;
   };
 
-  const isCharging = status?.state === 2 || status?.state === 3;
+  const isCharging = status?.state === 3;  // Nur State 3 = Charging, State 2 = Ready
   const isPluggedIn = (status?.plug || 0) >= 3;
   const power = status?.power || 0;
   const energySession = (status?.ePres || 0) / 1000;
@@ -248,28 +306,14 @@ export default function StatusPage() {
       icons.push({
         icon: Sun,
         label: "PV Überschussladung aktiv",
-        color: "text-yellow-500 dark:text-yellow-400"
+        color: "text-muted-foreground"
       });
     }
     if (settings?.nightChargingSchedule?.enabled) {
       icons.push({
-        icon: Moon,
-        label: "Nachtladungs-Scheduler aktiv",
-        color: "text-blue-500 dark:text-blue-400"
-      });
-    }
-    if (settings?.e3dc?.enabled && controlState?.batteryLock) {
-      icons.push({
-        icon: ShieldOff,
-        label: "Batterie-Entladesperre aktiv",
-        color: "text-orange-500 dark:text-orange-400"
-      });
-    }
-    if (settings?.e3dc?.enabled && controlState?.gridCharging) {
-      icons.push({
-        icon: PlugZap,
-        label: "Netzstrom-Laden aktiv",
-        color: "text-purple-500 dark:text-purple-400"
+        icon: Clock,
+        label: "Zeitgesteuerte Ladung aktiv",
+        color: "text-muted-foreground"
       });
     }
     return icons;
@@ -358,9 +402,16 @@ export default function StatusPage() {
     <div className="flex flex-col h-full">
       <div className="flex-1 overflow-y-auto pb-24 pt-6">
         <div className="max-w-2xl mx-auto px-4 space-y-6">
-          <div className="flex items-center gap-3">
-            <img src="/apple-touch-icon.png" alt="EnergyLink" className="w-10 h-10 rounded-lg" />
-            <h1 className="text-2xl font-bold mb-0">EnergyLink Wallbox</h1>
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <img src="/apple-touch-icon.png" alt="EnergyLink" className="w-10 h-10 rounded-lg" />
+              <h1 className="text-2xl font-bold mb-0">Wallbox</h1>
+            </div>
+            {settings?.demoMode && (
+              <Badge variant="secondary" className="text-xs shrink-0" data-testid="badge-demo-mode">
+                Demo
+              </Badge>
+            )}
           </div>
 
           {showError && (
@@ -382,7 +433,7 @@ export default function StatusPage() {
               badge={isLoading ? "..." : waitingForConfirmation ? "Warte auf Bestätigung" : getStatusBadge(status?.state || 0)}
               additionalInfo={getPhaseInfo()}
               statusIcons={getStatusIcons()}
-              onClick={() => setShowDetailsDrawer(true)}
+              onClick={() => setShowChargingControlDrawer(true)}
             />
 
             <Card data-testid="card-current-control">
@@ -470,7 +521,7 @@ export default function StatusPage() {
             </DrawerDescription>
           </DrawerHeader>
           <div className="px-4 pb-4 space-y-4">
-            {/* Nachtladung Scheduler */}
+            {/* Zeitgesteuerte Ladung */}
             <div className="space-y-2">
               <div className="flex items-center justify-between" data-testid="section-night-charging">
                 <div className="flex items-center gap-3">
@@ -478,7 +529,7 @@ export default function StatusPage() {
                     <Moon className="w-5 h-5 text-blue-500 dark:text-blue-400" />
                   </div>
                   <div>
-                    <p className="font-medium">Automatische Nachtladung</p>
+                    <p className="font-medium">Zeitgesteuerte Ladung</p>
                     {settings?.nightChargingSchedule?.enabled && (
                       <p className="text-sm text-muted-foreground" data-testid="text-night-charging-time">
                         <Clock className="w-3 h-3 inline mr-1" />
@@ -534,75 +585,6 @@ export default function StatusPage() {
                 </div>
               </div>
             </div>
-
-            {/* E3DC-abhängige Funktionen nur anzeigen wenn E3DC aktiviert */}
-            {settings?.e3dc?.enabled && (
-              <>
-                <Separator />
-
-                {/* Batterie-Entladesperre */}
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between" data-testid="section-battery-lock">
-                    <div className="flex items-center gap-3">
-                      <div className="flex items-center justify-center w-10 h-10 rounded-full bg-orange-500/10 dark:bg-orange-400/10">
-                        <ShieldOff className="w-5 h-5 text-orange-500 dark:text-orange-400" />
-                      </div>
-                      <div>
-                        <p className="font-medium">Batterie-Entladesperre</p>
-                        <p className="text-sm text-muted-foreground">
-                          Die Entladung der Hausbatterie ist gesperrt
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex items-center">
-                      {controlState?.batteryLock ? (
-                        <div className="flex items-center gap-1.5 text-green-600 dark:text-green-400" data-testid="status-battery-lock-enabled">
-                          <Check className="w-5 h-5" />
-                          <span className="text-sm font-medium">Aktiv</span>
-                        </div>
-                      ) : (
-                        <div className="flex items-center gap-1.5 text-muted-foreground" data-testid="status-battery-lock-disabled">
-                          <X className="w-5 h-5" />
-                          <span className="text-sm font-medium">Inaktiv</span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                <Separator />
-
-                {/* Netzstrom-Laden */}
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between" data-testid="section-grid-charging">
-                    <div className="flex items-center gap-3">
-                      <div className="flex items-center justify-center w-10 h-10 rounded-full bg-purple-500/10 dark:bg-purple-400/10">
-                        <PlugZap className="w-5 h-5 text-purple-500 dark:text-purple-400" />
-                      </div>
-                      <div>
-                        <p className="font-medium">Netzstrom-Laden</p>
-                        <p className="text-sm text-muted-foreground">
-                          Die Hausbatterie wird mit Netzstrom geladen
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex items-center">
-                      {controlState?.gridCharging ? (
-                        <div className="flex items-center gap-1.5 text-green-600 dark:text-green-400" data-testid="status-grid-charging-enabled">
-                          <Check className="w-5 h-5" />
-                          <span className="text-sm font-medium">Aktiv</span>
-                        </div>
-                      ) : (
-                        <div className="flex items-center gap-1.5 text-muted-foreground" data-testid="status-grid-charging-disabled">
-                          <X className="w-5 h-5" />
-                          <span className="text-sm font-medium">Inaktiv</span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </>
-            )}
           </div>
           <DrawerFooter>
             <DrawerClose asChild>
@@ -718,6 +700,102 @@ export default function StatusPage() {
               <Button variant="outline" data-testid="button-close-energy-drawer">Schließen</Button>
             </DrawerClose>
           </DrawerFooter>
+        </DrawerContent>
+      </Drawer>
+
+      <Drawer open={showChargingControlDrawer} onOpenChange={setShowChargingControlDrawer}>
+        <DrawerContent data-testid="drawer-charging-control">
+          <div className="mx-auto w-full max-w-sm">
+            <DrawerHeader>
+              <DrawerTitle>SmartHome-Steuerung</DrawerTitle>
+              <DrawerDescription>
+                Automatische Ladesteuerung konfigurieren
+              </DrawerDescription>
+            </DrawerHeader>
+            <div className="p-4 space-y-4">
+              {/* Zeitgesteuerte Ladung */}
+              <div className="flex items-start justify-between gap-4">
+                <div className="space-y-0.5 flex-1">
+                  <div className="flex items-center gap-2">
+                    <Clock className="w-4 h-4 text-muted-foreground" />
+                    <Label htmlFor="night-charging-drawer" className="text-sm font-medium">
+                      Zeitgesteuerte Ladung
+                    </Label>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Lädt das Fahrzeug automatisch im definierten Zeitfenster
+                  </p>
+                </div>
+                <Switch
+                  id="night-charging-drawer"
+                  checked={settings?.nightChargingSchedule?.enabled || false}
+                  onCheckedChange={handleNightChargingToggle}
+                  disabled={!settings || updateSettingsMutation.isPending}
+                  data-testid="switch-night-charging"
+                />
+              </div>
+
+              {settings?.nightChargingSchedule?.enabled && (
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="night-start-drawer" className="text-xs font-medium">
+                      Startzeit
+                    </Label>
+                    <Input
+                      id="night-start-drawer"
+                      type="time"
+                      value={settings.nightChargingSchedule.startTime}
+                      onChange={(e) => handleNightTimeChange('startTime', e.target.value)}
+                      className="h-9 text-sm border-none bg-transparent p-0 text-left focus-visible:ring-0 [-webkit-appearance:none] [&::-webkit-calendar-picker-indicator]:dark:invert [&::-webkit-date-and-time-value]:text-left [&::-webkit-datetime-edit]:p-0 [&::-webkit-datetime-edit-text]:p-0 [&::-webkit-datetime-edit-text]:m-0 [&::-webkit-datetime-edit-hour-field]:p-0 [&::-webkit-datetime-edit-hour-field]:m-0 [&::-webkit-datetime-edit-minute-field]:p-0 [&::-webkit-datetime-edit-minute-field]:m-0"
+                      data-testid="input-night-start"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="night-end-drawer" className="text-xs font-medium">
+                      Endzeit
+                    </Label>
+                    <Input
+                      id="night-end-drawer"
+                      type="time"
+                      value={settings.nightChargingSchedule.endTime}
+                      onChange={(e) => handleNightTimeChange('endTime', e.target.value)}
+                      className="h-9 text-sm border-none bg-transparent p-0 text-left focus-visible:ring-0 [-webkit-appearance:none] [&::-webkit-calendar-picker-indicator]:dark:invert [&::-webkit-date-and-time-value]:text-left [&::-webkit-datetime-edit]:p-0 [&::-webkit-datetime-edit-text]:p-0 [&::-webkit-datetime-edit-text]:m-0 [&::-webkit-datetime-edit-hour-field]:p-0 [&::-webkit-datetime-edit-hour-field]:m-0 [&::-webkit-datetime-edit-minute-field]:p-0 [&::-webkit-datetime-edit-minute-field]:m-0"
+                      data-testid="input-night-end"
+                    />
+                  </div>
+                </div>
+              )}
+
+              <Separator />
+
+              {/* PV Überschussladung */}
+              <div className="flex items-start justify-between gap-4">
+                <div className="space-y-0.5">
+                  <div className="flex items-center gap-2">
+                    <Sun className="w-4 h-4 text-muted-foreground" />
+                    <Label htmlFor="pv-surplus-drawer" className="text-sm font-medium">
+                      PV Überschussladung
+                    </Label>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Automatisches Laden bei Solarstrom-Überschuss
+                  </p>
+                </div>
+                <Switch
+                  id="pv-surplus-drawer"
+                  checked={controlState?.pvSurplus || false}
+                  onCheckedChange={handlePvSurplusToggle}
+                  disabled={!controlState || updateControlsMutation.isPending}
+                  data-testid="switch-pv-surplus"
+                />
+              </div>
+            </div>
+            <DrawerFooter>
+              <DrawerClose asChild>
+                <Button variant="outline" data-testid="button-close-control-drawer">Schließen</Button>
+              </DrawerClose>
+            </DrawerFooter>
+          </div>
         </DrawerContent>
       </Drawer>
     </div>

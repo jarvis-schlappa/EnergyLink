@@ -39,11 +39,16 @@ export type E3dcConfig = z.infer<typeof e3dcConfigSchema>;
 
 export const settingsSchema = z.object({
   wallboxIp: z.string(),
+  wallboxIpBackup: z.string().optional(),
   e3dcIp: z.string().optional(),
+  e3dcIpBackup: z.string().optional(),
   pvSurplusOnUrl: z.string().optional(),
   pvSurplusOffUrl: z.string().optional(),
+  pvSurplusOnUrlBackup: z.string().optional(),
+  pvSurplusOffUrlBackup: z.string().optional(),
   nightChargingSchedule: nightChargingScheduleSchema.optional(),
   e3dc: e3dcConfigSchema.optional(),
+  demoMode: z.boolean().optional(),
 });
 
 export type Settings = z.infer<typeof settingsSchema>;

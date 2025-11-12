@@ -1,6 +1,7 @@
 import ModbusRTU from "modbus-serial";
 import type { E3dcLiveData } from "@shared/schema";
 import { storage } from "./storage";
+import { log } from "./logger";
 
 /**
  * E3DC S10 Modbus TCP Register Mapping (Simple Mode)
@@ -57,16 +58,26 @@ export class E3dcModbusService {
         // Ignoriere Fehler beim Schließen
       }
 
+      // IP und Port trennen (falls IP:Port Format verwendet wird, z.B. "127.0.0.1:5502")
+      let host = ipAddress;
+      let port = MODBUS_PORT;
+      
+      if (ipAddress.includes(':')) {
+        const parts = ipAddress.split(':');
+        host = parts[0];
+        port = parseInt(parts[1], 10) || MODBUS_PORT;
+      }
+
       // Neue Connection aufbauen
-      await this.client.connectTCP(ipAddress, { port: MODBUS_PORT });
+      await this.client.connectTCP(host, { port });
       this.client.setID(1); // Modbus Unit ID (Standard: 1)
       this.isConnected = true;
       this.lastError = null;
-      console.log(`[E3DC Modbus] Verbindung zu ${ipAddress}:${MODBUS_PORT} hergestellt`);
+      log("debug", "system", `E3DC Modbus TCP Verbindung zu ${host}:${port} hergestellt`);
     } catch (error) {
       this.isConnected = false;
       this.lastError = error instanceof Error ? error.message : "Unbekannter Fehler";
-      console.error(`[E3DC Modbus] Verbindungsfehler: ${this.lastError}`);
+      log("error", "system", `E3DC Modbus TCP Verbindungsfehler zu ${ipAddress}`, this.lastError);
       throw new Error(`E3DC Modbus-Verbindung fehlgeschlagen: ${this.lastError}`);
     }
   }
@@ -77,7 +88,7 @@ export class E3dcModbusService {
   async disconnect(): Promise<void> {
     if (this.isConnected) {
       this.client.close(() => {
-        console.log("[E3DC Modbus] Verbindung getrennt");
+        log("debug", "system", "E3DC Modbus TCP Verbindung getrennt");
       });
       this.isConnected = false;
     }
@@ -145,10 +156,7 @@ export class E3dcModbusService {
       const selfConsumption = autarkySelfCons & 0xFF;
 
       // DEBUG: Kompakte einzeilige Ausgabe bei LogLevel DEBUG
-      const logSettings = storage.getLogSettings();
-      if (logSettings.level === "debug") {
-        console.log(`[E3DC Modbus] PV: ${pvPower} W, Batterie: ${batteryPower} W (SOC: ${batterySoc}%), Haus: ${housePower} W, Netz: ${gridPower} W, Autarkie: ${autarky}%, Eigenverbrauch: ${selfConsumption}%, Wallbox: ${kebaWallboxPower} W`);
-      }
+      log("debug", "system", `E3DC Register gelesen: PV=${pvPower}W, Batterie=${batteryPower}W (SOC=${batterySoc}%), Haus=${housePower}W, Netz=${gridPower}W, Autarkie=${autarky}%, Eigenverbrauch=${selfConsumption}%, Wallbox=${kebaWallboxPower}W`);
 
       return {
         pvPower,
@@ -163,7 +171,7 @@ export class E3dcModbusService {
       };
     } catch (error) {
       this.lastError = error instanceof Error ? error.message : "Unbekannter Fehler";
-      console.error(`[E3DC Modbus] Fehler beim Lesen der Register: ${this.lastError}`);
+      log("error", "system", "E3DC Fehler beim Lesen der Modbus Register", this.lastError);
       throw new Error(`E3DC Modbus-Lesefehler: ${this.lastError}`);
     }
   }

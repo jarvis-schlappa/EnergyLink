@@ -1,12 +1,15 @@
 {
-  "wallboxIp": "192.168.40.16",
-  "e3dcIp": "192.168.49.200",
-  "pvSurplusOnUrl": "http://192.168.40.11:8083/fhem?detail=autoWallboxPV&cmd.autoWallboxPV=set%20autoWallboxPV%20on",
-  "pvSurplusOffUrl": "http://192.168.40.11:8083/fhem?detail=autoWallboxPV&cmd.autoWallboxPV=set%20autoWallboxPV%20off",
+  "wallboxIp": "127.0.0.1",
+  "wallboxIpBackup": "192.168.40.16",
+  "e3dcIp": "127.0.0.1:5502",
+  "pvSurplusOnUrl": "http://127.0.0.1:8083/fhem?cmd.autoWallboxPV=on",
+  "pvSurplusOffUrl": "http://127.0.0.1:8083/fhem?cmd.autoWallboxPV=off",
+  "pvSurplusOnUrlBackup": "http://192.168.40.11:8083/fhem?detail=autoWallboxPV&cmd.autoWallboxPV=set%20autoWallboxPV%20on",
+  "pvSurplusOffUrlBackup": "http://192.168.40.11:8083/fhem?detail=autoWallboxPV&cmd.autoWallboxPV=set%20autoWallboxPV%20off",
   "nightChargingSchedule": {
     "enabled": true,
-    "startTime": "00:00",
-    "endTime": "05:00"
+    "startTime": "19:33",
+    "endTime": "19:35"
   },
   "e3dc": {
     "enabled": true,
@@ -16,5 +19,6 @@
     "gridChargeEnableCommand": "-c 2500 -e 6000",
     "gridChargeDisableCommand": "-e 0",
     "gridChargeDuringNightCharging": false
-  }
+  },
+  "demoMode": true
 }

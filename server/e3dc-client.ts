@@ -1,7 +1,7 @@
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import type { E3dcConfig } from '@shared/schema';
-import { log } from './routes';
+import { log } from './logger';
 
 const execAsync = promisify(exec);
 
@@ -130,9 +130,8 @@ class E3dcClient {
       log('info', 'system', `E3DC: ${commandName} erfolgreich ausgeführt`);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
-      const sanitizedError = this.sanitizeOutput(errorMessage, command, sensitiveValues);
       
-      log('error', 'system', `E3DC: ${commandName} fehlgeschlagen`, sanitizedError);
+      log('error', 'system', `E3DC: ${commandName} fehlgeschlagen`, `Command failed: ${fullCommand} ${errorMessage}`);
       throw new Error(`Failed to execute ${commandName}`);
     }
   }

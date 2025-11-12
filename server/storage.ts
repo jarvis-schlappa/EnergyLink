@@ -158,6 +158,117 @@ export class MemStorage implements IStorage {
   }
 
   saveSettings(settings: Settings): void {
+    const previousSettings = this.settings;
+    const wasDemoMode = previousSettings?.demoMode || false;
+    const isDemoMode = settings.demoMode || false;
+    
+    // Demo-Modus aktiviert: Backup erstellen und IPs auf Mock-Server setzen
+    if (isDemoMode && !wasDemoMode) {
+      // Wallbox IP Backup
+      settings.wallboxIpBackup = settings.wallboxIp;
+      settings.wallboxIp = "127.0.0.1";
+      console.log(`[Storage] Demo-Modus aktiviert - Wallbox Backup: ${settings.wallboxIpBackup} → 127.0.0.1`);
+      
+      // E3DC IP: IMMER auf Mock setzen, Backup nur wenn vorher konfiguriert
+      if (settings.e3dcIp) {
+        settings.e3dcIpBackup = settings.e3dcIp;
+        console.log(`[Storage] Demo-Modus aktiviert - E3DC Backup: ${settings.e3dcIpBackup} → 127.0.0.1:5502`);
+      }
+      settings.e3dcIp = "127.0.0.1:5502";
+      
+      // FHEM URLs: Backup erstellen und auf Mock-Server setzen
+      if (settings.pvSurplusOnUrl) {
+        settings.pvSurplusOnUrlBackup = settings.pvSurplusOnUrl;
+        settings.pvSurplusOnUrl = "http://127.0.0.1:8083/fhem?cmd.autoWallboxPV=on";
+        console.log(`[Storage] Demo-Modus aktiviert - FHEM ON URL → Mock-Server`);
+      }
+      if (settings.pvSurplusOffUrl) {
+        settings.pvSurplusOffUrlBackup = settings.pvSurplusOffUrl;
+        settings.pvSurplusOffUrl = "http://127.0.0.1:8083/fhem?cmd.autoWallboxPV=off";
+        console.log(`[Storage] Demo-Modus aktiviert - FHEM OFF URL → Mock-Server`);
+      }
+    }
+    // Demo-Modus deaktiviert: IPs aus previousSettings-Backup wiederherstellen
+    else if (!isDemoMode && wasDemoMode) {
+      // Wallbox IP wiederherstellen
+      if (previousSettings?.wallboxIpBackup) {
+        settings.wallboxIp = previousSettings.wallboxIpBackup;
+        console.log(`[Storage] Demo-Modus deaktiviert - Wallbox wiederhergestellt: ${settings.wallboxIp}`);
+      } else {
+        // Migration/Edge Case: Kein Backup vorhanden
+        if (settings.wallboxIp === "127.0.0.1") {
+          settings.wallboxIp = "192.168.40.16";
+          console.warn(`[Storage] Demo-Modus deaktiviert ohne Backup - Wallbox Fallback auf Default-IP: ${settings.wallboxIp}`);
+        }
+      }
+      delete settings.wallboxIpBackup;
+      
+      // E3DC IP wiederherstellen (nur wenn Backup existiert)
+      if (previousSettings?.e3dcIpBackup) {
+        settings.e3dcIp = previousSettings.e3dcIpBackup;
+        console.log(`[Storage] Demo-Modus deaktiviert - E3DC wiederhergestellt: ${settings.e3dcIp}`);
+        delete settings.e3dcIpBackup;
+      } else if (settings.e3dcIp === "127.0.0.1:5502") {
+        // Falls E3DC auf Mock-IP war aber kein Backup existiert, setze auf undefined
+        delete settings.e3dcIp;
+        console.warn(`[Storage] Demo-Modus deaktiviert ohne E3DC Backup - E3DC IP entfernt`);
+      }
+      
+      // FHEM URLs wiederherstellen
+      if (previousSettings?.pvSurplusOnUrlBackup) {
+        settings.pvSurplusOnUrl = previousSettings.pvSurplusOnUrlBackup;
+        console.log(`[Storage] Demo-Modus deaktiviert - FHEM ON URL wiederhergestellt`);
+      }
+      delete settings.pvSurplusOnUrlBackup;
+      
+      if (previousSettings?.pvSurplusOffUrlBackup) {
+        settings.pvSurplusOffUrl = previousSettings.pvSurplusOffUrlBackup;
+        console.log(`[Storage] Demo-Modus deaktiviert - FHEM OFF URL wiederhergestellt`);
+      }
+      delete settings.pvSurplusOffUrlBackup;
+    }
+    // Demo-Modus bleibt aktiv: IPs auf Mock-Server behalten, Backups erhalten
+    else if (isDemoMode && wasDemoMode) {
+      // Wallbox: Force Mock-IP
+      settings.wallboxIp = "127.0.0.1";
+      if (!settings.wallboxIpBackup && previousSettings?.wallboxIpBackup) {
+        settings.wallboxIpBackup = previousSettings.wallboxIpBackup;
+      }
+      
+      // E3DC: Wenn User neue ECHTE IP setzt (nicht Mock), backup it first
+      if (settings.e3dcIp && settings.e3dcIp !== "127.0.0.1:5502") {
+        // User hat echte IP eingetragen während Demo aktiv - backup erstellen
+        settings.e3dcIpBackup = settings.e3dcIp;
+        settings.e3dcIp = "127.0.0.1:5502";
+        console.log(`[Storage] Demo-Modus aktiv - Neue E3DC IP gesichert: ${settings.e3dcIpBackup} → 127.0.0.1:5502`);
+      } else if (settings.e3dcIp === "127.0.0.1:5502") {
+        // E3DC Mock-IP bleibt gesetzt → Backup aus previousSettings übernehmen
+        if (!settings.e3dcIpBackup && previousSettings?.e3dcIpBackup) {
+          settings.e3dcIpBackup = previousSettings.e3dcIpBackup;
+        }
+      } else if (!settings.e3dcIp && previousSettings?.e3dcIp === "127.0.0.1:5502") {
+        // E3DC IP leer vom Frontend, aber previous war Mock → Force Mock (fresh install case)
+        settings.e3dcIp = "127.0.0.1:5502";
+        if (!settings.e3dcIpBackup && previousSettings?.e3dcIpBackup) {
+          settings.e3dcIpBackup = previousSettings.e3dcIpBackup;
+        }
+      } else if (!settings.e3dcIp && previousSettings?.e3dcIp && previousSettings.e3dcIp !== "127.0.0.1:5502") {
+        // User hat E3DC gelöscht (undefined/null) UND previous war ECHTE IP → Respektiere Löschung
+        delete settings.e3dcIpBackup;
+        console.log(`[Storage] Demo-Modus aktiv - E3DC IP gelöscht (User-Request)`);
+      }
+      
+      // FHEM URLs: Force Mock-URLs, erhalte Backups
+      settings.pvSurplusOnUrl = "http://127.0.0.1:8083/fhem?cmd.autoWallboxPV=on";
+      settings.pvSurplusOffUrl = "http://127.0.0.1:8083/fhem?cmd.autoWallboxPV=off";
+      if (!settings.pvSurplusOnUrlBackup && previousSettings?.pvSurplusOnUrlBackup) {
+        settings.pvSurplusOnUrlBackup = previousSettings.pvSurplusOnUrlBackup;
+      }
+      if (!settings.pvSurplusOffUrlBackup && previousSettings?.pvSurplusOffUrlBackup) {
+        settings.pvSurplusOffUrlBackup = previousSettings.pvSurplusOffUrlBackup;
+      }
+    }
+    
     this.settings = settings;
     this.saveSettingsToFile(settings);
   }

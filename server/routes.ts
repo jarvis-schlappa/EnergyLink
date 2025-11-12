@@ -5,6 +5,7 @@ import { createSocket, type Socket } from "dgram";
 import { settingsSchema, controlStateSchema, logSettingsSchema, type LogLevel, e3dcBatteryStatusSchema, type ControlState, e3dcLiveDataSchema } from "@shared/schema";
 import { e3dcClient } from "./e3dc-client";
 import { getE3dcModbusService } from "./e3dc-modbus";
+import { log } from "./logger";
 
 const UDP_PORT = 7090;
 const UDP_TIMEOUT = 6000;
@@ -13,24 +14,6 @@ const UDP_TIMEOUT = 6000;
 let wallboxSocket: Socket | null = null;
 let currentRequest: { command: string, resolve: (data: any) => void, reject: (error: Error) => void, timeout: NodeJS.Timeout } | null = null;
 let commandQueue: Array<{ ip: string, command: string, resolve: (data: any) => void, reject: (error: Error) => void }> = [];
-
-const logLevelPriority: Record<LogLevel, number> = {
-  debug: 0,
-  info: 1,
-  warning: 2,
-  error: 3,
-};
-
-export function log(level: LogLevel, category: "wallbox" | "webhook" | "system", message: string, details?: string): void {
-  const currentSettings = storage.getLogSettings();
-  const currentLevelPriority = logLevelPriority[currentSettings.level];
-  const messageLevelPriority = logLevelPriority[level];
-  
-  if (messageLevelPriority >= currentLevelPriority) {
-    storage.addLog({ level, category, message, details });
-    console.log(`[${level.toUpperCase()}] [${category}] ${message}${details ? ` - ${details}` : ""}`);
-  }
-}
 
 function parseKebaResponse(response: string): Record<string, any> {
   const trimmed = response.trim();
@@ -170,9 +153,8 @@ function initWallboxSocket(): void {
     log("error", "wallbox", "UDP-Socket-Fehler", error instanceof Error ? error.message : String(error));
   });
 
-  wallboxSocket.bind(UDP_PORT, () => {
-    log("info", "system", `Wallbox-Socket lauscht auf Port ${UDP_PORT}`, ``);
-  });
+  // Kein bind() nötig - UDP-Client nutzt ephemeral port vom OS
+  log("info", "system", "Wallbox UDP-Client initialisiert (ephemeral port)");
 }
 
 function processCommandQueue(): void {
@@ -341,6 +323,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/wallbox/status", async (req, res) => {
     try {
       const settings = storage.getSettings();
+      
       if (!settings?.wallboxIp) {
         return res.status(400).json({ error: "Wallbox IP not configured" });
       }
@@ -354,8 +337,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         plug: report2?.Plug || 0,
         enableSys: report2["Enable sys"] || 0,
         maxCurr: (report2["Max curr"] || 0) / 1000,
-        ePres: (report3["E pres"] || 0) / 10,
-        eTotal: (report3["E total"] || 0) / 10,
+        ePres: report3["E pres"] || 0,  // Energie in Wh (Frontend konvertiert zu kWh)
+        eTotal: report3["E total"] || 0,  // Energie in Wh (Frontend konvertiert zu kWh)
         power: (report3?.P || 0) / 1000000,
         phases: report3?.["U1"] && report3?.["U2"] && report3?.["U3"] ? 3 : 
                 report3?.["U1"] ? 1 : 0,
@@ -393,6 +376,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/wallbox/start", async (req, res) => {
     try {
       const settings = storage.getSettings();
+      
       if (!settings?.wallboxIp) {
         return res.status(400).json({ error: "Wallbox IP not configured" });
       }
@@ -415,6 +399,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/wallbox/stop", async (req, res) => {
     try {
       const settings = storage.getSettings();
+      
       if (!settings?.wallboxIp) {
         return res.status(400).json({ error: "Wallbox IP not configured" });
       }
@@ -437,16 +422,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/wallbox/current", async (req, res) => {
     try {
       const settings = storage.getSettings();
-      if (!settings?.wallboxIp) {
-        return res.status(400).json({ error: "Wallbox IP not configured" });
-      }
-
+      
       const { current } = req.body;
       if (typeof current !== "number" || current < 6 || current > 32) {
         return res.status(400).json({ error: "Current must be between 6 and 32 amperes" });
       }
 
       const currentInMilliamps = Math.round(current * 1000);
+      
+      if (!settings?.wallboxIp) {
+        return res.status(400).json({ error: "Wallbox IP not configured" });
+      }
       
       // Sende curr Befehl und warte auf TCH-OK :done Bestätigung
       const response = await sendUdpCommand(settings.wallboxIp, `curr ${currentInMilliamps}`);
@@ -530,13 +516,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const settings = storage.getSettings();
       
-      // Prüfe ob E3DC IP konfiguriert ist
-      if (!settings?.e3dcIp) {
-        return res.status(400).json({ 
-          error: "E3DC IP-Adresse nicht konfiguriert. Bitte in den Einstellungen eine IP-Adresse angeben." 
-        });
-      }
-
       // Hole Wallbox-Leistung direkt über UDP (Report 3)
       let wallboxPower = 0; // in Watt
       if (settings?.wallboxIp) {
@@ -550,7 +529,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
-      // Verbinde zum E3DC Modbus und lese Live-Daten
+      // E3DC IP erforderlich (im Demo-Modus: 127.0.0.1:5502 für Unified Mock Server)
+      if (!settings?.e3dcIp) {
+        log("error", "system", "E3DC IP nicht konfiguriert - bitte in Einstellungen setzen");
+        return res.status(400).json({ 
+          error: "E3DC IP nicht konfiguriert" 
+        });
+      }
+
+      // Verbinde zum E3DC Modbus (echtes System oder Unified Mock Server im Demo-Modus)
       const e3dcService = getE3dcModbusService();
       
       try {
@@ -597,6 +584,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       if (changedFields.pvSurplus) {
         log("info", "system", `PV-Überschussladung ${state.pvSurplus ? "aktiviert" : "deaktiviert"}`);
+        
+        // Sende Wallbox-Phasen-Umschaltung (Mock versteht "mode pv", echte Wallbox ignoriert)
+        if (settings?.wallboxIp) {
+          try {
+            await sendUdpCommand(settings.wallboxIp, `mode pv ${state.pvSurplus ? '1' : '0'}`);
+            log("info", "wallbox", `Wallbox ${state.pvSurplus ? "auf einphasige (6-32A)" : "auf dreiphasige (6-16A)"} Ladung umgeschaltet`);
+          } catch (error) {
+            // Fehler ignorieren - echte Wallbox kennt diesen Befehl nicht, das ist ok
+            log("debug", "wallbox", `mode pv Befehl ignoriert (normale Wallbox kennt diesen Befehl nicht)`);
+          }
+        }
+        
+        // SmartHome-URL aufrufen (nur wenn konfiguriert)
         await callSmartHomeUrl(
           state.pvSurplus ? settings?.pvSurplusOnUrl : settings?.pvSurplusOffUrl
         );
@@ -639,6 +639,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const settings = storage.getSettings();
       const currentState = storage.getControlState();
       
+      
       // Prüfe ob PV-URLs konfiguriert sind
       if (!settings?.pvSurplusOnUrl) {
         log("warning", "system", "Keine PV-Überschuss URL konfiguriert - Status-Synchronisation übersprungen");
@@ -665,6 +666,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         newState.pvSurplus = pvState;
         hasChanges = true;
         log("info", "system", `PV-Überschussladung extern geändert auf ${pvState ? "ein" : "aus"}`);
+        
+        // Sende Wallbox-Phasen-Umschaltung (Mock versteht "mode pv", echte Wallbox ignoriert)
+        if (settings?.wallboxIp) {
+          try {
+            await sendUdpCommand(settings.wallboxIp, `mode pv ${pvState ? '1' : '0'}`);
+            log("info", "wallbox", `Wallbox ${pvState ? "auf einphasige (6-32A)" : "auf dreiphasige (6-16A)"} Ladung umgeschaltet`);
+          } catch (error) {
+            // Fehler ignorieren - echte Wallbox kennt diesen Befehl nicht, das ist ok
+            log("debug", "wallbox", `mode pv Befehl ignoriert (normale Wallbox kennt diesen Befehl nicht)`);
+          }
+        }
       }
       
       if (hasChanges) {
@@ -725,6 +737,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Hilfsfunktion für Batterie-Entladesperre (E3DC)
   const lockBatteryDischarge = async (settings: any) => {
+    // Im Demo-Modus keine echten CLI-Befehle ausführen
+    if (settings?.demoMode) {
+      log("info", "system", `Batterie-Entladesperre: Demo-Modus - Befehl wird simuliert`);
+      return;
+    }
+    
     if (settings?.e3dc?.enabled && e3dcClient.isConfigured()) {
       log("info", "system", `Batterie-Entladesperre: Verwende E3DC-Integration`);
       await e3dcClient.lockDischarge();
@@ -734,6 +752,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   };
 
   const unlockBatteryDischarge = async (settings: any) => {
+    // Im Demo-Modus keine echten CLI-Befehle ausführen
+    if (settings?.demoMode) {
+      log("info", "system", `Batterie-Entladesperre aufheben: Demo-Modus - Befehl wird simuliert`);
+      return;
+    }
+    
     if (settings?.e3dc?.enabled && e3dcClient.isConfigured()) {
       log("info", "system", `Batterie-Entladesperre aufheben: Verwende E3DC-Integration`);
       await e3dcClient.unlockDischarge();
@@ -744,6 +768,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Hilfsfunktion für Netzstrom-Laden (E3DC)
   const enableGridCharging = async (settings: any) => {
+    // Im Demo-Modus keine echten CLI-Befehle ausführen
+    if (settings?.demoMode) {
+      log("info", "system", `Netzstrom-Laden: Demo-Modus - Befehl wird simuliert`);
+      return;
+    }
+    
     if (settings?.e3dc?.enabled && e3dcClient.isConfigured()) {
       try {
         log("info", "system", `Netzstrom-Laden: Verwende E3DC-Integration`);
@@ -759,6 +789,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   };
 
   const disableGridCharging = async (settings: any) => {
+    // Im Demo-Modus keine echten CLI-Befehle ausführen
+    if (settings?.demoMode) {
+      log("info", "system", `Netzstrom-Laden deaktivieren: Demo-Modus - Befehl wird simuliert`);
+      return;
+    }
+    
     if (settings?.e3dc?.enabled && e3dcClient.isConfigured()) {
       try {
         log("info", "system", `Netzstrom-Laden deaktivieren: Verwende E3DC-Integration`);
@@ -773,7 +809,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   };
 
-  // Scheduler für automatische Nachtladung
+  // Scheduler für zeitgesteuerte Ladung
   let nightChargingSchedulerInterval: NodeJS.Timeout | null = null;
   
   const checkNightChargingSchedule = async () => {
@@ -784,33 +820,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const currentTime = getCurrentTimeInTimezone("Europe/Berlin");
       
-      log("debug", "system", `Nachtladungs-Scheduler läuft - Aktuelle Zeit: ${currentTime}, Zeitsteuerung aktiviert: ${schedule?.enabled}, Zeitfenster: ${schedule?.startTime}-${schedule?.endTime}`);
+      log("debug", "system", `Scheduler für zeitgesteuerte Ladung läuft - Aktuelle Zeit: ${currentTime}, Zeitsteuerung aktiviert: ${schedule?.enabled}, Zeitfenster: ${schedule?.startTime}-${schedule?.endTime}`);
       
       // Wenn Scheduler deaktiviert wurde, aber Wallbox noch lädt -> stoppen
       if (!schedule?.enabled) {
         if (currentState.nightCharging) {
-          log("info", "system", `Nachtladung: Zeitsteuerung deaktiviert - stoppe Laden`);
+          log("info", "system", `Zeitgesteuerte Ladung: Zeitsteuerung deaktiviert - stoppe Laden`);
           
           // Stoppe die Wallbox (kann fehlschlagen)
           if (settings?.wallboxIp) {
             try {
               await sendUdpCommand(settings.wallboxIp, "ena 0");
             } catch (error) {
-              log("error", "system", "Nachtladung: Fehler beim Stoppen der Wallbox (Scheduler deaktiviert)", error instanceof Error ? error.message : String(error));
+              log("error", "system", "Zeitgesteuerte Ladung: Fehler beim Stoppen der Wallbox (Scheduler deaktiviert)", error instanceof Error ? error.message : String(error));
             }
           }
           
           // Deaktiviere Batterie-Entladesperre beim Deaktivieren des Schedulers (immer)
-          log("info", "system", `Nachtladung: Deaktiviere Batterie-Entladesperre (Scheduler deaktiviert)`);
+          log("info", "system", `Zeitgesteuerte Ladung: Deaktiviere Batterie-Entladesperre (Scheduler deaktiviert)`);
           await unlockBatteryDischarge(settings);
           
           // Deaktiviere Netzstrom-Laden falls aktiviert
           if (e3dcClient.isConfigured() && e3dcClient.isGridChargeDuringNightChargingEnabled()) {
-            try {
-              log("info", "system", `Nachtladung: Deaktiviere Netzstrom-Laden (Scheduler deaktiviert)`);
-              await e3dcClient.disableGridCharge();
-            } catch (error) {
-              log("error", "system", "Fehler beim Deaktivieren des Netzstrom-Ladens", error instanceof Error ? error.message : String(error));
+            // Demo-Modus-Check: Keine echten CLI-Befehle im Demo-Modus
+            if (settings?.demoMode) {
+              log("info", "system", `Zeitgesteuerte Ladung: Netzstrom-Laden deaktivieren - Demo-Modus (simuliert)`);
+            } else {
+              try {
+                log("info", "system", `Zeitgesteuerte Ladung: Deaktiviere Netzstrom-Laden (Scheduler deaktiviert)`);
+                await e3dcClient.disableGridCharge();
+              } catch (error) {
+                log("error", "system", "Fehler beim Deaktivieren des Netzstrom-Ladens", error instanceof Error ? error.message : String(error));
+              }
             }
           }
           
@@ -822,21 +863,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const isInTimeWindow = isTimeInRange(currentTime, schedule.startTime, schedule.endTime);
       
       if (isInTimeWindow && !currentState.nightCharging) {
-        log("info", "system", `Nachtladung: Zeitfenster erreicht (${schedule.startTime}-${schedule.endTime}) - starte Laden`);
+        log("info", "system", `Zeitgesteuerte Ladung: Zeitfenster erreicht (${schedule.startTime}-${schedule.endTime}) - starte Laden`);
         
-        // Aktiviere Batterie-Entladesperre beim Start der Nachtladung (ZUERST!)
-        log("info", "system", `Nachtladung: Aktiviere Batterie-Entladesperre`);
+        // Aktiviere Batterie-Entladesperre beim Start der zeitgesteuerten Ladung (ZUERST!)
+        log("info", "system", `Zeitgesteuerte Ladung: Aktiviere Batterie-Entladesperre`);
         await lockBatteryDischarge(settings);
         
         // Aktiviere Netzstrom-Laden falls konfiguriert
         let gridChargingActive = false;
         if (e3dcClient.isConfigured() && e3dcClient.isGridChargeDuringNightChargingEnabled()) {
-          try {
-            log("info", "system", `Nachtladung: Aktiviere Netzstrom-Laden`);
-            await e3dcClient.enableGridCharge();
-            gridChargingActive = true;
-          } catch (error) {
-            log("error", "system", "Fehler beim Aktivieren des Netzstrom-Ladens", error instanceof Error ? error.message : String(error));
+          // Demo-Modus-Check: Keine echten CLI-Befehle im Demo-Modus
+          if (settings?.demoMode) {
+            log("info", "system", `Zeitgesteuerte Ladung: Netzstrom-Laden aktivieren - Demo-Modus (simuliert)`);
+            gridChargingActive = true; // Simuliere Erfolg
+          } else {
+            try {
+              log("info", "system", `Zeitgesteuerte Ladung: Aktiviere Netzstrom-Laden`);
+              await e3dcClient.enableGridCharge();
+              gridChargingActive = true;
+            } catch (error) {
+              log("error", "system", "Fehler beim Aktivieren des Netzstrom-Ladens", error instanceof Error ? error.message : String(error));
+            }
           }
         }
         
@@ -845,41 +892,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
           try {
             await sendUdpCommand(settings.wallboxIp, "ena 1");
           } catch (error) {
-            log("error", "system", "Nachtladung: Fehler beim Starten der Wallbox (Batterie-Sperre ist aktiv)", error instanceof Error ? error.message : String(error));
+            log("error", "system", "Zeitgesteuerte Ladung: Fehler beim Starten der Wallbox (Batterie-Sperre ist aktiv)", error instanceof Error ? error.message : String(error));
           }
         }
         
         storage.saveControlState({ ...currentState, nightCharging: true, batteryLock: true, gridCharging: gridChargingActive });
       } else if (!isInTimeWindow && currentState.nightCharging) {
-        log("info", "system", `Nachtladung: Zeitfenster beendet - stoppe Laden`);
+        log("info", "system", `Zeitgesteuerte Ladung: Zeitfenster beendet - stoppe Laden`);
         
         // Stoppe die Wallbox (kann fehlschlagen)
         if (settings?.wallboxIp) {
           try {
             await sendUdpCommand(settings.wallboxIp, "ena 0");
           } catch (error) {
-            log("error", "system", "Nachtladung: Fehler beim Stoppen der Wallbox", error instanceof Error ? error.message : String(error));
+            log("error", "system", "Zeitgesteuerte Ladung: Fehler beim Stoppen der Wallbox", error instanceof Error ? error.message : String(error));
           }
         }
         
-        // Deaktiviere Batterie-Entladesperre beim Ende der Nachtladung (immer)
-        log("info", "system", `Nachtladung: Deaktiviere Batterie-Entladesperre`);
+        // Deaktiviere Batterie-Entladesperre beim Ende der zeitgesteuerten Ladung (immer)
+        log("info", "system", `Zeitgesteuerte Ladung: Deaktiviere Batterie-Entladesperre`);
         await unlockBatteryDischarge(settings);
         
         // Deaktiviere Netzstrom-Laden falls aktiviert
         if (e3dcClient.isConfigured() && e3dcClient.isGridChargeDuringNightChargingEnabled()) {
-          try {
-            log("info", "system", `Nachtladung: Deaktiviere Netzstrom-Laden`);
-            await e3dcClient.disableGridCharge();
-          } catch (error) {
-            log("error", "system", "Fehler beim Deaktivieren des Netzstrom-Ladens", error instanceof Error ? error.message : String(error));
+          // Demo-Modus-Check: Keine echten CLI-Befehle im Demo-Modus
+          if (settings?.demoMode) {
+            log("info", "system", `Zeitgesteuerte Ladung: Netzstrom-Laden deaktivieren - Demo-Modus (simuliert)`);
+          } else {
+            try {
+              log("info", "system", `Zeitgesteuerte Ladung: Deaktiviere Netzstrom-Laden`);
+              await e3dcClient.disableGridCharge();
+            } catch (error) {
+              log("error", "system", "Fehler beim Deaktivieren des Netzstrom-Ladens", error instanceof Error ? error.message : String(error));
+            }
           }
         }
         
         storage.saveControlState({ ...currentState, nightCharging: false, batteryLock: false, gridCharging: false });
       }
     } catch (error) {
-      log("error", "system", "Fehler beim Nachtladungs-Scheduler", String(error));
+      log("error", "system", "Fehler beim Scheduler für zeitgesteuerte Ladung", String(error));
     }
   };
   
@@ -913,7 +965,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   }
 
   // Starte Scheduler synchronisiert zur vollen Minute
-  log("info", "system", "Nachtladungs-Scheduler wird gestartet - prüft jede volle Minute");
+  log("info", "system", "Scheduler für zeitgesteuerte Ladung wird gestartet - prüft jede volle Minute");
   
   // Berechne Verzögerung bis zur nächsten vollen Minute
   const now = new Date();

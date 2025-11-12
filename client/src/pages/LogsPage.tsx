@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import type { LogEntry, LogSettings, LogLevel } from "@shared/schema";
+import type { LogEntry, LogSettings, LogLevel, Settings } from "@shared/schema";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -22,6 +22,10 @@ export default function LogsPage() {
 
   const { data: logSettings } = useQuery<LogSettings>({
     queryKey: ["/api/logs/settings"],
+  });
+
+  const { data: settings } = useQuery<Settings>({
+    queryKey: ["/api/settings"],
   });
 
   const updateLogLevelMutation = useMutation({
@@ -104,8 +108,16 @@ export default function LogsPage() {
     <div className="flex flex-col h-full">
       <div className="flex-1 overflow-y-auto pb-24 pt-6">
         <div className="max-w-4xl mx-auto px-4 space-y-6">
-          <div>
-            <h1 className="text-2xl font-bold mb-2">Logs</h1>
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <img src="/apple-touch-icon.png" alt="EnergyLink" className="w-10 h-10 rounded-lg" />
+              <h1 className="text-2xl font-bold mb-0">Logs</h1>
+            </div>
+            {settings?.demoMode && (
+              <Badge variant="secondary" className="text-xs shrink-0" data-testid="badge-demo-mode">
+                Demo
+              </Badge>
+            )}
           </div>
 
           <Card>
