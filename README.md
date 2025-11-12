@@ -118,6 +118,8 @@ Detaillierte Kommunikationsprotokolle zur Fehlersuche
 ### Software
 - **Optional:** FHEM SmartHome-System für automatische PV-Überschuss-Ladefunktionen
 - **Optional:** E3DC CLI-Tool (e3dcset) für Batteriesperrung und Netzladung
+  - GitHub: [mschlappa/e3dcset](https://github.com/mschlappa/e3dcset)
+  - Ermöglicht Batteriesteuerung und Netzladung via Kommandozeile
 - **Browser:** Moderner Webbrowser (Chrome, Safari, Firefox, Edge)
 
 ### Deployment-Optionen
@@ -159,6 +161,8 @@ Detaillierte Kommunikationsprotokolle zur Fehlersuche
 - **E3DC-Integration aktivieren:** Schalten Sie die E3DC-Integration ein
 - **IP-Adresse:** Tragen Sie die IP Ihres E3DC S10 Systems ein (z.B. 192.168.40.50:502)
 - **CLI-Tool Pfad:** Pfad zum e3dcset-Tool (z.B. `/opt/e3dcset`)
+  - **Download:** [e3dcset auf GitHub](https://github.com/mschlappa/e3dcset)
+  - Installation & Konfiguration siehe e3dcset README
 - Nach Aktivierung erscheinen die E3DC-Monitoring-Seite und zusätzliche Steuerungs-Optionen
 
 #### 3. SmartHome-URLs konfigurieren (optional)
@@ -195,7 +199,7 @@ Detaillierte Kommunikationsprotokolle zur Fehlersuche
 - Ihre E3DC-Hausbatterie wird nicht zum Laden des E-Autos genutzt
 - Verhindert unnötige Lade-/Entladeverluste der Hausbatterie
 - Die Wallbox lädt nur mit Netzstrom oder direktem PV-Überschuss
-- **Steuerung:** Via E3DC CLI-Tool (e3dcset)
+- **Steuerung:** Via E3DC CLI-Tool ([e3dcset](https://github.com/mschlappa/e3dcset))
 - **Statusanzeige:** Ein Batterie-Schloss-Icon zeigt an, wenn die Batterie gesperrt ist
 
 ### Netzladung der Batterie (nur E3DC)
@@ -203,7 +207,7 @@ Detaillierte Kommunikationsprotokolle zur Fehlersuche
 - Lädt Ihre E3DC-Hausbatterie aus dem Netz während der Nachtladung
 - Nutzen Sie günstige Nachtstromtarife zum Laden der Hausbatterie
 - Kann optional mit Nachtladung kombiniert werden
-- **Steuerung:** Via E3DC CLI-Tool (e3dcset)
+- **Steuerung:** Via E3DC CLI-Tool ([e3dcset](https://github.com/mschlappa/e3dcset))
 
 ## Häufige Fragen (FAQ)
 
