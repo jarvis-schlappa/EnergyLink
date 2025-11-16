@@ -18,6 +18,52 @@ export class ChargingStrategyController {
   }
 
   /**
+   * Stoppt die Wallbox-Ladung wenn die Strategie auf "off" gesetzt wird.
+   * 
+   * Diese Methode:
+   * 1. Deaktiviert Battery Lock (via handleStrategyChange)
+   * 2. Stoppt die Wallbox (via "ena 0")
+   * 3. Aktualisiert Context und Settings
+   * 
+   * Wird aufgerufen von:
+   * - Scheduler bei activeStrategy === "off"
+   * - Broadcast-Listener bei Input 0
+   */
+  async stopChargingForStrategyOff(wallboxIp: string): Promise<void> {
+    const context = storage.getChargingContext();
+    const settings = storage.getSettings();
+    
+    // Prüfe ob bereits alles im Zielzustand ist
+    const alreadyStopped = !context.isActive;
+    const alreadyOffStrategy = context.strategy === "off" && 
+                                settings?.chargingStrategy?.activeStrategy === "off";
+    
+    // Wenn bereits alles gestoppt und auf "off" ist, komplett überspringen (keine Logs)
+    if (alreadyStopped && alreadyOffStrategy) {
+      log('debug', 'system', '[ChargingStrategyController] Wallbox bereits gestoppt und Strategie auf "off" - überspringe');
+      return;
+    }
+    
+    log('info', 'system', '[ChargingStrategyController] Strategie auf "off" → Wallbox wird gestoppt');
+    
+    // 1. Battery Lock deaktivieren (falls E3DC aktiviert)
+    await this.handleStrategyChange("off");
+    
+    // 2. Wallbox stoppen (stopCharging ist idempotent, stoppt nur wenn isActive)
+    await this.stopCharging(wallboxIp);
+    
+    // 3. Nur Strategie auf "off" setzen (stopCharging hat bereits isActive=false gesetzt)
+    storage.updateChargingContext({ strategy: "off" });
+    
+    if (settings && settings.chargingStrategy) {
+      settings.chargingStrategy.activeStrategy = "off";
+      storage.saveSettings(settings);
+    }
+    
+    log('info', 'system', '[ChargingStrategyController] Wallbox gestoppt, Strategie auf "off" gesetzt');
+  }
+
+  /**
    * Behandelt Strategie-Wechsel und aktiviert/deaktiviert Battery Lock
    * 
    * WICHTIG: Muss nach jedem Strategie-Wechsel aufgerufen werden!
@@ -44,14 +90,23 @@ export class ChargingStrategyController {
       }
     }
 
+    // Hole aktuellen Battery Lock Status
+    const controlState = storage.getControlState();
+    const currentBatteryLock = controlState.batteryLock ?? false;
+
     // Battery Lock nur für "Max Power without Battery" aktivieren
     if (newStrategy === "max_without_battery") {
+      // Prüfe ob Lock bereits aktiv ist
+      if (currentBatteryLock) {
+        log('debug', 'system', 'Battery Lock bereits aktiviert - überspringe');
+        return;
+      }
+      
       try {
         log('info', 'system', 'Strategie-Wechsel: Max Power ohne Batterie → Battery Lock aktivieren');
         await e3dcClient.lockDischarge();
         
         // Control State aktualisieren (für Konsistenz mit UI)
-        const controlState = storage.getControlState();
         storage.saveControlState({ ...controlState, batteryLock: true });
       } catch (error) {
         log('error', 'system', 'Fehler beim Aktivieren der Entladesperre', error instanceof Error ? error.message : String(error));
@@ -59,12 +114,17 @@ export class ChargingStrategyController {
       }
     } else if (newStrategy === "off" || newStrategy === "surplus_battery_prio" || 
                newStrategy === "surplus_vehicle_prio" || newStrategy === "max_with_battery") {
+      // Prüfe ob Lock bereits deaktiviert ist
+      if (!currentBatteryLock) {
+        log('debug', 'system', 'Battery Lock bereits deaktiviert - überspringe');
+        return;
+      }
+      
       try {
         log('info', 'system', `Strategie-Wechsel: ${newStrategy} → Battery Lock deaktivieren`);
         await e3dcClient.unlockDischarge();
         
         // Control State aktualisieren (für Konsistenz mit UI)
-        const controlState = storage.getControlState();
         storage.saveControlState({ ...controlState, batteryLock: false });
       } catch (error) {
         log('error', 'system', 'Fehler beim Deaktivieren der Entladesperre', error instanceof Error ? error.message : String(error));
@@ -83,21 +143,17 @@ export class ChargingStrategyController {
     
     const config = settings.chargingStrategy;
     
+    // WICHTIG: Prüfe "off"-Strategie VOR reconcile, um repetitive Stops zu vermeiden
+    if (config.activeStrategy === "off") {
+      // Verwende stopChargingForStrategyOff für idempotentes Stoppen
+      await this.stopChargingForStrategyOff(wallboxIp);
+      return;
+    }
+    
     // KRITISCH: Context mit echtem Wallbox-Status abgleichen
     await this.reconcileChargingContext(wallboxIp);
     
     const context = storage.getChargingContext();
-    
-    if (config.activeStrategy === "off") {
-      // Context auf "off" aktualisieren, damit Frontend richtig anzeigt
-      if (context.strategy !== "off") {
-        storage.updateChargingContext({ strategy: "off" });
-      }
-      if (context.isActive) {
-        await this.stopCharging(wallboxIp);
-      }
-      return;
-    }
     
     // Context-Strategie mit Config synchronisieren
     if (context.strategy !== config.activeStrategy) {
@@ -561,7 +617,7 @@ export class ChargingStrategyController {
         strategy: newStrategy,
       });
       
-      log("info", "system", `Max Power Strategie aktiviert - nächster Strategy Check startet Ladung`);
+      log("debug", "system", `Max Power Strategie aktiviert - nächster Strategy Check startet Ladung`);
     } else if (newStrategy === "off") {
       storage.updateChargingContext({
         strategy: newStrategy,
