@@ -156,3 +156,118 @@ Aktuelle Polling-Intervalle (5s für Status, 2s für Settings) führen zu spürb
 **Dependencies:**
 - Socket.IO (optional, kann auch native WebSocket verwenden)
 - Keine Breaking Changes für bestehende API-Clients
+
+---
+
+### FHEM-E3DC-Integration (Live-Daten-Sync)
+
+**Status:** Backlog (Nov 2024) | **Priorität:** LOW (Nice-to-have)
+
+**Hintergrund:**
+FHEM soll ein virtuelles `S10`-Device erhalten, das die aktuellen E3DC-Werte widerspiegelt. Damit können FHEM-Nutzer auf E3DC-Daten zugreifen, ohne direkten Modbus-Zugriff zu benötigen.
+
+**Anforderungen:**
+- 5 E3DC-Werte an FHEM senden (alle 10 Sekunden)
+- Sequentielle Requests (nicht parallel) um FHEM-Timeouts zu vermeiden
+- Funktioniert auch im Demo-Modus (mit Mock-Daten)
+- Separater Ein/Aus-Schalter in Settings
+- Log-Kategorie: `fhem`
+
+**FHEM-Schnittstelle:**
+```
+Base-URL: http://192.168.40.11:8083/fhem?cmd=setreading%20S10%20{name}%20{wert}
+Device: S10 (fix, nicht konfigurierbar)
+```
+
+**Daten-Mapping:**
+
+| FHEM Reading | E3DC Quelle | Beschreibung | Beispiel |
+|--------------|-------------|--------------|----------|
+| `sonne` | `pvPower` | PV-Leistung | 4500 W |
+| `haus` | `housePower` | Hausverbrauch | 1200 W |
+| `soc` | `batterySoc` | Batterie-Ladezustand | 85 % |
+| `netz` | `gridPower` | Netzbezug/Einspeisung | -3300 W (negativ = Einspeisung) |
+| `speicher` | `batteryPower` | Batterieleistung | -2000 W (negativ = Entladung) |
+
+**Implementierungsplan:**
+
+**Task 1: LSP-Fehler beheben (5 Min)**
+- [ ] Behebe 3 LSP-Fehler in `server/storage.ts`:
+  - `lastAdjustmentTimes` → `lastAdjustment` (2x)
+  - `mockWallboxPhases` und `mockWallboxPlugStatus` zu Default-Settings hinzufügen
+
+**Task 2: Schema erweitern (10 Min)**
+- [ ] `shared/schema.ts`: Neues `fhemSyncSchema` hinzufügen
+  ```typescript
+  fhemSync: {
+    enabled: boolean,
+    baseUrl: string  // "http://192.168.40.11:8083/fhem"
+  }
+  ```
+- [ ] Settings-Schema um `fhemSync` erweitern
+- [ ] Default-Werte in `storage.ts` setzen
+
+**Task 3: FHEM-Sync-Service erstellen (30 Min)**
+- [ ] Neue Datei: `server/fhem-e3dc-sync.ts`
+- [ ] Funktion: `sendFhemUpdate(name: string, value: number)`
+  - URL-Encoding für FHEM-Befehle
+  - Logging mit Kategorie `fhem`
+  - Error-Handling (FHEM nicht erreichbar)
+- [ ] Funktion: `syncE3dcToFhem()`
+  - Holt E3DC-Live-Daten (Modbus oder Mock)
+  - Sendet **sequentiell** 5 Updates mit 200ms Delay
+  - Prüft `settings.fhemSync?.enabled`
+- [ ] Scheduler: `setInterval(syncE3dcToFhem, 10000)` in `index.ts`
+
+**Task 4: Settings-UI erweitern (15 Min)**
+- [ ] `client/src/pages/SettingsPage.tsx`: Neuer Accordion-Bereich
+  ```
+  📡 FHEM Integration
+  ├─ FHEM E3DC Sync: [x] Aktiviert
+  ├─ FHEM-Server: http://192.168.40.11:8083/fhem
+  └─ ℹ️ Sendet E3DC-Daten alle 10s an FHEM Device 'S10'
+  ```
+- [ ] Switch-Control für `fhemSync.enabled`
+- [ ] Input-Feld für `fhemSync.baseUrl`
+- [ ] Hint-Box mit Beispiel-URL
+
+**Task 5: Testing (10 Min)**
+- [ ] Demo-Modus: Mock-Daten werden gesendet
+- [ ] Produktion: E3DC-Live-Daten werden gesendet
+- [ ] Logging prüfen (Kategorie `fhem`)
+- [ ] FHEM-Timeout-Verhalten testen (sequentielle Requests)
+
+**Geschätzte Entwicklungszeit:** ~1 Stunde
+
+**Technische Details:**
+
+**Sequentieller Request-Flow:**
+```typescript
+async function syncE3dcToFhem() {
+  if (!settings.fhemSync?.enabled) return;
+  
+  const liveData = await e3dcModbusService.getLiveData();
+  const updates = [
+    { name: 'sonne', value: liveData.pvPower },
+    { name: 'haus', value: liveData.housePower },
+    { name: 'soc', value: liveData.batterySoc },
+    { name: 'netz', value: liveData.gridPower },
+    { name: 'speicher', value: liveData.batteryPower }
+  ];
+  
+  for (const update of updates) {
+    await sendFhemUpdate(update.name, update.value);
+    await sleep(200); // 200ms Delay zwischen Requests
+  }
+}
+```
+
+**Fehlerbehandlung:**
+- FHEM nicht erreichbar: Logging, kein Crash
+- E3DC nicht verbunden: Scheduler läuft weiter (sendet 0-Werte oder überspringt)
+- Einzelne Updates fehlgeschlagen: Andere Updates laufen weiter
+
+**Dependencies:**
+- Keine neuen NPM-Pakete erforderlich
+- Nutzt bestehende `fetch()` API
+- Nutzt bestehende E3DC-Modbus-Integration
