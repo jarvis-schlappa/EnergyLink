@@ -1,11 +1,11 @@
 {
   "strategy": "surplus_vehicle_prio",
   "isActive": true,
-  "currentAmpere": 28,
-  "targetAmpere": 28,
+  "currentAmpere": 24,
+  "targetAmpere": 24,
   "currentPhases": 1,
   "adjustmentCount": 0,
   "lastAdjustmentTimes": [],
-  "calculatedSurplus": 6534,
-  "lastAdjustment": "2025-11-16T17:04:39.718Z"
+  "calculatedSurplus": 5584,
+  "lastAdjustment": "2025-11-16T17:40:11.574Z"
 }

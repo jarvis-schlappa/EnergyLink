@@ -133,6 +133,39 @@ export class ChargingStrategyController {
     }
   }
 
+  /**
+   * Triggert einen sofortigen Check nach Strategiewechsel.
+   * Vermeidet 0-15s Verzögerung durch Scheduler-Intervall.
+   * 
+   * Nutzt lastE3dcData als Fallback - wenn nicht verfügbar, wartet auf nächsten Scheduler-Run.
+   * 
+   * Wird aufgerufen von:
+   * - /api/charging/strategy nach Strategiewechsel
+   * - /api/wallbox/start nach manuellem Start
+   */
+  async triggerImmediateCheck(wallboxIp: string): Promise<void> {
+    try {
+      // Verwende gecachte E3DC-Daten (werden alle 15s vom Scheduler aktualisiert)
+      if (!this.lastE3dcData) {
+        log('debug', 'system', '[ImmediateCheck] Keine E3DC-Daten verfügbar - Scheduler wird Check nachholen');
+        return;
+      }
+      
+      // Führe normalen Strategy-Check mit gecachten Daten aus
+      await this.processStrategy(this.lastE3dcData, wallboxIp);
+      
+      log('debug', 'system', '[ImmediateCheck] Sofortiger Check nach Strategiewechsel durchgeführt');
+    } catch (error) {
+      log(
+        'warning',
+        'system',
+        '[ImmediateCheck] Sofortiger Check fehlgeschlagen (nicht kritisch, Scheduler übernimmt)',
+        error instanceof Error ? error.message : String(error)
+      );
+      // Nicht kritisch - Scheduler wird Check nachholen
+    }
+  }
+
   async processStrategy(liveData: E3dcLiveData, wallboxIp: string): Promise<void> {
     this.lastE3dcData = liveData;
     
@@ -459,6 +492,7 @@ export class ChargingStrategyController {
       if (!context.belowThresholdSince) {
         storage.updateChargingContext({
           belowThresholdSince: now.toISOString(),
+          remainingStopDelay: config.stopDelaySeconds, // Initial Stopp-Countdown
         });
         log("info", "system", 
           `[${strategy}] Überschuss unter Schwellwert: ${Math.round(availableSurplus)}W < ${config.stopThresholdWatt}W - Stopp-Timer gestartet`
@@ -468,15 +502,25 @@ export class ChargingStrategyController {
       
       const belowSince = new Date(context.belowThresholdSince);
       const duration = (now.getTime() - belowSince.getTime()) / 1000;
+      const remainingSeconds = Math.max(0, config.stopDelaySeconds - duration);
+      
+      // Update remaining delay für Frontend-Countdown
+      storage.updateChargingContext({
+        remainingStopDelay: Math.ceil(remainingSeconds),
+      });
       
       if (duration >= config.stopDelaySeconds) {
         log("info", "system", 
           `[${strategy}] Stopp-Bedingung erfüllt: Überschuss ${Math.round(availableSurplus)}W zu niedrig für ${Math.round(duration)}s (Schwellwert: ${config.stopThresholdWatt}W, Verzögerung: ${config.stopDelaySeconds}s)`
         );
+        storage.updateChargingContext({
+          belowThresholdSince: undefined,
+          remainingStopDelay: undefined,
+        });
         return true;
       } else {
         log("debug", "system", 
-          `[${strategy}] Unter Schwellwert seit ${Math.round(duration)}s von ${config.stopDelaySeconds}s - warte noch ${Math.round(config.stopDelaySeconds - duration)}s`
+          `[${strategy}] Unter Schwellwert seit ${Math.round(duration)}s von ${config.stopDelaySeconds}s - warte noch ${remainingSeconds.toFixed(1)}s`
         );
       }
     } else {
@@ -486,6 +530,7 @@ export class ChargingStrategyController {
         );
         storage.updateChargingContext({
           belowThresholdSince: undefined,
+          remainingStopDelay: undefined,
         });
       }
     }

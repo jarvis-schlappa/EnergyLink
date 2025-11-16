@@ -164,6 +164,7 @@ export const chargingContextSchema = z.object({
   adjustmentCount: z.number(),
   calculatedSurplus: z.number().optional(),
   remainingStartDelay: z.number().optional(), // Sekunden bis zum Start (nur für Überschuss-Strategien)
+  remainingStopDelay: z.number().optional(), // Sekunden bis zum Stopp (nur für Überschuss-Strategien)
 });
 
 export type ChargingContext = z.infer<typeof chargingContextSchema>;

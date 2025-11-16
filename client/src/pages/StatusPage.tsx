@@ -38,10 +38,10 @@ import { de } from "date-fns/locale";
 // Strategy Label Mapping
 const STRATEGY_OPTIONS: Array<{ value: ChargingStrategy; label: string; description: string }> = [
   { value: "off", label: "Aus", description: "Keine automatische Ladung" },
-  { value: "surplus_battery_prio", label: "Überschuss (Batterie priorisiert)", description: "Nur Netzeinspeisung nutzen" },
-  { value: "surplus_vehicle_prio", label: "Überschuss (Fahrzeug priorisiert)", description: "Mit Batterie-Entladung" },
-  { value: "max_with_battery", label: "Max Power (mit Batterieentladung)", description: "Volle Leistung inkl. Batterie" },
-  { value: "max_without_battery", label: "Max Power (ohne Batterieentladung)", description: "Volle Leistung ohne Batterie" },
+  { value: "surplus_battery_prio", label: "Überschuss (Batterie priorisiert)", description: "Nur PV Überschuss nutzen" },
+  { value: "surplus_vehicle_prio", label: "Überschuss (Fahrzeug priorisiert)", description: "Fahrzeug nur mit PV Überschuss laden" },
+  { value: "max_with_battery", label: "Max Power (mit Batterieentladung)", description: "Volle Leistung mit Entladung der Hausbatterie" },
+  { value: "max_without_battery", label: "Max Power (ohne Batterieentladung)", description: "Volle Leistung ohne Entladung der Hausbatterie" },
 ];
 
 
@@ -58,6 +58,7 @@ export default function StatusPage() {
   const [showBuildInfoDialog, setShowBuildInfoDialog] = useState(false);
   const [relativeUpdateTime, setRelativeUpdateTime] = useState<string>("");
   const [liveCountdown, setLiveCountdown] = useState<number | null>(null);
+  const [liveStopCountdown, setLiveStopCountdown] = useState<number | null>(null);
 
   const { data: status, isLoading, error } = useQuery<WallboxStatus>({
     queryKey: ["/api/wallbox/status"],
@@ -135,7 +136,7 @@ export default function StatusPage() {
     previousNightChargingRef.current = controlState?.nightCharging;
   }, [controlState?.nightCharging, status]);
 
-  // Live-Countdown für Überschuss-Strategien
+  // Live-Countdown für Überschuss-Strategien (Start)
   useEffect(() => {
     if (chargingContext?.remainingStartDelay !== undefined && chargingContext.remainingStartDelay > 0) {
       // Backend liefert neuen Wert - setze Live-Countdown
@@ -155,6 +156,27 @@ export default function StatusPage() {
       setLiveCountdown(null);
     }
   }, [chargingContext?.remainingStartDelay]);
+
+  // Live-Countdown für Überschuss-Strategien (Stopp)
+  useEffect(() => {
+    if (chargingContext?.remainingStopDelay !== undefined && chargingContext.remainingStopDelay > 0) {
+      // Backend liefert neuen Wert - setze Live-Stopp-Countdown
+      setLiveStopCountdown(chargingContext.remainingStopDelay);
+      
+      // Starte sekündlichen Countdown zwischen Backend-Updates
+      const interval = setInterval(() => {
+        setLiveStopCountdown(prev => {
+          if (prev === null || prev <= 0) return 0;
+          return prev - 1;
+        });
+      }, 1000);
+      
+      return () => clearInterval(interval);
+    } else {
+      // Kein Stopp-Countdown aktiv
+      setLiveStopCountdown(null);
+    }
+  }, [chargingContext?.remainingStopDelay]);
 
   const startChargingMutation = useMutation({
     mutationFn: (strategy?: string) => apiRequest("POST", "/api/wallbox/start", { strategy }),
@@ -555,12 +577,23 @@ export default function StatusPage() {
                       const isSurplusStrategy = strategy === "surplus_battery_prio" || strategy === "surplus_vehicle_prio";
                       
                       // UI-Verbesserung für Überschuss-Strategien
-                      if (isSurplusStrategy && !isCharging) {
-                        // Countdown läuft
+                      if (isSurplusStrategy) {
+                        // Lädt und Stopp-Countdown aktiv (PV zu niedrig)
+                        if (isCharging && liveStopCountdown !== null && liveStopCountdown > 0) {
+                          return `Stopp in ${liveStopCountdown}s`;
+                        }
+                        
+                        // Lädt normal (genug PV)
+                        if (isCharging) {
+                          return getStrategyLabel(strategy);
+                        }
+                        
+                        // NICHT lädt: Start-Countdown läuft
                         if (liveCountdown !== null && liveCountdown > 0) {
                           return `Start in ${liveCountdown}s`;
                         }
-                        // Warte auf Überschuss (kein Countdown aktiv)
+                        
+                        // NICHT lädt: Warte auf Überschuss
                         return "Warte auf Überschuss";
                       }
                       
@@ -584,7 +617,16 @@ export default function StatusPage() {
                   <div className="flex items-center gap-2">
                     <Gauge className="w-5 h-5 text-primary" />
                     <CardTitle className="text-base font-semibold">
-                      Ladestrom {Math.round(status?.maxCurr || 0)}A
+                      Ladestrom {(() => {
+                        const strategy = settings?.chargingStrategy?.activeStrategy;
+                        const isSurplusStrategy = strategy === "surplus_battery_prio" || strategy === "surplus_vehicle_prio";
+                        // Bei Überschuss-Strategien: Zeige echte Wallbox-Stromstärke
+                        if (isSurplusStrategy) {
+                          return Math.round(status?.maxCurr || 0);
+                        }
+                        // Bei manuellen Strategien: Zeige Slider-Wert
+                        return currentAmpere;
+                      })()}A
                     </CardTitle>
                   </div>
                   {(() => {
@@ -613,7 +655,16 @@ export default function StatusPage() {
               </CardHeader>
               <CardContent className="space-y-4">
                 <Slider
-                  value={[Math.round(status?.maxCurr || 6)]}
+                  value={[(() => {
+                    const strategy = settings?.chargingStrategy?.activeStrategy;
+                    const isSurplusStrategy = strategy === "surplus_battery_prio" || strategy === "surplus_vehicle_prio";
+                    // Bei Überschuss-Strategien: Zeige echte Wallbox-Stromstärke (read-only)
+                    if (isSurplusStrategy) {
+                      return Math.round(status?.maxCurr || 6);
+                    }
+                    // Bei manuellen Strategien: Zeige/verwende currentAmpere State
+                    return currentAmpere;
+                  })()]}
                   onValueChange={handleCurrentChange}
                   onValueCommit={handleCurrentCommit}
                   min={6}

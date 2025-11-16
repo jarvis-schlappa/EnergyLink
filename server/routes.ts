@@ -929,6 +929,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
           );
           // Nicht kritisch - Strategie wurde trotzdem gespeichert
         }
+
+        // Option 1: Sofortiger Check nach Strategiewechsel (vermeidet 0-15s Verzögerung)
+        try {
+          const wallboxIp = settings.wallboxIp || "192.168.40.16";
+          await strategyController.triggerImmediateCheck(wallboxIp);
+        } catch (error) {
+          log(
+            "debug",
+            "system",
+            "Sofortiger Check fehlgeschlagen (Scheduler übernimmt)",
+            error instanceof Error ? error.message : String(error),
+          );
+          // Nicht kritisch - Scheduler wird Check nachholen
+        }
       }
 
       log("info", "system", `Ladestrategie gewechselt auf: ${strategy}`);
