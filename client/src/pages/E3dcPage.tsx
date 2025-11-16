@@ -59,6 +59,7 @@ export default function E3dcPage() {
   // Lade Control State
   const { data: controlState, isLoading: isLoadingControls } = useQuery<ControlState>({
     queryKey: ["/api/controls"],
+    refetchInterval: 5000, // Automatisch alle 5 Sekunden aktualisieren
   });
 
   // Lade E3DC Live-Daten (Backend liefert automatisch Mock wenn keine IP konfiguriert)

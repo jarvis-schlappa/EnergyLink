@@ -340,6 +340,7 @@ export class ChargingStrategyController {
       if (context.startDelayTrackerSince) {
         storage.updateChargingContext({
           startDelayTrackerSince: undefined,
+          remainingStartDelay: undefined,
         });
         log("debug", "system", "Start-Delay zurückgesetzt - Überschuss zu niedrig");
       }
@@ -350,6 +351,7 @@ export class ChargingStrategyController {
     if (!context.startDelayTrackerSince) {
       storage.updateChargingContext({
         startDelayTrackerSince: now.toISOString(),
+        remainingStartDelay: config.startDelaySeconds, // Initial countdown
       });
       log("debug", "system", 
         `Start-Delay gestartet: Überschuss ${surplus}W > ${config.minStartPowerWatt}W - warte ${config.startDelaySeconds}s`
@@ -359,6 +361,12 @@ export class ChargingStrategyController {
     
     const waitingSince = new Date(context.startDelayTrackerSince);
     const waitingDuration = (now.getTime() - waitingSince.getTime()) / 1000;
+    const remainingSeconds = Math.max(0, config.startDelaySeconds - waitingDuration);
+    
+    // Update remaining delay für Frontend-Countdown
+    storage.updateChargingContext({
+      remainingStartDelay: Math.ceil(remainingSeconds),
+    });
     
     if (waitingDuration >= config.startDelaySeconds) {
       log("info", "system", 
@@ -366,11 +374,12 @@ export class ChargingStrategyController {
       );
       storage.updateChargingContext({
         startDelayTrackerSince: undefined,
+        remainingStartDelay: undefined,
       });
       return true;
     }
     
-    log("debug", "system", `Warte noch ${config.startDelaySeconds - waitingDuration}s`);
+    log("debug", "system", `Warte noch ${remainingSeconds.toFixed(1)}s`);
     return false;
   }
 

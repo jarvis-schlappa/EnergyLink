@@ -7,7 +7,7 @@
   "pvSurplusOnUrlBackup": "http://127.0.0.1:8083/fhem?cmd.autoWallboxPV=on",
   "pvSurplusOffUrlBackup": "http://127.0.0.1:8083/fhem?cmd.autoWallboxPV=off",
   "nightChargingSchedule": {
-    "enabled": false,
+    "enabled": true,
     "startTime": "00:00",
     "endTime": "05:00"
   },
@@ -21,7 +21,7 @@
     "gridChargeDuringNightCharging": false
   },
   "chargingStrategy": {
-    "activeStrategy": "off",
+    "activeStrategy": "surplus_vehicle_prio",
     "minStartPowerWatt": 500,
     "stopThresholdWatt": 1000,
     "startDelaySeconds": 30,
@@ -35,5 +35,5 @@
   "mockWallboxPhases": 1,
   "mockWallboxPlugStatus": 7,
   "mockTimeEnabled": true,
-  "mockDateTime": "2025-06-15T12:00"
+  "mockDateTime": "2025-06-16T12:00"
 }

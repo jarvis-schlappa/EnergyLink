@@ -892,7 +892,7 @@ export default function SettingsPage() {
                       htmlFor="input-x1-strategy"
                       className="text-sm font-medium"
                     >
-                      Auswahl Ladestrategie Kontakt (X1)
+                      Standard-Ladestrategie
                     </Label>
                     <Select
                       value={
@@ -930,8 +930,7 @@ export default function SettingsPage() {
                       </SelectContent>
                     </Select>
                     <p className="text-xs text-muted-foreground">
-                      Diese Strategie wird aktiviert, wenn der potenzialfreie
-                      Kontakt X1 der Wallbox geschlossen wird
+                      Wird aktiviert beim Klick auf "Laden starten" und bei geschlossenem X1-Kontakt der Wallbox
                     </p>
                   </div>
                 </AccordionItem>

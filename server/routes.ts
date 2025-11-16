@@ -250,6 +250,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Wallbox IP not configured" });
       }
 
+      // Optional: Aktiviere Ladestrategie (Standard: inputX1Strategy)
+      const { strategy } = req.body;
+      if (strategy !== undefined) {
+        const strategyValidation = chargingStrategySchema.safeParse(strategy);
+        if (!strategyValidation.success) {
+          return res.status(400).json({ error: "Invalid charging strategy" });
+        }
+
+        const updatedSettings = {
+          ...settings,
+          chargingStrategy: {
+            ...settings.chargingStrategy,
+            minStartPowerWatt: settings.chargingStrategy?.minStartPowerWatt ?? 1400,
+            stopThresholdWatt: settings.chargingStrategy?.stopThresholdWatt ?? 1000,
+            startDelaySeconds: settings.chargingStrategy?.startDelaySeconds ?? 120,
+            stopDelaySeconds: settings.chargingStrategy?.stopDelaySeconds ?? 300,
+            physicalPhaseSwitch: settings.chargingStrategy?.physicalPhaseSwitch ?? 3,
+            minCurrentChangeAmpere: settings.chargingStrategy?.minCurrentChangeAmpere ?? 1,
+            minChangeIntervalSeconds: settings.chargingStrategy?.minChangeIntervalSeconds ?? 60,
+            inputX1Strategy: settings.chargingStrategy?.inputX1Strategy ?? "max_without_battery",
+            activeStrategy: strategyValidation.data,
+          },
+        };
+
+        storage.saveSettings(updatedSettings);
+        log("info", "wallbox", `Ladestrategie aktiviert: ${strategyValidation.data}`);
+        
+        // WICHTIG: Battery Lock aktivieren/deaktivieren basierend auf Strategie
+        const controller = new ChargingStrategyController(sendUdpCommand);
+        await controller.handleStrategyChange(strategyValidation.data);
+      }
+
       const response = await sendUdpCommand(settings.wallboxIp, "ena 1");
 
       if (
@@ -287,6 +319,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!settings?.wallboxIp) {
         return res.status(400).json({ error: "Wallbox IP not configured" });
       }
+
+      // Setze Ladestrategie auf "off"
+      const updatedSettings = {
+        ...settings,
+        chargingStrategy: {
+          ...settings.chargingStrategy,
+          minStartPowerWatt: settings.chargingStrategy?.minStartPowerWatt ?? 1400,
+          stopThresholdWatt: settings.chargingStrategy?.stopThresholdWatt ?? 1000,
+          startDelaySeconds: settings.chargingStrategy?.startDelaySeconds ?? 120,
+          stopDelaySeconds: settings.chargingStrategy?.stopDelaySeconds ?? 300,
+          physicalPhaseSwitch: settings.chargingStrategy?.physicalPhaseSwitch ?? 3,
+          minCurrentChangeAmpere: settings.chargingStrategy?.minCurrentChangeAmpere ?? 1,
+          minChangeIntervalSeconds: settings.chargingStrategy?.minChangeIntervalSeconds ?? 60,
+          inputX1Strategy: settings.chargingStrategy?.inputX1Strategy ?? "max_without_battery",
+          activeStrategy: "off" as const,
+        },
+      };
+
+      storage.saveSettings(updatedSettings);
+      log("info", "wallbox", `Ladestrategie deaktiviert (auf "off" gesetzt)`);
+      
+      // WICHTIG: Battery Lock deaktivieren
+      const controller = new ChargingStrategyController(sendUdpCommand);
+      await controller.handleStrategyChange("off");
 
       const response = await sendUdpCommand(settings.wallboxIp, "ena 0");
 

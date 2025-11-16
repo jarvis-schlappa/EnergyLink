@@ -44,6 +44,7 @@ const STRATEGY_OPTIONS: Array<{ value: ChargingStrategy; label: string; descript
   { value: "max_without_battery", label: "Max Power (ohne Batterieentladung)", description: "Volle Leistung ohne Batterie" },
 ];
 
+
 export default function StatusPage() {
   const { toast } = useToast();
   const errorCountRef = useRef(0);
@@ -51,12 +52,12 @@ export default function StatusPage() {
   const [currentAmpere, setCurrentAmpere] = useState(16);
   const previousNightChargingRef = useRef<boolean | undefined>(undefined);
   const [waitingForConfirmation, setWaitingForConfirmation] = useState(false);
-  const [showDetailsDrawer, setShowDetailsDrawer] = useState(false);
   const [showCableDrawer, setShowCableDrawer] = useState(false);
   const [showEnergyDrawer, setShowEnergyDrawer] = useState(false);
   const [showChargingControlDrawer, setShowChargingControlDrawer] = useState(false);
   const [showBuildInfoDialog, setShowBuildInfoDialog] = useState(false);
   const [relativeUpdateTime, setRelativeUpdateTime] = useState<string>("");
+  const [liveCountdown, setLiveCountdown] = useState<number | null>(null);
 
   const { data: status, isLoading, error } = useQuery<WallboxStatus>({
     queryKey: ["/api/wallbox/status"],
@@ -134,11 +135,33 @@ export default function StatusPage() {
     previousNightChargingRef.current = controlState?.nightCharging;
   }, [controlState?.nightCharging, status]);
 
+  // Live-Countdown für Überschuss-Strategien
+  useEffect(() => {
+    if (chargingContext?.remainingStartDelay !== undefined && chargingContext.remainingStartDelay > 0) {
+      // Backend liefert neuen Wert - setze Live-Countdown
+      setLiveCountdown(chargingContext.remainingStartDelay);
+      
+      // Starte sekündlichen Countdown zwischen Backend-Updates
+      const interval = setInterval(() => {
+        setLiveCountdown(prev => {
+          if (prev === null || prev <= 0) return 0;
+          return prev - 1;
+        });
+      }, 1000);
+      
+      return () => clearInterval(interval);
+    } else {
+      // Kein Countdown aktiv
+      setLiveCountdown(null);
+    }
+  }, [chargingContext?.remainingStartDelay]);
+
   const startChargingMutation = useMutation({
-    mutationFn: () => apiRequest("POST", "/api/wallbox/start"),
+    mutationFn: (strategy?: string) => apiRequest("POST", "/api/wallbox/start", { strategy }),
     onSuccess: () => {
       setWaitingForConfirmation(true);
       queryClient.invalidateQueries({ queryKey: ["/api/wallbox/status"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/settings"] });
     },
     onError: () => {
       setWaitingForConfirmation(false);
@@ -154,6 +177,7 @@ export default function StatusPage() {
     mutationFn: () => apiRequest("POST", "/api/wallbox/stop"),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/wallbox/status"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/settings"] });
     },
     onError: () => {
       toast({
@@ -208,9 +232,12 @@ export default function StatusPage() {
   const handleToggleCharging = () => {
     const isCharging = status?.state === 3;
     if (isCharging) {
+      // Stoppen: Backend setzt Strategie automatisch auf "off"
       stopChargingMutation.mutate();
     } else {
-      startChargingMutation.mutate();
+      // Starten: Aktiviere die in inputX1Strategy konfigurierte Strategie
+      const targetStrategy = settings?.chargingStrategy?.inputX1Strategy || "max_without_battery";
+      startChargingMutation.mutate(targetStrategy);
     }
   };
 
@@ -518,7 +545,33 @@ export default function StatusPage() {
               value={isLoading ? "..." : power.toFixed(1)}
               unit="kW"
               status={isCharging ? "charging" : "stopped"}
-              badge={isLoading ? "..." : waitingForConfirmation ? "Warte auf Bestätigung" : getStatusBadge(status?.state || 0)}
+              badge={
+                isLoading 
+                  ? "..." 
+                  : waitingForConfirmation 
+                  ? "Warte auf Bestätigung" 
+                  : (() => {
+                      const strategy = settings?.chargingStrategy?.activeStrategy;
+                      const isSurplusStrategy = strategy === "surplus_battery_prio" || strategy === "surplus_vehicle_prio";
+                      
+                      // UI-Verbesserung für Überschuss-Strategien
+                      if (isSurplusStrategy && !isCharging) {
+                        // Countdown läuft
+                        if (liveCountdown !== null && liveCountdown > 0) {
+                          return `Start in ${liveCountdown}s`;
+                        }
+                        // Warte auf Überschuss (kein Countdown aktiv)
+                        return "Warte auf Überschuss";
+                      }
+                      
+                      // Normale Anzeige: Strategie-Name oder Status
+                      if (strategy && strategy !== "off") {
+                        return getStrategyLabel(strategy);
+                      }
+                      
+                      return getStatusBadge(status?.state || 0);
+                    })()
+              }
               additionalInfo={getPhaseInfo()}
               statusIcons={getStatusIcons()}
               onClick={() => setShowChargingControlDrawer(true)}
@@ -531,25 +584,49 @@ export default function StatusPage() {
                   <div className="flex items-center gap-2">
                     <Gauge className="w-5 h-5 text-primary" />
                     <CardTitle className="text-base font-semibold">
-                      Ladestrom {currentAmpere}A
+                      Ladestrom {Math.round(status?.maxCurr || 0)}A
                     </CardTitle>
                   </div>
-                  {controlState?.pvSurplus && (
-                    <span className="text-sm text-muted-foreground" data-testid="text-pv-surplus-active">
-                      PV-Überschuss aktiv
-                    </span>
-                  )}
+                  {(() => {
+                    const strategy = settings?.chargingStrategy?.activeStrategy;
+                    const isSurplusStrategy = strategy === "surplus_battery_prio" || strategy === "surplus_vehicle_prio";
+                    
+                    if (isSurplusStrategy) {
+                      return (
+                        <Badge variant="secondary" className="text-xs shrink-0" data-testid="badge-auto-regulated">
+                          Automatisch geregelt
+                        </Badge>
+                      );
+                    }
+                    
+                    if (controlState?.pvSurplus) {
+                      return (
+                        <span className="text-sm text-muted-foreground" data-testid="text-pv-surplus-active">
+                          PV-Überschuss aktiv
+                        </span>
+                      );
+                    }
+                    
+                    return null;
+                  })()}
                 </div>
               </CardHeader>
               <CardContent className="space-y-4">
                 <Slider
-                  value={[currentAmpere]}
+                  value={[Math.round(status?.maxCurr || 6)]}
                   onValueChange={handleCurrentChange}
                   onValueCommit={handleCurrentCommit}
                   min={6}
                   max={phases === 3 ? 16 : 32}
                   step={1}
-                  disabled={setCurrentMutation.isPending || controlState?.pvSurplus === true || !isPluggedIn}
+                  disabled={
+                    setCurrentMutation.isPending || 
+                    !isPluggedIn || 
+                    (() => {
+                      const strategy = settings?.chargingStrategy?.activeStrategy;
+                      return strategy === "surplus_battery_prio" || strategy === "surplus_vehicle_prio";
+                    })()
+                  }
                   data-testid="slider-current"
                 />
                 <div className="flex justify-between text-xs text-muted-foreground">
@@ -588,8 +665,8 @@ export default function StatusPage() {
               {startChargingMutation.isPending || stopChargingMutation.isPending
                 ? "Wird verarbeitet..."
                 : isCharging
-                ? "Laden stoppen"
-                : "Laden starten"}
+                ? `Stoppe ${getStrategyLabel(settings?.chargingStrategy?.activeStrategy || "off")}`
+                : `Starte ${getStrategyLabel(settings?.chargingStrategy?.inputX1Strategy || "max_without_battery")}`}
             </Button>
 
             {status?.lastUpdated && relativeUpdateTime && (
@@ -600,88 +677,6 @@ export default function StatusPage() {
           </div>
         </div>
       </div>
-
-      <Drawer open={showDetailsDrawer} onOpenChange={setShowDetailsDrawer}>
-        <DrawerContent data-testid="drawer-charging-details">
-          <DrawerHeader>
-            <DrawerTitle>SmartHome-Funktionen</DrawerTitle>
-            <DrawerDescription>
-              Übersicht über aktive Automatisierungen
-            </DrawerDescription>
-          </DrawerHeader>
-          <div className="px-4 pb-4 space-y-4">
-            {/* Ladestrategie */}
-            <div className="space-y-3">
-              <div className="flex items-center gap-3">
-                <div className="flex items-center justify-center w-10 h-10 rounded-full bg-yellow-500/10 dark:bg-yellow-400/10">
-                  <Sparkles className="w-5 h-5 text-yellow-500 dark:text-yellow-400" />
-                </div>
-                <div className="flex-1">
-                  <p className="font-medium">Ladestrategie</p>
-                </div>
-              </div>
-              <div className="pl-[52px]" data-testid="section-charging-strategy">
-                <Select
-                  value={settings?.chargingStrategy?.activeStrategy || "off"}
-                  onValueChange={(value) => handleStrategyChange(value as ChargingStrategy)}
-                  disabled={!settings || updateSettingsMutation.isPending}
-                >
-                  <SelectTrigger className="[&>span]:line-clamp-none" data-testid="select-strategy-desktop">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {STRATEGY_OPTIONS.map((option) => (
-                      <SelectItem key={option.value} value={option.value} data-testid={`option-strategy-${option.value}`}>
-                        {option.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            <Separator />
-
-            {/* Zeitgesteuerte Ladung */}
-            <div className="space-y-2">
-              <div className="flex items-center justify-between" data-testid="section-night-charging">
-                <div className="flex items-center gap-3">
-                  <div className="flex items-center justify-center w-10 h-10 rounded-full bg-blue-500/10 dark:bg-blue-400/10">
-                    <Moon className="w-5 h-5 text-blue-500 dark:text-blue-400" />
-                  </div>
-                  <div>
-                    <p className="font-medium">Zeitgesteuerte Ladung</p>
-                    {settings?.nightChargingSchedule?.enabled && (
-                      <p className="text-sm text-muted-foreground" data-testid="text-night-charging-time">
-                        <Clock className="w-3 h-3 inline mr-1" />
-                        {getScheduleTimeRange()}
-                      </p>
-                    )}
-                  </div>
-                </div>
-                <div className="flex items-center">
-                  {settings?.nightChargingSchedule?.enabled ? (
-                    <div className="flex items-center gap-1.5 text-green-600 dark:text-green-400" data-testid="status-night-charging-enabled">
-                      <Check className="w-5 h-5" />
-                      <span className="text-sm font-medium">Ein</span>
-                    </div>
-                  ) : (
-                    <div className="flex items-center gap-1.5 text-muted-foreground" data-testid="status-night-charging-disabled">
-                      <X className="w-5 h-5" />
-                      <span className="text-sm font-medium">Aus</span>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-          <DrawerFooter>
-            <DrawerClose asChild>
-              <Button variant="outline" data-testid="button-close-drawer">Schließen</Button>
-            </DrawerClose>
-          </DrawerFooter>
-        </DrawerContent>
-      </Drawer>
 
       <Drawer open={showCableDrawer} onOpenChange={setShowCableDrawer}>
         <DrawerContent data-testid="drawer-cable-details">
@@ -800,78 +795,48 @@ export default function StatusPage() {
             </DrawerHeader>
             <div className="p-4 space-y-4">
               {/* Ladestrategie */}
-              <div className="space-y-2">
+              <div className="space-y-3">
                 <div className="flex items-center gap-2">
                   <Sparkles className="w-4 h-4 text-muted-foreground" />
                   <Label className="text-sm font-medium">Ladestrategie</Label>
                 </div>
-                <Select
-                  value={settings?.chargingStrategy?.activeStrategy || "off"}
-                  onValueChange={(value) => handleStrategyChange(value as ChargingStrategy)}
-                  disabled={!settings || updateSettingsMutation.isPending}
-                >
-                  <SelectTrigger className="[&>span]:line-clamp-none" data-testid="select-strategy-drawer">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {STRATEGY_OPTIONS.map((option) => (
-                      <SelectItem key={option.value} value={option.value} data-testid={`option-strategy-drawer-${option.value}`}>
-                        {option.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                
+                {/* Toggle Switches für Strategien */}
+                <div className="space-y-3">
+                  {STRATEGY_OPTIONS.filter(opt => opt.value !== "off").map((strategy) => {
+                    const isActive = settings?.chargingStrategy?.activeStrategy === strategy.value;
+                    const isDisabled = !settings || updateSettingsMutation.isPending;
+                    
+                    return (
+                      <div 
+                        key={strategy.value} 
+                        className="flex items-start justify-between gap-4"
+                      >
+                        <div className="space-y-0.5 flex-1">
+                          <Label 
+                            htmlFor={`strategy-${strategy.value}`} 
+                            className="text-sm font-medium cursor-pointer"
+                          >
+                            {strategy.label}
+                          </Label>
+                          <p className="text-xs text-muted-foreground">
+                            {strategy.description}
+                          </p>
+                        </div>
+                        <Switch
+                          id={`strategy-${strategy.value}`}
+                          checked={isActive}
+                          onCheckedChange={(checked) => {
+                            handleStrategyChange(checked ? strategy.value : "off");
+                          }}
+                          disabled={isDisabled}
+                          data-testid={`switch-strategy-${strategy.value}`}
+                        />
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
-
-              {/* Ladesteuerung Status */}
-              {chargingContext?.isActive && (
-                <>
-                  <Separator />
-                  
-                  <div className="space-y-3" data-testid="section-charging-strategy">
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <p className="text-xs text-muted-foreground">Aktive Ladestrategie</p>
-                        <p className="text-sm font-medium" data-testid="text-strategy-name">
-                          {getStrategyLabel(chargingContext.strategy)}
-                        </p>
-                      </div>
-                      
-                      <div className="flex items-center justify-between">
-                        <p className="text-xs text-muted-foreground">Ladestrom</p>
-                        <p className="text-sm font-medium" data-testid="text-strategy-current">
-                          {chargingContext.currentAmpere ?? "–"}A → {chargingContext.targetAmpere ?? "–"}A
-                        </p>
-                      </div>
-                      
-                      <div className="flex items-center justify-between">
-                        <p className="text-xs text-muted-foreground">Phasen</p>
-                        <p className="text-sm font-medium" data-testid="text-strategy-phases">
-                          {chargingContext.currentPhases === 3 ? "3-phasig" : chargingContext.currentPhases === 1 ? "1-phasig" : "Unbekannt"}
-                        </p>
-                      </div>
-                      
-                      {chargingContext.strategy !== "off" && chargingContext.calculatedSurplus !== undefined && (
-                        <div className="flex items-center justify-between">
-                          <p className="text-xs text-muted-foreground">PV-Überschuss</p>
-                          <p className="text-sm font-medium" data-testid="text-strategy-surplus">
-                            {chargingContext.calculatedSurplus >= 0 ? "+" : ""}{(chargingContext.calculatedSurplus / 1000).toFixed(2)} kW
-                          </p>
-                        </div>
-                      )}
-                      
-                      {chargingContext.strategy !== "off" && chargingContext.lastAdjustment && (
-                        <div className="flex items-center justify-between">
-                          <p className="text-xs text-muted-foreground">Letzte Anpassung</p>
-                          <p className="text-sm font-medium" data-testid="text-strategy-last-adjustment">
-                            {formatRelativeTime(chargingContext.lastAdjustment)}
-                          </p>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </>
-              )}
 
               <Separator />
 
