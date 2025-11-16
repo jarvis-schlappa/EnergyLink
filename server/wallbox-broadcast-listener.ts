@@ -1,27 +1,28 @@
 /**
  * Wallbox Broadcast Listener
- * 
+ *
  * Lauscht auf UDP-Broadcasts der KEBA Wallbox auf Port 7090.
  * Reagiert auf verschiedene Broadcast-Typen:
  * - Input → Ladestrategie-Wechsel basierend auf potenzialfreiem Kontakt X1
  * - Plug → Kabelstatus-Änderungen in Echtzeit
  * - E pres → Session-Energie während der Ladung
  * - State → Wallbox-Status-Änderungen
- * 
+ *
  * Verwendet den zentralen UDP-Channel (kein eigener Socket).
  */
 
-import { log } from './logger';
-import { storage } from './storage';
-import { wallboxUdpChannel } from './wallbox-udp-channel';
-import { ChargingStrategyController } from './charging-strategy-controller';
+import { log } from "./logger";
+import { storage } from "./storage";
+import { wallboxUdpChannel } from "./wallbox-udp-channel";
+import { ChargingStrategyController } from "./charging-strategy-controller";
 
 let lastInputStatus: number | null = null;
 let lastPlugStatus: number | null = null;
 let lastState: number | null = null;
 let isEnabled = false;
 let strategyController: ChargingStrategyController | null = null;
-let sendUdpCommand: ((ip: string, command: string) => Promise<any>) | null = null;
+let sendUdpCommand: ((ip: string, command: string) => Promise<any>) | null =
+  null;
 
 // Handler für Broadcast-Nachrichten (async für stopChargingForStrategyOff)
 const handleBroadcast = async (data: any, rinfo: any) => {
@@ -32,11 +33,15 @@ const handleBroadcast = async (data: any, rinfo: any) => {
     // Nutzt In-Memory-Tracking für schnelle Änderungs-Erkennung
     if (data.Plug !== undefined) {
       const plugStatus = data.Plug;
-      
+
       // Prüfe ob Status sich geändert hat (In-Memory-Vergleich)
       if (lastPlugStatus !== null && lastPlugStatus !== plugStatus) {
-        log("info", "system", `[Wallbox-Broadcast-Listener] Plug-Status geändert: ${lastPlugStatus} → ${plugStatus} (von ${rinfo.address})`);
-        
+        log(
+          "info",
+          "system",
+          `[Wallbox-Broadcast-Listener] Plug-Status geändert: ${lastPlugStatus} → ${plugStatus} (von ${rinfo.address})`,
+        );
+
         // Aktualisiere Plug-Tracking mit Zeitstempel
         try {
           storage.savePlugStatusTracking({
@@ -44,7 +49,12 @@ const handleBroadcast = async (data: any, rinfo: any) => {
             lastPlugChange: new Date().toISOString(),
           });
         } catch (error) {
-          log("error", "system", "[Wallbox-Broadcast-Listener] Fehler beim Speichern des Plug-Status:", error instanceof Error ? error.message : String(error));
+          log(
+            "error",
+            "system",
+            "[Wallbox-Broadcast-Listener] Fehler beim Speichern des Plug-Status:",
+            error instanceof Error ? error.message : String(error),
+          );
         }
       } else if (lastPlugStatus === null) {
         // Erster Broadcast - initialisiere Storage ohne Log (verhindert false-positive bei Startup)
@@ -53,10 +63,15 @@ const handleBroadcast = async (data: any, rinfo: any) => {
             lastPlugStatus: plugStatus,
           });
         } catch (error) {
-          log("error", "system", "[Wallbox-Broadcast-Listener] Fehler beim Initialisieren des Plug-Status:", error instanceof Error ? error.message : String(error));
+          log(
+            "error",
+            "system",
+            "[Wallbox-Broadcast-Listener] Fehler beim Initialisieren des Plug-Status:",
+            error instanceof Error ? error.message : String(error),
+          );
         }
       }
-      
+
       // Update In-Memory-Tracker für nächsten Broadcast
       lastPlugStatus = plugStatus;
     }
@@ -67,7 +82,7 @@ const handleBroadcast = async (data: any, rinfo: any) => {
     // Dieser Handler dient als zusätzliche Debugging-Information für schnellere Erkennung.
     if (data.State !== undefined) {
       const state = data.State;
-      
+
       if (state !== lastState && lastState !== null) {
         const stateNames: Record<number, string> = {
           0: "starting",
@@ -77,10 +92,14 @@ const handleBroadcast = async (data: any, rinfo: any) => {
           4: "error",
           5: "authorization rejected",
         };
-        
-        log("info", "system", `[Wallbox-Broadcast-Listener] State geändert: ${lastState} → ${state} (${stateNames[state] || 'unknown'}) (von ${rinfo.address})`);
+
+        log(
+          "info",
+          "system",
+          `[Wallbox-Broadcast-Listener] State geändert: ${lastState} → ${state} (${stateNames[state] || "unknown"}) (von ${rinfo.address})`,
+        );
       }
-      
+
       lastState = state;
     }
 
@@ -103,48 +122,97 @@ const handleBroadcast = async (data: any, rinfo: any) => {
       return;
     }
 
-    lastInputStatus = inputStatus;
+    // Initial-Sync: Erster Broadcast initialisiert nur den Baseline-State
+    // Verhindert ungewollte Strategiewechsel beim App-Start
+    if (lastInputStatus === null) {
+      lastInputStatus = inputStatus;
+      log(
+        "debug",
+        "system",
+        `[Wallbox-Broadcast-Listener] Initial-Sync: Input=${inputStatus} (von ${rinfo.address})`,
+      );
+      return; // Keine Controller-Aktionen beim ersten Broadcast
+    }
 
-    log("info", "system", `[Wallbox-Broadcast-Listener] Input-Status geändert: ${inputStatus} (von ${rinfo.address})`);
+    log(
+      "info",
+      "system",
+      `[Wallbox-Broadcast-Listener] Input-Status geändert: ${lastInputStatus} → ${inputStatus} (von ${rinfo.address})`,
+    );
+    lastInputStatus = inputStatus;
 
     // Reagiere auf Input-Änderung
     if (inputStatus === 1) {
       // Hole konfigurierte Strategie aus den Einstellungen
       const settings = storage.getSettings();
-      targetStrategy = settings?.chargingStrategy?.inputX1Strategy ?? "max_without_battery";
-      
-      log("info", "system", `[Wallbox-Broadcast-Listener] Aktiviere Ladestrategie: ${targetStrategy}`);
-      
+      targetStrategy =
+        settings?.chargingStrategy?.inputX1Strategy ?? "max_without_battery";
+
+      log(
+        "info",
+        "system",
+        `[Wallbox-Broadcast-Listener] Aktiviere Ladestrategie: ${targetStrategy}`,
+      );
+
       // WICHTIG: Battery Lock aktivieren (für E3DC S10) wenn Strategie max_without_battery
       if (strategyController) {
         try {
           await strategyController.handleStrategyChange(targetStrategy);
         } catch (error) {
-          log("error", "system", "[Wallbox-Broadcast-Listener] Strategie-Wechsel fehlgeschlagen:", error instanceof Error ? error.message : String(error));
+          log(
+            "error",
+            "system",
+            "[Wallbox-Broadcast-Listener] Strategie-Wechsel fehlgeschlagen:",
+            error instanceof Error ? error.message : String(error),
+          );
           // Fortfahren - Strategie wird trotzdem gesetzt (finally-Block)
         }
       } else {
-        log("warning", "system", "[Wallbox-Broadcast-Listener] ChargingStrategyController nicht verfügbar");
+        log(
+          "warning",
+          "system",
+          "[Wallbox-Broadcast-Listener] ChargingStrategyController nicht verfügbar",
+        );
       }
     } else if (inputStatus === 0) {
       targetStrategy = "off";
-      log("info", "system", "[Wallbox-Broadcast-Listener] Deaktiviere Ladestrategie: Aus");
-      
+      log(
+        "info",
+        "system",
+        "[Wallbox-Broadcast-Listener] Deaktiviere Ladestrategie: Aus",
+      );
+
       // Verwende den ChargingStrategyController für zentralisierte Stopp-Logik
       const settings = storage.getSettings();
       if (settings?.wallboxIp && strategyController) {
         try {
-          await strategyController.stopChargingForStrategyOff(settings.wallboxIp);
+          await strategyController.stopChargingForStrategyOff(
+            settings.wallboxIp,
+          );
         } catch (error) {
-          log("error", "system", "[Wallbox-Broadcast-Listener] Wallbox stoppen fehlgeschlagen:", error instanceof Error ? error.message : String(error));
+          log(
+            "error",
+            "system",
+            "[Wallbox-Broadcast-Listener] Wallbox stoppen fehlgeschlagen:",
+            error instanceof Error ? error.message : String(error),
+          );
           // Fortfahren - Strategie wird trotzdem auf "off" gesetzt (finally-Block)
         }
       } else {
-        log("warning", "system", "[Wallbox-Broadcast-Listener] ChargingStrategyController nicht verfügbar - Wallbox nicht gestoppt");
+        log(
+          "warning",
+          "system",
+          "[Wallbox-Broadcast-Listener] ChargingStrategyController nicht verfügbar - Wallbox nicht gestoppt",
+        );
       }
     }
   } catch (error) {
-    log("error", "system", "[Wallbox-Broadcast-Listener] Nachricht verarbeiten fehlgeschlagen:", error instanceof Error ? error.message : String(error));
+    log(
+      "error",
+      "system",
+      "[Wallbox-Broadcast-Listener] Nachricht verarbeiten fehlgeschlagen:",
+      error instanceof Error ? error.message : String(error),
+    );
   } finally {
     // KRITISCH: Strategie IMMER setzen, auch wenn Controller-Aufrufe fehlschlagen
     // Dies verhindert inkonsistente States zwischen Input und Strategie
@@ -152,31 +220,49 @@ const handleBroadcast = async (data: any, rinfo: any) => {
       try {
         // WICHTIG: Context NACH Controller-Aufrufen neu laden, um Updates nicht zu überschreiben
         const freshContext = storage.getChargingContext();
-        
+
         // Nur Strategie ändern, wenn sie sich vom Ziel unterscheidet
         if (freshContext.strategy !== targetStrategy) {
           storage.saveChargingContext({
             ...freshContext,
-            strategy: targetStrategy
+            strategy: targetStrategy,
           });
-          log("info", "system", `[Wallbox-Broadcast-Listener] Strategie persistent gesetzt: ${targetStrategy}`);
+          log(
+            "info",
+            "system",
+            `[Wallbox-Broadcast-Listener] Strategie persistent gesetzt: ${targetStrategy}`,
+          );
         }
 
         const settings = storage.getSettings();
-        if (settings?.chargingStrategy && settings.chargingStrategy.activeStrategy !== targetStrategy) {
+        if (
+          settings?.chargingStrategy &&
+          settings.chargingStrategy.activeStrategy !== targetStrategy
+        ) {
           settings.chargingStrategy.activeStrategy = targetStrategy;
           storage.saveSettings(settings);
-          log("info", "system", `[Wallbox-Broadcast-Listener] Settings persistent gesetzt: ${targetStrategy}`);
+          log(
+            "info",
+            "system",
+            `[Wallbox-Broadcast-Listener] Settings persistent gesetzt: ${targetStrategy}`,
+          );
         }
       } catch (persistError) {
-        log("error", "system", "[Wallbox-Broadcast-Listener] KRITISCH: Strategie-Persistierung fehlgeschlagen:", persistError instanceof Error ? persistError.message : String(persistError));
+        log(
+          "error",
+          "system",
+          "[Wallbox-Broadcast-Listener] KRITISCH: Strategie-Persistierung fehlgeschlagen:",
+          persistError instanceof Error
+            ? persistError.message
+            : String(persistError),
+        );
       }
     }
   }
 };
 
 export async function startBroadcastListener(
-  udpCommandSender: (ip: string, command: string) => Promise<any>
+  udpCommandSender: (ip: string, command: string) => Promise<any>,
 ): Promise<void> {
   if (isEnabled) {
     log("debug", "system", "[Wallbox-Broadcast-Listener] Läuft bereits");
@@ -191,13 +277,22 @@ export async function startBroadcastListener(
   wallboxUdpChannel.onBroadcast(handleBroadcast);
 
   isEnabled = true;
-  
+
   // Hole konfigurierte X1-Strategie für Logging
   const settings = storage.getSettings();
-  const x1Strategy = settings?.chargingStrategy?.inputX1Strategy ?? "max_without_battery";
-  
-  log("info", "system", "✅ [Wallbox-Broadcast-Listener] Lauscht auf Wallbox-Broadcasts (Port 7090)");
-  log("info", "system", `   - Input → Ladestrategie-Wechsel (X1=1: '${x1Strategy}', X1=0: 'Aus')`);
+  const x1Strategy =
+    settings?.chargingStrategy?.inputX1Strategy ?? "max_without_battery";
+
+  log(
+    "info",
+    "system",
+    "✅ [Wallbox-Broadcast-Listener] Lauscht auf Wallbox-Broadcasts (Port 7090)",
+  );
+  log(
+    "info",
+    "system",
+    `   - Input → Ladestrategie-Wechsel (X1=1: '${x1Strategy}', X1=0: 'Aus')`,
+  );
   log("info", "system", "   - Plug → Kabelstatus-Tracking in Echtzeit");
   log("info", "system", "   - State → Wallbox-Status-Änderungen");
   log("info", "system", "   - E pres → Session-Energie während Ladung");

@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from "react";
-import { Battery, Plug, Zap, AlertCircle, Gauge, Sun, Moon, ShieldOff, PlugZap, Clock, Check, X, Sparkles } from "lucide-react";
+import { Battery, Plug, Zap, AlertCircle, Gauge, Sun, Moon, ShieldOff, PlugZap, Clock, Check, X, Sparkles, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Slider } from "@/components/ui/slider";
@@ -11,7 +11,8 @@ import StatusCard from "@/components/StatusCard";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import type { WallboxStatus, ControlState, Settings, PlugStatusTracking, ChargingContext, ChargingStrategy } from "@shared/schema";
+import type { WallboxStatus, ControlState, Settings, PlugStatusTracking, ChargingContext, ChargingStrategy, BuildInfo } from "@shared/schema";
+import { buildInfoSchema } from "@shared/schema";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -23,6 +24,13 @@ import {
   DrawerHeader,
   DrawerTitle,
 } from "@/components/ui/drawer";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Separator } from "@/components/ui/separator";
 import { formatDistanceToNow, format } from "date-fns";
 import { de } from "date-fns/locale";
@@ -47,6 +55,7 @@ export default function StatusPage() {
   const [showCableDrawer, setShowCableDrawer] = useState(false);
   const [showEnergyDrawer, setShowEnergyDrawer] = useState(false);
   const [showChargingControlDrawer, setShowChargingControlDrawer] = useState(false);
+  const [showBuildInfoDialog, setShowBuildInfoDialog] = useState(false);
   const [relativeUpdateTime, setRelativeUpdateTime] = useState<string>("");
 
   const { data: status, isLoading, error } = useQuery<WallboxStatus>({
@@ -74,6 +83,19 @@ export default function StatusPage() {
   const { data: chargingContext } = useQuery<ChargingContext>({
     queryKey: ["/api/charging/context"],
     refetchInterval: 5000, // Synchron mit Status-Updates
+  });
+
+  const { data: buildInfo } = useQuery<BuildInfo>({
+    queryKey: ["/api/build-info"],
+    staleTime: Infinity,
+    select: (data) => {
+      const parsed = buildInfoSchema.safeParse(data);
+      if (!parsed.success) {
+        console.error("Build-Info validation failed:", parsed.error);
+        throw new Error("Invalid build info data");
+      }
+      return parsed.data;
+    },
   });
 
   useEffect(() => {
@@ -243,6 +265,7 @@ export default function StatusPage() {
         physicalPhaseSwitch: settings.chargingStrategy?.physicalPhaseSwitch ?? 3,
         minCurrentChangeAmpere: settings.chargingStrategy?.minCurrentChangeAmpere ?? 1,
         minChangeIntervalSeconds: settings.chargingStrategy?.minChangeIntervalSeconds ?? 60,
+        inputX1Strategy: settings.chargingStrategy?.inputX1Strategy ?? "max_without_battery",
         activeStrategy: strategy,
       },
     };
@@ -463,10 +486,15 @@ export default function StatusPage() {
       <div className="flex-1 overflow-y-auto pb-24 pt-6">
         <div className="max-w-2xl mx-auto px-4 space-y-6">
           <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-3">
+            <button 
+              onClick={() => setShowBuildInfoDialog(true)}
+              className="flex items-center gap-3 hover-elevate active-elevate-2 rounded-lg p-2 -m-2 transition-all"
+              aria-label="App-Informationen anzeigen"
+              data-testid="button-show-build-info"
+            >
               <img src="/apple-touch-icon.png" alt="EnergyLink" className="w-10 h-10 rounded-lg" />
               <h1 className="text-2xl font-bold mb-0">Wallbox</h1>
-            </div>
+            </button>
             {settings?.demoMode && (
               <Badge variant="secondary" className="text-xs shrink-0" data-testid="badge-demo-mode">
                 Demo
@@ -908,6 +936,65 @@ export default function StatusPage() {
           </div>
         </DrawerContent>
       </Drawer>
+
+      <Dialog open={showBuildInfoDialog} onOpenChange={setShowBuildInfoDialog}>
+        <DialogContent className="max-w-md" data-testid="dialog-build-info">
+          <DialogHeader>
+            <div className="flex items-center gap-2">
+              <Info className="w-5 h-5 text-primary" />
+              <DialogTitle>EnergyLink App</DialogTitle>
+            </div>
+            <DialogDescription>
+              Smarte Steuerung von KEBA P20 Wallbox und E3DC S10 Hauskraftwerk
+            </DialogDescription>
+          </DialogHeader>
+          
+          {buildInfo ? (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <p className="text-xs font-medium text-muted-foreground">Version</p>
+                  <p className="text-sm font-mono" data-testid="text-build-version">
+                    v{buildInfo.version}
+                  </p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-xs font-medium text-muted-foreground">Branch</p>
+                  <p className="text-sm font-mono" data-testid="text-build-branch">
+                    {buildInfo.branch}
+                  </p>
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <p className="text-xs font-medium text-muted-foreground">Commit</p>
+                  <p className="text-sm font-mono" data-testid="text-build-commit">
+                    {buildInfo.commit}
+                  </p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-xs font-medium text-muted-foreground">Build</p>
+                  <p className="text-sm" data-testid="text-build-time">
+                    {new Date(buildInfo.buildTime).toLocaleDateString("de-DE", {
+                      year: "numeric",
+                      month: "2-digit",
+                      day: "2-digit",
+                    })}, {new Date(buildInfo.buildTime).toLocaleTimeString("de-DE", {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}
+                  </p>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              Build-Informationen konnten nicht geladen werden
+            </p>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

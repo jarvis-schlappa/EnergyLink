@@ -1,5 +1,14 @@
 import { z } from "zod";
 
+export const buildInfoSchema = z.object({
+  version: z.string(),
+  branch: z.string(),
+  commit: z.string(),
+  buildTime: z.string(),
+});
+
+export type BuildInfo = z.infer<typeof buildInfoSchema>;
+
 export const wallboxStatusSchema = z.object({
   state: z.number(),
   plug: z.number(),

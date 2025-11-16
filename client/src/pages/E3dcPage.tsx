@@ -1,7 +1,8 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Battery, Home as HomeIcon, Sun, Grid3x3, TrendingUp, TrendingDown, AlertCircle, PlugZap, ShieldOff, Zap, Clock, Settings as SettingsIcon } from "lucide-react";
+import { Battery, Home as HomeIcon, Sun, Grid3x3, TrendingUp, TrendingDown, AlertCircle, PlugZap, ShieldOff, Zap, Clock, Settings as SettingsIcon, Info } from "lucide-react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import type { E3dcLiveData, Settings, ControlState } from "@shared/schema";
+import { buildInfoSchema } from "@shared/schema";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -19,6 +20,13 @@ import {
   DrawerTitle,
 } from "@/components/ui/drawer";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
@@ -31,8 +39,17 @@ import { useToast } from "@/hooks/use-toast";
 
 export default function E3dcPage() {
   const [showBatteryDrawer, setShowBatteryDrawer] = useState(false);
+  const [showBuildInfoDialog, setShowBuildInfoDialog] = useState(false);
   const [relativeUpdateTime, setRelativeUpdateTime] = useState<string>("");
   const { toast } = useToast();
+
+  // Lade Build-Info (nur einmal, keine Auto-Updates)
+  const { data: buildInfoRaw } = useQuery({
+    queryKey: ["/api/build-info"],
+    staleTime: Infinity,
+  });
+  const buildInfoResult = buildInfoRaw ? buildInfoSchema.safeParse(buildInfoRaw) : null;
+  const buildInfo = buildInfoResult?.success ? buildInfoResult.data : undefined;
 
   // Lade Settings (für Fehler-Anzeige bei Connection-Fehlern)
   const { data: settings, isLoading: isLoadingSettings } = useQuery<Settings>({
@@ -85,51 +102,6 @@ export default function E3dcPage() {
 
   // Demo-Modus aktiv wenn in Settings aktiviert
   const isDemoMode = settings?.demoMode === true;
-
-  // Fehler beim Laden der E3DC-Daten
-  if (error) {
-    return (
-      <div className="flex flex-col h-full">
-        <div className="flex-1 overflow-y-auto pb-24 pt-6">
-          <div className="max-w-2xl mx-auto px-4 space-y-6">
-            <div className="flex items-center justify-between gap-3">
-              <div className="flex items-center gap-3">
-                <img src="/apple-touch-icon.png" alt="EnergyLink" className="w-10 h-10 rounded-lg" />
-                <h1 className="text-2xl font-bold mb-0">Hauskraftwerk</h1>
-              </div>
-              {isDemoMode && (
-                <Badge variant="secondary" className="text-xs shrink-0" data-testid="badge-demo-mode">
-                  Demo
-                </Badge>
-              )}
-            </div>
-
-            <Card className="max-w-md">
-              <CardHeader>
-                <div className="flex items-center gap-2 text-destructive">
-                  <AlertCircle className="w-5 h-5" />
-                  <CardTitle>Verbindungsfehler</CardTitle>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <p className="text-sm text-muted-foreground">
-                  {settings?.e3dcIp 
-                    ? `Verbindung zum E3DC S10 (${settings.e3dcIp}) fehlgeschlagen.`
-                    : "Verbindung zum E3DC S10 fehlgeschlagen."}
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  Fehler: {error instanceof Error ? error.message : String(error)}
-                </p>
-                <Button onClick={() => refetch()} className="w-full" data-testid="button-retry">
-                  Erneut versuchen
-                </Button>
-              </CardContent>
-            </Card>
-          </div>
-        </div>
-      </div>
-    );
-  }
 
   // Berechne ob Batterie lädt oder entlädt
   const isBatteryCharging = (e3dcData?.batteryPower || 0) > 100;
@@ -236,10 +208,15 @@ export default function E3dcPage() {
         <div className="max-w-2xl mx-auto px-4 space-y-6">
           {/* Header */}
           <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-3">
+            <button 
+              onClick={() => setShowBuildInfoDialog(true)}
+              className="flex items-center gap-3 hover-elevate active-elevate-2 rounded-lg p-2 -m-2 transition-all"
+              aria-label="App-Informationen anzeigen"
+              data-testid="button-show-build-info"
+            >
               <img src="/apple-touch-icon.png" alt="EnergyLink" className="w-10 h-10 rounded-lg" />
               <h1 className="text-2xl font-bold mb-0">Hauskraftwerk</h1>
-            </div>
+            </button>
             {isDemoMode && (
               <Badge variant="secondary" className="text-xs shrink-0" data-testid="badge-demo-mode">
                 Demo
@@ -247,7 +224,31 @@ export default function E3dcPage() {
             )}
           </div>
 
-          <div className="space-y-4">
+          {/* Fehler-Ansicht */}
+          {error ? (
+            <Card className="max-w-md">
+              <CardHeader>
+                <div className="flex items-center gap-2 text-destructive">
+                  <AlertCircle className="w-5 h-5" />
+                  <CardTitle>Verbindungsfehler</CardTitle>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <p className="text-sm text-muted-foreground">
+                  {settings?.e3dcIp 
+                    ? `Verbindung zum E3DC S10 (${settings.e3dcIp}) fehlgeschlagen.`
+                    : "Verbindung zum E3DC S10 fehlgeschlagen."}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Fehler: {error instanceof Error ? error.message : String(error)}
+                </p>
+                <Button onClick={() => refetch()} className="w-full" data-testid="button-retry">
+                  Erneut versuchen
+                </Button>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="space-y-4">
             {/* Hausbatterie + PV - 2x2 Grid */}
             <div className="grid grid-cols-2 gap-3">
               {/* Hausbatterie SOC */}
@@ -465,7 +466,8 @@ export default function E3dcPage() {
                 Letztes Update: {format(new Date(e3dcData.timestamp), 'HH:mm:ss', { locale: de })} ({relativeUpdateTime})
               </div>
             )}
-          </div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -554,6 +556,65 @@ export default function E3dcPage() {
           </div>
         </DrawerContent>
       </Drawer>
+
+      <Dialog open={showBuildInfoDialog} onOpenChange={setShowBuildInfoDialog}>
+        <DialogContent className="max-w-md" data-testid="dialog-build-info">
+          <DialogHeader>
+            <div className="flex items-center gap-2">
+              <Info className="w-5 h-5 text-primary" />
+              <DialogTitle>EnergyLink App</DialogTitle>
+            </div>
+            <DialogDescription>
+              Smarte Steuerung von KEBA P20 Wallbox und E3DC S10 Hauskraftwerk
+            </DialogDescription>
+          </DialogHeader>
+          
+          {buildInfo ? (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <p className="text-xs font-medium text-muted-foreground">Version</p>
+                  <p className="text-sm font-mono" data-testid="text-build-version">
+                    v{buildInfo.version}
+                  </p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-xs font-medium text-muted-foreground">Branch</p>
+                  <p className="text-sm font-mono" data-testid="text-build-branch">
+                    {buildInfo.branch}
+                  </p>
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <p className="text-xs font-medium text-muted-foreground">Commit</p>
+                  <p className="text-sm font-mono" data-testid="text-build-commit">
+                    {buildInfo.commit}
+                  </p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-xs font-medium text-muted-foreground">Build</p>
+                  <p className="text-sm" data-testid="text-build-time">
+                    {new Date(buildInfo.buildTime).toLocaleDateString("de-DE", {
+                      year: "numeric",
+                      month: "2-digit",
+                      day: "2-digit",
+                    })}, {new Date(buildInfo.buildTime).toLocaleTimeString("de-DE", {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}
+                  </p>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              Build-Informationen konnten nicht geladen werden
+            </p>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -3,23 +3,73 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { LogEntry, LogSettings, LogLevel, Settings } from "@shared/schema";
+import { buildInfoSchema } from "@shared/schema";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Trash2, Filter, RefreshCw } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Trash2, Filter, RefreshCw, Info } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
-type LogCategory = "wallbox" | "wallbox-mock" | "e3dc" | "e3dc-mock" | "fhem" | "fhem-mock" | "webhook" | "system" | "storage";
+type LogCategory =
+  | "wallbox"
+  | "wallbox-mock"
+  | "e3dc"
+  | "e3dc-mock"
+  | "fhem"
+  | "fhem-mock"
+  | "webhook"
+  | "system"
+  | "storage";
 
-const ALL_CATEGORIES: LogCategory[] = ["wallbox", "wallbox-mock", "e3dc", "e3dc-mock", "fhem", "fhem-mock", "webhook", "system", "storage"];
+const ALL_CATEGORIES: LogCategory[] = [
+  "wallbox",
+  "wallbox-mock",
+  "e3dc",
+  "e3dc-mock",
+  "fhem",
+  "fhem-mock",
+  "webhook",
+  "system",
+  "storage",
+];
 
 export default function LogsPage() {
   const { toast } = useToast();
   const [filterLevel, setFilterLevel] = useState<LogLevel | "all">("all");
-  const [selectedCategories, setSelectedCategories] = useState<LogCategory[]>([]);
+  const [selectedCategories, setSelectedCategories] = useState<LogCategory[]>(
+    [],
+  );
+  const [showBuildInfoDialog, setShowBuildInfoDialog] = useState(false);
 
-  const { data: logs = [], isLoading: logsLoading, refetch } = useQuery<LogEntry[]>({
+  // Lade Build-Info (nur einmal, keine Auto-Updates)
+  const { data: buildInfoRaw } = useQuery({
+    queryKey: ["/api/build-info"],
+    staleTime: Infinity,
+  });
+  const buildInfoResult = buildInfoRaw
+    ? buildInfoSchema.safeParse(buildInfoRaw)
+    : null;
+  const buildInfo = buildInfoResult?.success ? buildInfoResult.data : undefined;
+
+  const {
+    data: logs = [],
+    isLoading: logsLoading,
+    refetch,
+  } = useQuery<LogEntry[]>({
     queryKey: ["/api/logs"],
     refetchInterval: 2000,
   });
@@ -33,7 +83,8 @@ export default function LogsPage() {
   });
 
   const updateLogLevelMutation = useMutation({
-    mutationFn: (level: LogLevel) => apiRequest("POST", "/api/logs/settings", { level }),
+    mutationFn: (level: LogLevel) =>
+      apiRequest("POST", "/api/logs/settings", { level }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/logs/settings"] });
       toast({
@@ -83,28 +134,41 @@ export default function LogsPage() {
       const filterPriority = logLevelPriority[filterLevel];
       return logPriority >= filterPriority;
     })
-    .filter((log) => selectedCategories.length === 0 || selectedCategories.includes(log.category as LogCategory))
+    .filter(
+      (log) =>
+        selectedCategories.length === 0 ||
+        selectedCategories.includes(log.category as LogCategory),
+    )
     .reverse();
 
   const toggleCategory = (category: LogCategory) => {
     setSelectedCategories((prev) =>
       prev.includes(category)
         ? prev.filter((c) => c !== category)
-        : [...prev, category]
+        : [...prev, category],
     );
   };
 
   const getCategoryLabel = (category: LogCategory): string => {
     switch (category) {
-      case "wallbox": return "Wallbox";
-      case "wallbox-mock": return "Wallbox Mock";
-      case "e3dc": return "E3DC";
-      case "e3dc-mock": return "E3DC Mock";
-      case "fhem": return "FHEM";
-      case "fhem-mock": return "FHEM Mock";
-      case "webhook": return "Webhook";
-      case "system": return "System";
-      case "storage": return "Storage";
+      case "wallbox":
+        return "Wallbox";
+      case "wallbox-mock":
+        return "Wallbox Mock";
+      case "e3dc":
+        return "E3DC";
+      case "e3dc-mock":
+        return "E3DC Mock";
+      case "fhem":
+        return "FHEM";
+      case "fhem-mock":
+        return "FHEM Mock";
+      case "webhook":
+        return "Webhook";
+      case "system":
+        return "System";
+      case "storage":
+        return "Storage";
     }
   };
 
@@ -162,12 +226,25 @@ export default function LogsPage() {
       <div className="flex-1 overflow-y-auto pb-24 pt-6">
         <div className="max-w-4xl mx-auto px-4 space-y-6">
           <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-3">
-              <img src="/apple-touch-icon.png" alt="EnergyLink" className="w-10 h-10 rounded-lg" />
+            <button
+              onClick={() => setShowBuildInfoDialog(true)}
+              className="flex items-center gap-3 hover-elevate active-elevate-2 rounded-lg p-2 -m-2 transition-all"
+              aria-label="App-Informationen anzeigen"
+              data-testid="button-show-build-info"
+            >
+              <img
+                src="/apple-touch-icon.png"
+                alt="EnergyLink"
+                className="w-10 h-10 rounded-lg"
+              />
               <h1 className="text-2xl font-bold mb-0">Logs</h1>
-            </div>
+            </button>
             {settings?.demoMode && (
-              <Badge variant="secondary" className="text-xs shrink-0" data-testid="badge-demo-mode">
+              <Badge
+                variant="secondary"
+                className="text-xs shrink-0"
+                data-testid="badge-demo-mode"
+              >
                 Demo
               </Badge>
             )}
@@ -181,15 +258,21 @@ export default function LogsPage() {
               <div className="flex flex-col gap-2">
                 <Select
                   value={logSettings?.level || "info"}
-                  onValueChange={(value) => updateLogLevelMutation.mutate(value as LogLevel)}
+                  onValueChange={(value) =>
+                    updateLogLevelMutation.mutate(value as LogLevel)
+                  }
                   data-testid="select-log-level"
                 >
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="trace">Trace (sehr detailliert, inkl. HTTP)</SelectItem>
-                    <SelectItem value="debug">Debug (alle Meldungen)</SelectItem>
+                    <SelectItem value="trace">
+                      Trace (sehr detailliert, inkl. HTTP)
+                    </SelectItem>
+                    <SelectItem value="debug">
+                      Debug (alle Meldungen)
+                    </SelectItem>
                     <SelectItem value="info">Info (Standard)</SelectItem>
                     <SelectItem value="warning">Warning (Warnungen)</SelectItem>
                     <SelectItem value="error">Error (nur Fehler)</SelectItem>
@@ -232,7 +315,9 @@ export default function LogsPage() {
                 <label className="text-sm text-muted-foreground">Level</label>
                 <Select
                   value={filterLevel}
-                  onValueChange={(value) => setFilterLevel(value as LogLevel | "all")}
+                  onValueChange={(value) =>
+                    setFilterLevel(value as LogLevel | "all")
+                  }
                   data-testid="select-filter-level"
                 >
                   <SelectTrigger>
@@ -252,7 +337,11 @@ export default function LogsPage() {
               <div className="flex flex-col gap-3">
                 <div className="flex items-center justify-between">
                   <label className="text-sm text-muted-foreground">
-                    Kategorien ({selectedCategories.length > 0 ? selectedCategories.length : 'Alle'})
+                    Kategorien (
+                    {selectedCategories.length > 0
+                      ? selectedCategories.length
+                      : "Alle"}
+                    )
                   </label>
                   {selectedCategories.length > 0 && (
                     <Button
@@ -275,7 +364,7 @@ export default function LogsPage() {
                         className={`cursor-pointer transition-all ${
                           isSelected
                             ? getCategoryColor(category)
-                            : 'bg-muted text-muted-foreground hover-elevate'
+                            : "bg-muted text-muted-foreground hover-elevate"
                         }`}
                         onClick={() => toggleCategory(category)}
                         data-testid={`badge-filter-${category}`}
@@ -286,7 +375,8 @@ export default function LogsPage() {
                   })}
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  Klicke auf Kategorien um sie zu filtern. Ohne Auswahl werden alle angezeigt.
+                  Klicke auf Kategorien um sie zu filtern. Ohne Auswahl werden
+                  alle angezeigt.
                 </p>
               </div>
             </CardContent>
@@ -296,33 +386,53 @@ export default function LogsPage() {
             <Alert data-testid="alert-no-logs">
               <Filter className="h-4 w-4" />
               <AlertDescription>
-                Keine Log-Einträge vorhanden. Sobald die Wallbox abgefragt wird oder Webhooks aufgerufen werden, erscheinen hier die Logs.
+                Keine Log-Einträge vorhanden. Sobald die Wallbox abgefragt wird
+                oder Webhooks aufgerufen werden, erscheinen hier die Logs.
               </AlertDescription>
             </Alert>
           )}
 
           <div className="space-y-2">
             {filteredLogs.map((log) => (
-              <Card key={log.id} className="overflow-hidden" data-testid={`log-entry-${log.id}`}>
+              <Card
+                key={log.id}
+                className="overflow-hidden"
+                data-testid={`log-entry-${log.id}`}
+              >
                 <CardContent className="p-4">
                   <div className="flex items-start gap-3">
                     <div className="flex flex-col gap-1 min-w-0 flex-1">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <Badge className={getLevelColor(log.level)} data-testid={`badge-level-${log.level}`}>
+                        <Badge
+                          className={getLevelColor(log.level)}
+                          data-testid={`badge-level-${log.level}`}
+                        >
                           {log.level.toUpperCase()}
                         </Badge>
-                        <Badge className={getCategoryColor(log.category)} data-testid={`badge-category-${log.category}`}>
+                        <Badge
+                          className={getCategoryColor(log.category)}
+                          data-testid={`badge-category-${log.category}`}
+                        >
                           {log.category}
                         </Badge>
-                        <span className="text-xs text-muted-foreground" data-testid={`text-timestamp-${log.id}`}>
+                        <span
+                          className="text-xs text-muted-foreground"
+                          data-testid={`text-timestamp-${log.id}`}
+                        >
                           {formatTimestamp(log.timestamp)}
                         </span>
                       </div>
-                      <p className="text-sm font-medium" data-testid={`text-message-${log.id}`}>
+                      <p
+                        className="text-sm font-medium"
+                        data-testid={`text-message-${log.id}`}
+                      >
                         {log.message}
                       </p>
                       {log.details && (
-                        <p className="text-xs text-muted-foreground font-mono break-all" data-testid={`text-details-${log.id}`}>
+                        <p
+                          className="text-xs text-muted-foreground font-mono break-all"
+                          data-testid={`text-details-${log.id}`}
+                        >
                           {log.details}
                         </p>
                       )}
@@ -340,6 +450,84 @@ export default function LogsPage() {
           )}
         </div>
       </div>
+
+      <Dialog open={showBuildInfoDialog} onOpenChange={setShowBuildInfoDialog}>
+        <DialogContent className="max-w-md" data-testid="dialog-build-info">
+          <DialogHeader>
+            <div className="flex items-center gap-2">
+              <Info className="w-5 h-5 text-primary" />
+              <DialogTitle>EnergyLink App</DialogTitle>
+            </div>
+            <DialogDescription>
+              Smarte Steuerung von KEBA P20 Wallbox und E3DC S10 Hauskraftwerk
+            </DialogDescription>
+          </DialogHeader>
+
+          {buildInfo ? (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <p className="text-xs font-medium text-muted-foreground">
+                    Version
+                  </p>
+                  <p
+                    className="text-sm font-mono"
+                    data-testid="text-build-version"
+                  >
+                    v{buildInfo.version}
+                  </p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-xs font-medium text-muted-foreground">
+                    Branch
+                  </p>
+                  <p
+                    className="text-sm font-mono"
+                    data-testid="text-build-branch"
+                  >
+                    {buildInfo.branch}
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <p className="text-xs font-medium text-muted-foreground">
+                    Commit
+                  </p>
+                  <p
+                    className="text-sm font-mono"
+                    data-testid="text-build-commit"
+                  >
+                    {buildInfo.commit}
+                  </p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-xs font-medium text-muted-foreground">
+                    Build
+                  </p>
+                  <p className="text-sm" data-testid="text-build-time">
+                    {new Date(buildInfo.buildTime).toLocaleDateString("de-DE", {
+                      year: "numeric",
+                      month: "2-digit",
+                      day: "2-digit",
+                    })}
+                    ,{" "}
+                    {new Date(buildInfo.buildTime).toLocaleTimeString("de-DE", {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}
+                  </p>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              Build-Informationen konnten nicht geladen werden
+            </p>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
