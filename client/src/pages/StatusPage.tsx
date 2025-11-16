@@ -418,6 +418,20 @@ export default function StatusPage() {
     return option?.label || "Aus";
   };
 
+  const getBadgeLabel = (strategy: string | undefined) => {
+    // Kurze Texte nur für Badge-Anzeige
+    switch (strategy) {
+      case "surplus_battery_prio":
+      case "surplus_vehicle_prio":
+        return "Überschussladung";
+      case "max_with_battery":
+      case "max_without_battery":
+        return "Max Power";
+      default:
+        return "Aus";
+    }
+  };
+
   const getStatusIcons = () => {
     const icons = [];
     
@@ -585,7 +599,7 @@ export default function StatusPage() {
                         
                         // Lädt normal (genug PV)
                         if (isCharging) {
-                          return getStrategyLabel(strategy);
+                          return getBadgeLabel(strategy);
                         }
                         
                         // NICHT lädt: Start-Countdown läuft
@@ -599,7 +613,7 @@ export default function StatusPage() {
                       
                       // Normale Anzeige: Strategie-Name oder Status
                       if (strategy && strategy !== "off") {
-                        return getStrategyLabel(strategy);
+                        return getBadgeLabel(strategy);
                       }
                       
                       return getStatusBadge(status?.state || 0);
