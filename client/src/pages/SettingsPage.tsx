@@ -744,7 +744,7 @@ export default function SettingsPage() {
                           type="number"
                           min="500"
                           max="5000"
-                          step="100"
+                          step="1"
                           {...form.register(
                             "chargingStrategy.minStartPowerWatt",
                             { valueAsNumber: true },
@@ -769,7 +769,7 @@ export default function SettingsPage() {
                           type="number"
                           min="300"
                           max="3000"
-                          step="100"
+                          step="1"
                           {...form.register(
                             "chargingStrategy.stopThresholdWatt",
                             { valueAsNumber: true },
@@ -795,7 +795,7 @@ export default function SettingsPage() {
                           type="number"
                           min="30"
                           max="600"
-                          step="30"
+                          step="1"
                           {...form.register(
                             "chargingStrategy.startDelaySeconds",
                             { valueAsNumber: true },
@@ -820,7 +820,7 @@ export default function SettingsPage() {
                           type="number"
                           min="60"
                           max="900"
-                          step="60"
+                          step="1"
                           {...form.register(
                             "chargingStrategy.stopDelaySeconds",
                             { valueAsNumber: true },
@@ -870,7 +870,7 @@ export default function SettingsPage() {
                           type="number"
                           min="10"
                           max="300"
-                          step="10"
+                          step="1"
                           {...form.register(
                             "chargingStrategy.minChangeIntervalSeconds",
                             { valueAsNumber: true },
