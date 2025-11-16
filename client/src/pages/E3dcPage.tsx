@@ -250,114 +250,73 @@ export default function E3dcPage() {
             </Card>
           ) : (
             <div className="space-y-4">
-            {/* Hausbatterie + PV - 2x2 Grid */}
-            <div className="grid grid-cols-2 gap-3">
-              {/* Hausbatterie SOC */}
-              <Card 
-                className={`p-6 relative ${isE3dcEnabled ? 'cursor-pointer hover-elevate active-elevate-2' : ''}`}
-                onClick={() => isE3dcEnabled && setShowBatteryDrawer(true)}
-                data-testid="card-battery-soc"
-              >
-                {isLoading ? (
-                  <Skeleton className="h-16 w-full" />
-                ) : e3dcData ? (
-                  <div>
-                    <div className="flex items-center gap-2 mb-3">
-                      <Battery className="w-4 h-4 text-muted-foreground" />
-                      <span className="text-base font-semibold">Ladezustand</span>
-                      {isE3dcEnabled && (controlState?.batteryLock || controlState?.gridCharging || settings?.e3dc?.gridChargeDuringNightCharging) && (
-                        <div className="flex items-center gap-1.5 ml-1">
-                          {controlState?.batteryLock && (
-                            <ShieldOff className="w-4 h-4 text-muted-foreground" data-testid="icon-battery-lock-active" />
-                          )}
-                          {controlState?.gridCharging && (
-                            <Zap className="w-4 h-4 text-muted-foreground" data-testid="icon-grid-charging-active" />
-                          )}
-                          {settings?.e3dc?.gridChargeDuringNightCharging && (
-                            <Clock className="w-4 h-4 text-muted-foreground" data-testid="icon-grid-charge-night-active" />
-                          )}
-                        </div>
-                      )}
-                    </div>
-                    <div className="text-2xl font-bold" data-testid="text-battery-soc">
-                      {e3dcData.batterySoc}%
-                    </div>
+            {/* Hausbatterie - Kombinierte Kachel */}
+            <Card 
+              className={`p-6 relative ${isE3dcEnabled ? 'cursor-pointer hover-elevate active-elevate-2' : ''}`}
+              onClick={() => isE3dcEnabled && setShowBatteryDrawer(true)}
+              data-testid="card-battery"
+            >
+              {isLoading ? (
+                <Skeleton className="h-24 w-full" />
+              ) : e3dcData ? (
+                <div>
+                  {/* Header */}
+                  <div className="flex items-center gap-2 mb-4">
+                    <Battery className="w-5 h-5 text-muted-foreground" />
+                    <span className="text-base font-semibold">Hausbatterie</span>
+                    {isE3dcEnabled && (controlState?.batteryLock || controlState?.gridCharging || settings?.e3dc?.gridChargeDuringNightCharging) && (
+                      <div className="flex items-center gap-1.5 ml-1">
+                        {controlState?.batteryLock && (
+                          <ShieldOff className="w-4 h-4 text-muted-foreground" data-testid="icon-battery-lock-active" />
+                        )}
+                        {controlState?.gridCharging && (
+                          <Zap className="w-4 h-4 text-muted-foreground" data-testid="icon-grid-charging-active" />
+                        )}
+                        {settings?.e3dc?.gridChargeDuringNightCharging && (
+                          <Clock className="w-4 h-4 text-muted-foreground" data-testid="icon-grid-charge-night-active" />
+                        )}
+                      </div>
+                    )}
                   </div>
-                ) : null}
-                {isE3dcEnabled && (
-                  <TooltipProvider>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <div className="absolute bottom-3 right-3">
-                          <SettingsIcon 
-                            className="w-4 h-4 text-muted-foreground" 
-                            data-testid="icon-config-indicator-soc"
-                          />
-                        </div>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p>Konfiguration verfügbar</p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
-                )}
-              </Card>
-
-              {/* Hausbatterie Leistung */}
-              <Card 
-                className={`p-6 relative ${isE3dcEnabled ? 'cursor-pointer hover-elevate active-elevate-2' : ''}`}
-                onClick={() => isE3dcEnabled && setShowBatteryDrawer(true)}
-                data-testid="card-battery-power"
-              >
-                {isLoading ? (
-                  <Skeleton className="h-16 w-full" />
-                ) : e3dcData ? (
-                  <div>
-                    <div className="flex items-center gap-2 mb-3">
-                      <Zap className="w-4 h-4 text-muted-foreground" />
-                      <span className="text-base font-semibold">Leistung</span>
-                      {isE3dcEnabled && (controlState?.batteryLock || controlState?.gridCharging || settings?.e3dc?.gridChargeDuringNightCharging) && (
-                        <div className="flex items-center gap-1.5 ml-1">
-                          {controlState?.batteryLock && (
-                            <ShieldOff className="w-4 h-4 text-muted-foreground" data-testid="icon-battery-lock-active-power" />
-                          )}
-                          {controlState?.gridCharging && (
-                            <Zap className="w-4 h-4 text-muted-foreground" data-testid="icon-grid-charging-active-power" />
-                          )}
-                          {settings?.e3dc?.gridChargeDuringNightCharging && (
-                            <Clock className="w-4 h-4 text-muted-foreground" data-testid="icon-grid-charge-night-active-power" />
-                          )}
-                        </div>
-                      )}
+                  
+                  {/* Werte */}
+                  <div className="space-y-2">
+                    {/* Ladezustand */}
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-muted-foreground">Ladezustand (SOC)</span>
+                      <span className="text-xl font-bold" data-testid="text-battery-soc">
+                        {e3dcData.batterySoc}%
+                      </span>
                     </div>
-                    <div className="flex items-center gap-1.5">
-                      {isBatteryCharging && <TrendingUp className="w-4 h-4 text-muted-foreground" />}
-                      {isBatteryDischarging && <TrendingDown className="w-4 h-4 text-muted-foreground" />}
-                      <span className="text-2xl font-bold" data-testid="text-battery-power">
-                        {formatPower(Math.abs(e3dcData.batteryPower))}
+                    
+                    {/* Leistung */}
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-muted-foreground">Leistung</span>
+                      <span className="text-xl font-bold" data-testid="text-battery-power">
+                        {e3dcData.batteryPower < 0 ? '-' : ''}{formatPower(Math.abs(e3dcData.batteryPower))}
                       </span>
                     </div>
                   </div>
-                ) : null}
-                {isE3dcEnabled && (
-                  <TooltipProvider>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <div className="absolute bottom-3 right-3">
-                          <SettingsIcon 
-                            className="w-4 h-4 text-muted-foreground" 
-                            data-testid="icon-config-indicator-power"
-                          />
-                        </div>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p>Konfiguration verfügbar</p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
-                )}
-              </Card>
-            </div>
+                </div>
+              ) : null}
+              {isE3dcEnabled && (
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <div className="absolute top-3 right-3">
+                        <SettingsIcon 
+                          className="w-4 h-4 text-muted-foreground" 
+                          data-testid="icon-config-indicator-battery"
+                        />
+                      </div>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Konfiguration verfügbar</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              )}
+            </Card>
 
             {/* PV, Wallbox, Hausverbrauch, Netz - 2x2 Grid */}
             <div className="grid grid-cols-2 gap-3">
