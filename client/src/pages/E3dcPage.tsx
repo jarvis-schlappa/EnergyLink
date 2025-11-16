@@ -396,10 +396,10 @@ export default function E3dcPage() {
 
             {/* Effizienzwerte */}
             <Card>
-              <CardHeader>
+              <CardHeader className="pb-3">
                 <CardTitle className="text-base">Effizienz</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-3">
+              <CardContent className="space-y-2 pb-4">
                 {isLoading ? (
                   <>
                     <Skeleton className="h-6 w-full" />
