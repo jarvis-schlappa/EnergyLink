@@ -2,19 +2,45 @@ import type { Settings, ControlState, LogEntry, LogSettings, LogLevel, PlugStatu
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from "fs";
 import { join } from "path";
 
+// Global cache for log level (loaded once at startup, before storage is created)
+let cachedLogLevel: LogLevel = "info"; // Default: INFO
+
 // Simple logger for storage operations (avoids circular dependency with logger.ts)
 // Uses identical timestamp formatting as logger.ts to ensure consistency
-function logStorage(level: "debug" | "info" | "warning", message: string, details?: string): void {
-  const now = new Date();
-  const hours = String(now.getHours()).padStart(2, '0');
-  const minutes = String(now.getMinutes()).padStart(2, '0');
-  const seconds = String(now.getSeconds()).padStart(2, '0');
-  const milliseconds = String(now.getMilliseconds()).padStart(3, '0');
-  const timestamp = `${hours}:${minutes}:${seconds},${milliseconds}`;
+// Respects the configured log level to avoid excessive console output
+function logStorage(level: "trace" | "debug" | "info" | "warning", message: string, details?: string): void {
+  const logLevelPriority: Record<string, number> = {
+    trace: 0,
+    debug: 1,
+    info: 2,
+    warning: 3,
+    error: 4,
+  };
+
+  const currentLevelPriority = logLevelPriority[cachedLogLevel];
+  const messageLevelPriority = logLevelPriority[level];
   
-  const levelUpper = level.toUpperCase() as 'DEBUG' | 'INFO' | 'WARNING';
-  const fullMessage = details ? `${message} - ${details}` : message;
-  console.log(`[${timestamp}] [${levelUpper}] [storage] ${fullMessage}`);
+  if (messageLevelPriority >= currentLevelPriority) {
+    const now = new Date();
+    const hours = String(now.getHours()).padStart(2, '0');
+    const minutes = String(now.getMinutes()).padStart(2, '0');
+    const seconds = String(now.getSeconds()).padStart(2, '0');
+    const milliseconds = String(now.getMilliseconds()).padStart(3, '0');
+    const timestamp = `${hours}:${minutes}:${seconds},${milliseconds}`;
+    
+    const levelUpper = level.toUpperCase() as 'TRACE' | 'DEBUG' | 'INFO' | 'WARNING';
+    const fullMessage = details ? `${message} - ${details}` : message;
+    console.log(`[${timestamp}] [${levelUpper}] [storage] ${fullMessage}`);
+    
+    // Also add to central log store so it appears in UI (if storage is ready)
+    try {
+      if (typeof storage !== 'undefined') {
+        storage.addLog({ level: level as LogLevel, category: "storage", message, details });
+      }
+    } catch (e) {
+      // storage not yet initialized - skip
+    }
+  }
 }
 
 export interface IStorage {
@@ -40,6 +66,7 @@ export class MemStorage implements IStorage {
   private controlStateFilePath = join(process.cwd(), "data", "control-state.json");
   private plugTrackingFilePath = join(process.cwd(), "data", "plug-tracking.json");
   private chargingContextFilePath = join(process.cwd(), "data", "charging-context.json");
+  private logSettingsFilePath = join(process.cwd(), "data", "log-settings.json");
   private settings: Settings | null = null;
   private controlState: ControlState = {
     pvSurplus: false,
@@ -59,7 +86,7 @@ export class MemStorage implements IStorage {
   };
   private logs: LogEntry[] = [];
   private logSettings: LogSettings = {
-    level: "debug" as LogLevel,
+    level: "info" as LogLevel,
   };
   private maxLogs = 1000;
 
@@ -69,6 +96,9 @@ export class MemStorage implements IStorage {
     if (!existsSync(dataDir)) {
       mkdirSync(dataDir, { recursive: true });
     }
+
+    // Lade Log-Settings ZUERST - damit logStorage das korrekte Level während Initialisierung verwendet
+    this.logSettings = this.loadLogSettingsFromFile();
 
     // Lade Settings aus Datei oder verwende Defaults
     this.settings = this.loadSettingsFromFile();
@@ -424,12 +454,50 @@ export class MemStorage implements IStorage {
     this.logs = [];
   }
 
+  private loadLogSettingsFromFile(): LogSettings {
+    if (existsSync(this.logSettingsFilePath)) {
+      try {
+        const data = readFileSync(this.logSettingsFilePath, "utf-8");
+        const loaded = JSON.parse(data);
+        // Update global cache immediately so logStorage respects it
+        cachedLogLevel = loaded.level;
+        return loaded;
+      } catch (error) {
+        // Silently fall back to default if file is corrupted
+      }
+    }
+    
+    // Default: INFO level (not DEBUG)
+    const defaults: LogSettings = {
+      level: "info" as LogLevel,
+    };
+    
+    // Update global cache
+    cachedLogLevel = defaults.level;
+    
+    // Save defaults to file for future restarts
+    try {
+      writeFileSync(this.logSettingsFilePath, JSON.stringify(defaults, null, 2), "utf-8");
+    } catch (error) {
+      // Silent fail - not critical
+    }
+    
+    return defaults;
+  }
+
   getLogSettings(): LogSettings {
     return this.logSettings;
   }
 
   saveLogSettings(settings: LogSettings): void {
     this.logSettings = settings;
+    // Update global cache immediately
+    cachedLogLevel = settings.level;
+    try {
+      writeFileSync(this.logSettingsFilePath, JSON.stringify(settings, null, 2), "utf-8");
+    } catch (error) {
+      // Silent fail - log settings are not critical for operation
+    }
   }
 }
 

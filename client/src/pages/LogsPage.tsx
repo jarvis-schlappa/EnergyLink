@@ -10,10 +10,14 @@ import { Badge } from "@/components/ui/badge";
 import { Trash2, Filter, RefreshCw } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
+type LogCategory = "wallbox" | "wallbox-mock" | "e3dc" | "e3dc-mock" | "fhem" | "fhem-mock" | "webhook" | "system" | "storage";
+
+const ALL_CATEGORIES: LogCategory[] = ["wallbox", "wallbox-mock", "e3dc", "e3dc-mock", "fhem", "fhem-mock", "webhook", "system", "storage"];
+
 export default function LogsPage() {
   const { toast } = useToast();
   const [filterLevel, setFilterLevel] = useState<LogLevel | "all">("all");
-  const [filterCategory, setFilterCategory] = useState<string>("all");
+  const [selectedCategories, setSelectedCategories] = useState<LogCategory[]>([]);
 
   const { data: logs = [], isLoading: logsLoading, refetch } = useQuery<LogEntry[]>({
     queryKey: ["/api/logs"],
@@ -64,13 +68,50 @@ export default function LogsPage() {
     },
   });
 
+  const logLevelPriority: Record<LogLevel, number> = {
+    trace: 0,
+    debug: 1,
+    info: 2,
+    warning: 3,
+    error: 4,
+  };
+
   const filteredLogs = logs
-    .filter((log) => filterLevel === "all" || log.level === filterLevel)
-    .filter((log) => filterCategory === "all" || log.category === filterCategory)
+    .filter((log) => {
+      if (filterLevel === "all") return true;
+      const logPriority = logLevelPriority[log.level];
+      const filterPriority = logLevelPriority[filterLevel];
+      return logPriority >= filterPriority;
+    })
+    .filter((log) => selectedCategories.length === 0 || selectedCategories.includes(log.category as LogCategory))
     .reverse();
+
+  const toggleCategory = (category: LogCategory) => {
+    setSelectedCategories((prev) =>
+      prev.includes(category)
+        ? prev.filter((c) => c !== category)
+        : [...prev, category]
+    );
+  };
+
+  const getCategoryLabel = (category: LogCategory): string => {
+    switch (category) {
+      case "wallbox": return "Wallbox";
+      case "wallbox-mock": return "Wallbox Mock";
+      case "e3dc": return "E3DC";
+      case "e3dc-mock": return "E3DC Mock";
+      case "fhem": return "FHEM";
+      case "fhem-mock": return "FHEM Mock";
+      case "webhook": return "Webhook";
+      case "system": return "System";
+      case "storage": return "Storage";
+    }
+  };
 
   const getLevelColor = (level: LogLevel) => {
     switch (level) {
+      case "trace":
+        return "bg-gray-400 text-white dark:bg-gray-500";
       case "debug":
         return "bg-muted text-muted-foreground";
       case "info":
@@ -86,10 +127,22 @@ export default function LogsPage() {
     switch (category) {
       case "wallbox":
         return "bg-blue-500 text-white dark:bg-blue-600";
+      case "wallbox-mock":
+        return "bg-blue-400 text-white dark:bg-blue-500";
+      case "e3dc":
+        return "bg-orange-500 text-white dark:bg-orange-600";
+      case "e3dc-mock":
+        return "bg-orange-400 text-white dark:bg-orange-500";
+      case "fhem":
+        return "bg-teal-500 text-white dark:bg-teal-600";
+      case "fhem-mock":
+        return "bg-teal-400 text-white dark:bg-teal-500";
       case "webhook":
         return "bg-green-500 text-white dark:bg-green-600";
       case "system":
         return "bg-purple-500 text-white dark:bg-purple-600";
+      case "storage":
+        return "bg-gray-500 text-white dark:bg-gray-600";
       default:
         return "bg-muted text-muted-foreground";
     }
@@ -135,6 +188,7 @@ export default function LogsPage() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="trace">Trace (sehr detailliert, inkl. HTTP)</SelectItem>
                     <SelectItem value="debug">Debug (alle Meldungen)</SelectItem>
                     <SelectItem value="info">Info (Standard)</SelectItem>
                     <SelectItem value="warning">Warning (Warnungen)</SelectItem>
@@ -174,44 +228,66 @@ export default function LogsPage() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="flex flex-col gap-2">
-                  <label className="text-sm text-muted-foreground">Level</label>
-                  <Select
-                    value={filterLevel}
-                    onValueChange={(value) => setFilterLevel(value as LogLevel | "all")}
-                    data-testid="select-filter-level"
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Alle</SelectItem>
-                      <SelectItem value="debug">Debug</SelectItem>
-                      <SelectItem value="info">Info</SelectItem>
-                      <SelectItem value="warning">Warning</SelectItem>
-                      <SelectItem value="error">Error</SelectItem>
-                    </SelectContent>
-                  </Select>
+              <div className="flex flex-col gap-2">
+                <label className="text-sm text-muted-foreground">Level</label>
+                <Select
+                  value={filterLevel}
+                  onValueChange={(value) => setFilterLevel(value as LogLevel | "all")}
+                  data-testid="select-filter-level"
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Alle</SelectItem>
+                    <SelectItem value="trace">Trace (und höher)</SelectItem>
+                    <SelectItem value="debug">Debug (und höher)</SelectItem>
+                    <SelectItem value="info">Info (und höher)</SelectItem>
+                    <SelectItem value="warning">Warning (und höher)</SelectItem>
+                    <SelectItem value="error">Nur Error</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="flex flex-col gap-3">
+                <div className="flex items-center justify-between">
+                  <label className="text-sm text-muted-foreground">
+                    Kategorien ({selectedCategories.length > 0 ? selectedCategories.length : 'Alle'})
+                  </label>
+                  {selectedCategories.length > 0 && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => setSelectedCategories([])}
+                      className="h-6 text-xs"
+                      data-testid="button-clear-category-filter"
+                    >
+                      Alle auswählen
+                    </Button>
+                  )}
                 </div>
-                <div className="flex flex-col gap-2">
-                  <label className="text-sm text-muted-foreground">Kategorie</label>
-                  <Select
-                    value={filterCategory}
-                    onValueChange={setFilterCategory}
-                    data-testid="select-filter-category"
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Alle</SelectItem>
-                      <SelectItem value="wallbox">Wallbox</SelectItem>
-                      <SelectItem value="webhook">Webhook</SelectItem>
-                      <SelectItem value="system">System</SelectItem>
-                    </SelectContent>
-                  </Select>
+                <div className="flex flex-wrap gap-2">
+                  {ALL_CATEGORIES.map((category) => {
+                    const isSelected = selectedCategories.includes(category);
+                    return (
+                      <Badge
+                        key={category}
+                        className={`cursor-pointer transition-all ${
+                          isSelected
+                            ? getCategoryColor(category)
+                            : 'bg-muted text-muted-foreground hover-elevate'
+                        }`}
+                        onClick={() => toggleCategory(category)}
+                        data-testid={`badge-filter-${category}`}
+                      >
+                        {getCategoryLabel(category)}
+                      </Badge>
+                    );
+                  })}
                 </div>
+                <p className="text-xs text-muted-foreground">
+                  Klicke auf Kategorien um sie zu filtern. Ohne Auswahl werden alle angezeigt.
+                </p>
               </div>
             </CardContent>
           </Card>
