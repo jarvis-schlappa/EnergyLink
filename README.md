@@ -2,7 +2,7 @@
 
 Eine moderne Progressive Web App (PWA) zur intelligenten Steuerung Ihrer KEBA Wallbox Ladestation für Elektrofahrzeuge mit E3DC S10 und SmartHome-Integration.
 
-_Version 1.0 – November 2025_
+_Version 1.0.1 – November 2025_
 
 ## 🎭 Live-Demo ausprobieren
 
