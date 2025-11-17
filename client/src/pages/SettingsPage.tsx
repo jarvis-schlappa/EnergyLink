@@ -792,6 +792,216 @@ export default function SettingsPage() {
             <Separator />
 
             <div className="border rounded-lg p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label htmlFor="prowl-enabled" className="text-sm font-medium">
+                    Prowl Push-Benachrichtigungen
+                  </Label>
+                  <p className="text-xs text-muted-foreground">
+                    Erhalte Benachrichtigungen über Ladeereignisse auf iOS/Android
+                  </p>
+                </div>
+                <Switch
+                  id="prowl-enabled"
+                  checked={form.watch("prowl.enabled")}
+                  onCheckedChange={(checked) =>
+                    form.setValue("prowl.enabled", checked)
+                  }
+                  data-testid="switch-prowl-enabled"
+                />
+              </div>
+
+              {form.watch("prowl.enabled") && (
+                <>
+                  <Separator />
+
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label
+                        htmlFor="prowl-api-key"
+                        className="text-sm font-medium"
+                      >
+                        Prowl API Key
+                      </Label>
+                      <Input
+                        id="prowl-api-key"
+                        type="password"
+                        placeholder="40 Zeichen API Key"
+                        {...form.register("prowl.apiKey")}
+                        className="h-12 font-mono"
+                        data-testid="input-prowl-api-key"
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        API Key von <a href="https://www.prowlapp.com" target="_blank" rel="noopener noreferrer" className="underline">prowlapp.com</a>
+                      </p>
+                    </div>
+
+                    <div className="p-3 rounded-md bg-muted">
+                      <p className="text-xs text-muted-foreground">
+                        <strong>ℹ️ Hinweis:</strong> Prowl sendet Benachrichtigungen an iOS und Android. Registriere dich kostenlos auf prowlapp.com und kopiere den API Key hierher.
+                      </p>
+                    </div>
+
+                    <Separator />
+
+                    <div className="space-y-3">
+                      <Label className="text-sm font-medium">
+                        Benachrichtigungen aktivieren
+                      </Label>
+                      
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <Label htmlFor="event-charging-started" className="text-xs font-normal">
+                            Ladung gestartet
+                          </Label>
+                          <Switch
+                            id="event-charging-started"
+                            checked={form.watch("prowl.events.chargingStarted")}
+                            onCheckedChange={(checked) =>
+                              form.setValue("prowl.events.chargingStarted", checked)
+                            }
+                            data-testid="switch-event-charging-started"
+                          />
+                        </div>
+                        
+                        <div className="flex items-center justify-between">
+                          <Label htmlFor="event-charging-stopped" className="text-xs font-normal">
+                            Ladung gestoppt
+                          </Label>
+                          <Switch
+                            id="event-charging-stopped"
+                            checked={form.watch("prowl.events.chargingStopped")}
+                            onCheckedChange={(checked) =>
+                              form.setValue("prowl.events.chargingStopped", checked)
+                            }
+                            data-testid="switch-event-charging-stopped"
+                          />
+                        </div>
+                        
+                        <div className="flex items-center justify-between">
+                          <Label htmlFor="event-current-adjusted" className="text-xs font-normal">
+                            Ladestrom angepasst
+                          </Label>
+                          <Switch
+                            id="event-current-adjusted"
+                            checked={form.watch("prowl.events.currentAdjusted")}
+                            onCheckedChange={(checked) =>
+                              form.setValue("prowl.events.currentAdjusted", checked)
+                            }
+                            data-testid="switch-event-current-adjusted"
+                          />
+                        </div>
+                        
+                        <div className="flex items-center justify-between">
+                          <Label htmlFor="event-plug-connected" className="text-xs font-normal">
+                            Auto angesteckt
+                          </Label>
+                          <Switch
+                            id="event-plug-connected"
+                            checked={form.watch("prowl.events.plugConnected")}
+                            onCheckedChange={(checked) =>
+                              form.setValue("prowl.events.plugConnected", checked)
+                            }
+                            data-testid="switch-event-plug-connected"
+                          />
+                        </div>
+                        
+                        <div className="flex items-center justify-between">
+                          <Label htmlFor="event-plug-disconnected" className="text-xs font-normal">
+                            Auto abgesteckt
+                          </Label>
+                          <Switch
+                            id="event-plug-disconnected"
+                            checked={form.watch("prowl.events.plugDisconnected")}
+                            onCheckedChange={(checked) =>
+                              form.setValue("prowl.events.plugDisconnected", checked)
+                            }
+                            data-testid="switch-event-plug-disconnected"
+                          />
+                        </div>
+                        
+                        <div className="flex items-center justify-between">
+                          <Label htmlFor="event-battery-lock-activated" className="text-xs font-normal">
+                            Entladesperre aktiviert
+                          </Label>
+                          <Switch
+                            id="event-battery-lock-activated"
+                            checked={form.watch("prowl.events.batteryLockActivated")}
+                            onCheckedChange={(checked) =>
+                              form.setValue("prowl.events.batteryLockActivated", checked)
+                            }
+                            data-testid="switch-event-battery-lock-activated"
+                          />
+                        </div>
+                        
+                        <div className="flex items-center justify-between">
+                          <Label htmlFor="event-battery-lock-deactivated" className="text-xs font-normal">
+                            Entladesperre deaktiviert
+                          </Label>
+                          <Switch
+                            id="event-battery-lock-deactivated"
+                            checked={form.watch("prowl.events.batteryLockDeactivated")}
+                            onCheckedChange={(checked) =>
+                              form.setValue("prowl.events.batteryLockDeactivated", checked)
+                            }
+                            data-testid="switch-event-battery-lock-deactivated"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    <Separator />
+
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={async () => {
+                        try {
+                          const settings = form.getValues();
+                          await fetch("/api/settings", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify(settings),
+                          });
+                          
+                          const response = await fetch("/api/prowl/test", {
+                            method: "POST",
+                          });
+                          
+                          if (response.ok) {
+                            toast({
+                              title: "Test-Benachrichtigung gesendet",
+                              description: "Prüfe dein Smartphone (kann bis zu 1 Minute dauern)",
+                            });
+                          } else {
+                            const error = await response.json();
+                            toast({
+                              title: "Test fehlgeschlagen",
+                              description: error.error || "Prüfe API Key und Logs",
+                              variant: "destructive",
+                            });
+                          }
+                        } catch (error) {
+                          toast({
+                            title: "Fehler",
+                            description: "Test-Benachrichtigung konnte nicht gesendet werden",
+                            variant: "destructive",
+                          });
+                        }
+                      }}
+                      className="w-full"
+                      data-testid="button-prowl-test"
+                    >
+                      Test-Benachrichtigung senden
+                    </Button>
+                  </div>
+                </>
+              )}
+            </div>
+
+            <Separator />
+
+            <div className="border rounded-lg p-4 space-y-3">
               <Accordion type="single" collapsible className="w-full">
                 <AccordionItem value="strategy-params" className="border-none">
                   <div className="space-y-2">

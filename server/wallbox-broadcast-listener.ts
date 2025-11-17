@@ -15,6 +15,7 @@ import { log } from "./logger";
 import { storage } from "./storage";
 import { wallboxUdpChannel } from "./wallbox-udp-channel";
 import { ChargingStrategyController } from "./charging-strategy-controller";
+import { getProwlNotifier } from "./prowl-notifier";
 
 let lastInputStatus: number | null = null;
 let lastPlugStatus: number | null = null;
@@ -55,6 +56,24 @@ const handleBroadcast = async (data: any, rinfo: any) => {
             "[Wallbox-Broadcast-Listener] Fehler beim Speichern des Plug-Status:",
             error instanceof Error ? error.message : String(error),
           );
+        }
+        
+        // Prowl-Benachrichtigung (non-blocking, with initialization guard)
+        try {
+          const settingsForProwl = storage.getSettings();
+          
+          if (settingsForProwl?.prowl?.enabled) {
+            const prowl = getProwlNotifier();
+            
+            // Plug=7 = Auto angesteckt, Plug=1 = Auto abgesteckt
+            if (plugStatus === 7 && settingsForProwl?.prowl?.events?.plugConnected) {
+              void prowl.sendPlugConnected();
+            } else if (plugStatus === 1 && settingsForProwl?.prowl?.events?.plugDisconnected) {
+              void prowl.sendPlugDisconnected();
+            }
+          }
+        } catch (error) {
+          log("debug", "system", "Prowl-Notifier nicht initialisiert - überspringe Benachrichtigung");
         }
       } else if (lastPlugStatus === null) {
         // Erster Broadcast - initialisiere Storage ohne Log (verhindert false-positive bei Startup)

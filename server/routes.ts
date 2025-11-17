@@ -22,6 +22,7 @@ import { sendUdpCommand, sendUdpCommandNoResponse } from "./wallbox-transport";
 import { getBuildInfo } from "./build-info";
 import { syncE3dcToFhem, startFhemSyncScheduler, stopFhemSyncScheduler } from "./fhem-e3dc-sync";
 import { startE3dcPoller, stopE3dcPoller } from "./e3dc-poller";
+import { initializeProwlNotifier, getProwlNotifier } from "./prowl-notifier";
 
 // Module-scope Scheduler Handles (überleben Hot-Reload)
 let chargingStrategyInterval: NodeJS.Timeout | null = null;
@@ -194,6 +195,10 @@ function extractBaseUrlFromUrl(url: string | undefined): string | null {
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Initialisiere Prowl-Notifier mit aktuellen Settings
+  const prowlSettings = storage.getSettings();
+  initializeProwlNotifier(prowlSettings);
+  
   app.get("/api/build-info", (req, res) => {
     try {
       const buildInfo = getBuildInfo();
@@ -629,6 +634,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const e3dcChanged = JSON.stringify(oldE3dc) !== JSON.stringify(newE3dc);
 
       storage.saveSettings(newSettings);
+      
+      // Aktualisiere Prowl-Notifier mit neuen Settings
+      try {
+        getProwlNotifier().updateSettings(newSettings);
+      } catch (error) {
+        log("warning", "system", "Prowl-Notifier konnte nicht aktualisiert werden", error instanceof Error ? error.message : String(error));
+      }
 
       // Demo-Modus: Aktualisiere Mock-Wallbox-Phasen ohne Neustart
       if (newSettings.demoMode && phasesChanged && newPhases) {
@@ -774,6 +786,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
         "Unerwarteter Fehler bei E3DC Live-Daten Abfrage",
         error instanceof Error ? error.message : String(error),
       );
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.post("/api/prowl/test", async (req, res) => {
+    try {
+      const settings = storage.getSettings();
+      
+      if (!settings?.prowl?.enabled) {
+        return res.status(400).json({ error: "Prowl ist nicht aktiviert" });
+      }
+      
+      if (!settings?.prowl?.apiKey) {
+        return res.status(400).json({ error: "Prowl API Key nicht konfiguriert" });
+      }
+      
+      const success = await getProwlNotifier().sendTestNotification();
+      
+      if (success) {
+        log("info", "system", "Prowl Test-Benachrichtigung gesendet");
+        res.json({ success: true, message: "Test-Benachrichtigung gesendet" });
+      } else {
+        res.status(500).json({ error: "Test-Benachrichtigung fehlgeschlagen - prüfe API Key und Logs" });
+      }
+    } catch (error) {
+      log("error", "system", "Fehler beim Senden der Prowl Test-Benachrichtigung", error instanceof Error ? error.message : String(error));
       res.status(500).json({ error: "Internal server error" });
     }
   });

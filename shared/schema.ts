@@ -79,6 +79,28 @@ export const fhemSyncSchema = z.object({
 
 export type FhemSync = z.infer<typeof fhemSyncSchema>;
 
+export const prowlEventsSchema = z.object({
+  chargingStarted: z.boolean(),
+  chargingStopped: z.boolean(),
+  currentAdjusted: z.boolean(),
+  plugConnected: z.boolean(),
+  plugDisconnected: z.boolean(),
+  batteryLockActivated: z.boolean(),
+  batteryLockDeactivated: z.boolean(),
+  strategyChanged: z.boolean(),
+  errors: z.boolean(),
+});
+
+export type ProwlEvents = z.infer<typeof prowlEventsSchema>;
+
+export const prowlSchema = z.object({
+  enabled: z.boolean(),
+  apiKey: z.string(),
+  events: prowlEventsSchema,
+});
+
+export type Prowl = z.infer<typeof prowlSchema>;
+
 export const settingsSchema = z.object({
   wallboxIp: z.string(),
   wallboxIpBackup: z.string().optional(),
@@ -92,6 +114,7 @@ export const settingsSchema = z.object({
   e3dc: e3dcConfigSchema.optional(),
   chargingStrategy: chargingStrategyConfigSchema.optional(),
   fhemSync: fhemSyncSchema.optional(),
+  prowl: prowlSchema.optional(),
   demoMode: z.boolean().optional(),
   mockWallboxPhases: z.union([z.literal(1), z.literal(3)]).optional().default(3),
   mockWallboxPlugStatus: z.number().min(0).max(7).optional().default(7), // 0-7 gemäß KEBA Spezifikation
