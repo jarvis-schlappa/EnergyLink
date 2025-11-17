@@ -82,7 +82,7 @@ export class MemStorage implements IStorage {
     targetAmpere: 0,
     currentPhases: 3,
     adjustmentCount: 0,
-    lastAdjustmentTimes: [],
+    lastAdjustment: undefined,
   };
   private logs: LogEntry[] = [];
   private logSettings: LogSettings = {
@@ -135,6 +135,13 @@ export class MemStorage implements IStorage {
         startTime: "00:00",
         endTime: "05:00",
       },
+      fhemSync: {
+        enabled: false,
+        host: "192.168.40.11",
+        port: 7072,
+      },
+      mockWallboxPhases: 3,
+      mockWallboxPlugStatus: 7,
     };
     
     // Speichere Defaults in Datei
@@ -228,7 +235,7 @@ export class MemStorage implements IStorage {
           targetAmpere: 0,
           currentPhases: 3,
           adjustmentCount: 0,
-          lastAdjustmentTimes: [],
+          lastAdjustment: undefined,
           ...loaded,
         };
       } catch (error) {
@@ -243,7 +250,7 @@ export class MemStorage implements IStorage {
       targetAmpere: 0,
       currentPhases: 3,
       adjustmentCount: 0,
-      lastAdjustmentTimes: [],
+      lastAdjustment: undefined,
     };
   }
 

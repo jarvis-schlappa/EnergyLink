@@ -71,6 +71,14 @@ export const chargingStrategyConfigSchema = z.object({
 
 export type ChargingStrategyConfig = z.infer<typeof chargingStrategyConfigSchema>;
 
+export const fhemSyncSchema = z.object({
+  enabled: z.boolean(),
+  host: z.string(),
+  port: z.number(),
+});
+
+export type FhemSync = z.infer<typeof fhemSyncSchema>;
+
 export const settingsSchema = z.object({
   wallboxIp: z.string(),
   wallboxIpBackup: z.string().optional(),
@@ -83,6 +91,7 @@ export const settingsSchema = z.object({
   nightChargingSchedule: nightChargingScheduleSchema.optional(),
   e3dc: e3dcConfigSchema.optional(),
   chargingStrategy: chargingStrategyConfigSchema.optional(),
+  fhemSync: fhemSyncSchema.optional(),
   demoMode: z.boolean().optional(),
   mockWallboxPhases: z.union([z.literal(1), z.literal(3)]).optional().default(3),
   mockWallboxPlugStatus: z.number().min(0).max(7).optional().default(7), // 0-7 gemäß KEBA Spezifikation
@@ -115,7 +124,7 @@ export const logEntrySchema = z.object({
   id: z.string(),
   timestamp: z.string(),
   level: logLevelSchema,
-  category: z.enum(["wallbox", "wallbox-mock", "e3dc", "e3dc-mock", "fhem", "fhem-mock", "webhook", "system", "storage"]),
+  category: z.enum(["wallbox", "wallbox-mock", "e3dc", "e3dc-mock", "e3dc-poller", "e3dc-hub", "fhem", "fhem-mock", "webhook", "system", "storage", "strategy"]),
   message: z.string(),
   details: z.string().optional(),
 });

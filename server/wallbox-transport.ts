@@ -142,7 +142,7 @@ function registerPersistentHandler(): void {
     }
     
     try {
-      log("debug", "wallbox", `UDP-Roh-Antwort empfangen für "${currentRequest.command}"`, `Rohdaten: ${msg.raw.substring(0, 200)}`);
+      log("trace", "wallbox", `UDP-Roh-Antwort empfangen für "${currentRequest.command}"`, `Rohdaten: ${msg.raw.substring(0, 200)}`);
       const parsed = parseKebaResponse(msg.raw);
       
       // Validiere ob die Antwort zum erwarteten Befehl passt

@@ -120,13 +120,18 @@ app.use((req, res, next) => {
     viteLog(`serving on port ${port}`);
   });
   
-  // Graceful Shutdown für Mock-Server und Broadcast-Listener (falls aktiv)
+  // Graceful Shutdown für Mock-Server, Broadcast-Listener und Scheduler (falls aktiv)
   const shutdown = async () => {
     log('info', 'system', '🛑 Graceful Shutdown wird durchgeführt...');
     try {
+      // Import shutdownSchedulers dynamisch, da routes.ts erst nach registerRoutes existiert
+      const { shutdownSchedulers } = await import('./routes');
+      
+      // Stoppe alle Dienste parallel
       await Promise.all([
         stopUnifiedMock(),
-        stopBroadcastListener()
+        stopBroadcastListener(),
+        shutdownSchedulers()
       ]);
     } catch (error) {
       log('error', 'system', 'Fehler beim Shutdown', error instanceof Error ? error.message : String(error));

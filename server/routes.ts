@@ -20,6 +20,52 @@ import { ChargingStrategyController } from "./charging-strategy-controller";
 import { wallboxMockService } from "./wallbox-mock";
 import { sendUdpCommand, sendUdpCommandNoResponse } from "./wallbox-transport";
 import { getBuildInfo } from "./build-info";
+import { syncE3dcToFhem, startFhemSyncScheduler, stopFhemSyncScheduler } from "./fhem-e3dc-sync";
+import { startE3dcPoller, stopE3dcPoller } from "./e3dc-poller";
+
+// Module-scope Scheduler Handles (überleben Hot-Reload)
+let chargingStrategyInterval: NodeJS.Timeout | null = null;
+let nightChargingSchedulerInterval: NodeJS.Timeout | null = null;
+let fhemSyncInterval: NodeJS.Timeout | null = null;
+let e3dcPollerInterval: NodeJS.Timeout | null = null;
+let strategyController: ChargingStrategyController | null = null;
+
+/**
+ * Graceful Shutdown für alle Scheduler
+ * Wird von index.ts beim SIGTERM/SIGINT aufgerufen
+ */
+export async function shutdownSchedulers(): Promise<void> {
+  log("info", "system", "Stoppe alle Scheduler...");
+  
+  // Stoppe Charging Strategy Event-Listener (wartet auf laufenden Strategy-Check)
+  if (strategyController) {
+    await strategyController.stopEventListener();
+    log("info", "system", "Charging-Strategy-Event-Listener gestoppt");
+  }
+  
+  // Stoppe Scheduler
+  if (chargingStrategyInterval) {
+    clearInterval(chargingStrategyInterval);
+    chargingStrategyInterval = null;
+    log("info", "system", "Charging-Strategy-Fallback-Timer gestoppt");
+  }
+  
+  if (nightChargingSchedulerInterval) {
+    clearInterval(nightChargingSchedulerInterval);
+    nightChargingSchedulerInterval = null;
+    log("info", "system", "Night-Charging-Scheduler gestoppt");
+  }
+  
+  // Stoppe FHEM-Sync-Scheduler (wartet auf laufenden Sync)
+  await stopFhemSyncScheduler(fhemSyncInterval);
+  fhemSyncInterval = null;
+  
+  // Stoppe E3DC-Background-Poller (wartet auf laufenden Poll)
+  await stopE3dcPoller();
+  e3dcPollerInterval = null;
+  
+  log("info", "system", "Alle Scheduler erfolgreich gestoppt");
+}
 
 async function callSmartHomeUrl(url: string | undefined): Promise<void> {
   if (!url) return;
@@ -278,8 +324,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         log("info", "wallbox", `Ladestrategie aktiviert: ${strategyValidation.data}`);
         
         // WICHTIG: Battery Lock aktivieren/deaktivieren basierend auf Strategie
-        const controller = new ChargingStrategyController(sendUdpCommand);
-        await controller.handleStrategyChange(strategyValidation.data);
+        // Initialisiere Controller wenn noch nicht vorhanden (Shared instance)
+        if (!strategyController) {
+          strategyController = new ChargingStrategyController(sendUdpCommand);
+        }
+        await strategyController.handleStrategyChange(strategyValidation.data);
       }
 
       const response = await sendUdpCommand(settings.wallboxIp, "ena 1");
@@ -341,8 +390,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       log("info", "wallbox", `Ladestrategie deaktiviert (auf "off" gesetzt)`);
       
       // WICHTIG: Battery Lock deaktivieren
-      const controller = new ChargingStrategyController(sendUdpCommand);
-      await controller.handleStrategyChange("off");
+      // Initialisiere Controller wenn noch nicht vorhanden (Shared instance)
+      if (!strategyController) {
+        strategyController = new ChargingStrategyController(sendUdpCommand);
+      }
+      await strategyController.handleStrategyChange("off");
 
       const response = await sendUdpCommand(settings.wallboxIp, "ena 0");
 
@@ -673,24 +725,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const settings = storage.getSettings();
 
-      // Hole Wallbox-Leistung direkt über UDP (Report 3)
-      let wallboxPower = 0; // in Watt
-      if (settings?.wallboxIp) {
-        try {
-          const report3 = await sendUdpCommand(settings.wallboxIp, "report 3");
-          // Power ist in Report 3 als P (in Milliwatt), dividiert durch 1000000 für kW
-          // Wir brauchen Watt, also dividieren wir nur durch 1000
-          wallboxPower = (report3?.P || 0) / 1000;
-        } catch (error) {
-          log(
-            "warning",
-            "system",
-            "Konnte Wallbox-Leistung nicht abrufen, verwende 0W",
-            error instanceof Error ? error.message : String(error),
-          );
-        }
-      }
-
       // E3DC IP erforderlich (im Demo-Modus: 127.0.0.1:5502 für Unified Mock Server)
       if (!settings?.e3dcIp) {
         log(
@@ -703,35 +737,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      // Verbinde zum E3DC Modbus (echtes System oder Unified Mock Server im Demo-Modus)
+      // Hole Daten aus dem Cache (E3DC-Poller aktualisiert alle 5s)
       const e3dcService = getE3dcModbusService();
+      const cachedData = e3dcService.getLastReadLiveData();
 
-      try {
-        // Stelle Verbindung her (wiederverwendet bestehende Verbindung wenn bereits verbunden)
-        await e3dcService.connect(settings.e3dcIp);
-
-        // Lese Live-Daten mit aktueller Wallbox-Leistung
-        const liveData = await e3dcService.readLiveData(wallboxPower);
-
+      if (cachedData) {
+        // Cache-Hit: Verwende gecachte Daten (vom E3DC-Poller)
         log(
           "debug",
           "system",
-          `E3DC Live-Daten erfolgreich abgerufen: PV=${liveData.pvPower}W, Batterie=${liveData.batteryPower}W, Haus=${liveData.housePower}W, Wallbox=${liveData.wallboxPower}W`,
+          `E3DC Live-Daten aus Cache gelesen: PV=${cachedData.pvPower}W, Batterie=${cachedData.batteryPower}W (SOC=${cachedData.batterySoc}%), Haus=${cachedData.housePower}W`,
         );
-
-        res.json(liveData);
-      } catch (error) {
-        const errorMessage =
-          error instanceof Error ? error.message : String(error);
+        res.json(cachedData);
+      } else {
+        // Cache-Miss: Erste Anfrage vor erstem Poll
         log(
-          "error",
+          "warning",
           "system",
-          "Fehler beim Abrufen der E3DC Live-Daten",
-          errorMessage,
+          "E3DC Cache leer - warte auf ersten Poller-Durchlauf (alle 5s)",
         );
-
-        res.status(500).json({
-          error: `E3DC Modbus-Fehler: ${errorMessage}`,
+        res.status(503).json({
+          error: "E3DC-Daten noch nicht verfügbar - bitte kurz warten und erneut versuchen",
         });
       }
     } catch (error) {
@@ -1107,9 +1133,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
   };
 
   // === CHARGING STRATEGY SCHEDULER ===
-  let chargingStrategyInterval: NodeJS.Timeout | null = null;
-  let strategyController: ChargingStrategyController | null = null;
-
   const checkChargingStrategy = async () => {
     try {
       const settings = storage.getSettings();
@@ -1239,7 +1262,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
   };
 
   // Scheduler für zeitgesteuerte Ladung
-  let nightChargingSchedulerInterval: NodeJS.Timeout | null = null;
 
   const checkNightChargingSchedule = async () => {
     try {
@@ -1537,29 +1559,59 @@ export async function registerRoutes(app: Express): Promise<Server> {
   );
 
   // Erste Prüfung zur nächsten vollen Minute
-  setTimeout(() => {
-    checkNightChargingSchedule();
+  if (!nightChargingSchedulerInterval) {
+    setTimeout(() => {
+      checkNightChargingSchedule();
 
-    // Danach jede Minute exakt zur vollen Minute
-    nightChargingSchedulerInterval = setInterval(
-      checkNightChargingSchedule,
-      60 * 1000,
-    );
-  }, msUntilNextMinute);
+      // Danach jede Minute exakt zur vollen Minute
+      nightChargingSchedulerInterval = setInterval(
+        checkNightChargingSchedule,
+        60 * 1000,
+      );
+    }, msUntilNextMinute);
+  }
 
   // Initiale Prüfung beim Start (optional - prüft sofort)
   checkNightChargingSchedule();
 
-  // === STARTE CHARGING STRATEGY SCHEDULER ===
+  // === STARTE CHARGING STRATEGY EVENT-LISTENER ===
+  // Primär: Event-driven via E3DC-Hub (~1ms Latenz)
+  // Sekundär: 15s-Timer als Health-Check/Fallback
+  const currentSettings = storage.getSettings();
+  const wallboxIp = currentSettings?.wallboxIp || "192.168.40.16";
+  
+  // Initialisiere Controller wenn noch nicht vorhanden
+  if (!strategyController) {
+    strategyController = new ChargingStrategyController(sendUdpCommand);
+  }
+  
+  await strategyController.startEventListener(wallboxIp);
+  
   log(
     "info",
     "system",
-    "Scheduler für automatische Ladestrategien wird gestartet - prüft alle 15 Sekunden",
+    "Charging Strategy Scheduler wird gestartet - Event-driven (primär) + 15s-Timer (Fallback)",
   );
+  
+  // 15s-Timer als Fallback/Health-Check
+  if (!chargingStrategyInterval) {
+    chargingStrategyInterval = setInterval(() => {
+      log("debug", "strategy", "Fallback-Timer: Health-Check Charging Strategy");
+      checkChargingStrategy();
+    }, 15 * 1000);
+  }
 
-  // Starte sofort und dann alle 15 Sekunden
-  checkChargingStrategy();
-  chargingStrategyInterval = setInterval(checkChargingStrategy, 15 * 1000);
+  // === STARTE E3DC-BACKGROUND-POLLER ===
+  // Liest alle 10s E3DC-Daten im Hintergrund - unabhängig von Clients oder Strategien
+  if (!e3dcPollerInterval) {
+    e3dcPollerInterval = startE3dcPoller();
+  }
+
+  // === STARTE FHEM-E3DC-SYNC SCHEDULER ===
+  // Startet separaten 10s-Scheduler, damit FHEM auch Updates bekommt wenn kein Client aktiv ist
+  if (!fhemSyncInterval) {
+    fhemSyncInterval = startFhemSyncScheduler();
+  }
 
   const httpServer = createServer(app);
 

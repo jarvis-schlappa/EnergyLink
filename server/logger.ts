@@ -2,15 +2,16 @@ import type { LogLevel } from "@shared/schema";
 import { storage } from "./storage";
 
 const logLevelPriority: Record<LogLevel, number> = {
-  debug: 0,
-  info: 1,
-  warning: 2,
-  error: 3,
+  trace: 0,
+  debug: 1,
+  info: 2,
+  warning: 3,
+  error: 4,
 };
 
 export function log(
   level: LogLevel, 
-  category: "wallbox" | "wallbox-mock" | "e3dc" | "e3dc-mock" | "fhem" | "fhem-mock" | "webhook" | "system" | "storage", 
+  category: "wallbox" | "wallbox-mock" | "e3dc" | "e3dc-mock" | "e3dc-poller" | "e3dc-hub" | "fhem" | "fhem-mock" | "webhook" | "system" | "storage" | "strategy", 
   message: string, 
   details?: string
 ): void {

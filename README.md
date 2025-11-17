@@ -95,6 +95,10 @@ Feinjustierung aller Parameter für perfekte Anpassung:
 #### E3DC-spezifische Funktionen
 - **Batteriesperrung:** Verhindert Batterie-Entladung zum Laden des Autos (via CLI-Tool)
 - **Netzladung:** Lädt Hausbatterie aus dem Netz während der Nachtladung (via CLI-Tool)
+- **FHEM Live-Daten-Sync:** Sendet E3DC-Daten alle 10 Sekunden an FHEM (PV, Haus, SOC, Netz, Speicher)
+  - Konfigurierbare IP-Adresse und Port (Standard: Port 7072)
+  - Native TCP-Socket-Verbindung (sicher, keine Command-Injection)
+  - Funktioniert im Demo-Modus mit Mock-Server
 
 ### ⚙️ Einfache Einrichtung
 - **Wallbox-IP-Adresse** konfigurieren
@@ -396,8 +400,10 @@ Detaillierte Kommunikationsprotokolle mit der Wallbox zur Fehlersuche und Analys
   - **KEBA Wallbox:** UDP-Protokoll (Port 7090) mit Broadcast-Listener
   - **E3DC S10:** Modbus TCP (Port 502) für Live-Daten
   - **E3DC Steuerung:** CLI-Tool (e3dcset) für Batterie-/Netzladung
+  - **FHEM Integration:** TCP-Socket (Port 7072) für E3DC-Daten-Sync (optional)
 - **Datenhaltung:** File-based JSON Storage mit Atomicity
 - **Broadcast-Handler:** Echtzeit-Erkennung von Wallbox-Statusänderungen (Input X1, Plug, State, E pres)
+- **FHEM-E3DC-Sync:** 10-Sekunden-Intervall mit graceful shutdown und Promise-Queue
 - **Logging:** Strukturiertes Logging mit Log-Levels
 
 ### Ladestrategien-Controller
@@ -408,13 +414,14 @@ Detaillierte Kommunikationsprotokolle mit der Wallbox zur Fehlersuche und Analys
 - **On-the-fly Switching:** Strategiewechsel ohne Lade-Unterbrechung
 
 ### Demo-Modus
-- **Unified Mock Server:** Simuliert Wallbox und E3DC S10 in einem Prozess
+- **Unified Mock Server:** Simuliert Wallbox, E3DC S10 und FHEM in einem Prozess
 - **Realistische Simulation:** Tageszeit-abhängige PV-Kurven, saisonale Variation (November: ~3.5kW Peak, Sommer: ~8kW Peak)
 - **Auto-Start:** Startet automatisch bei DEMO_AUTOSTART=true
 - **State-Synchronisation:** Wallbox-Leistung beeinflusst E3DC Grid-Berechnung
 - **Realistische Haushaltslasten:** Morgen-/Mittag-/Abend-Peaks mit Basis-Verbrauch
 - **Plug-Status-Steuerung:** Manuelles Setzen aller KEBA-Kabelstatus via Settings-Dropdown (Getrennt, In Buchse, Verriegelt, Bereit, Laden)
 - **Broadcast-Simulation:** Automatische UDP-Broadcasts bei Statusänderungen
+- **FHEM TCP Mock:** Empfängt E3DC-Daten auf Port 7072 und loggt sie auf DEBUG-Level (automatische localhost-Konfiguration)
 
 ### Sicherheit & Zuverlässigkeit
 - **CLI Output Sanitization:** Sichere Ausführung von E3DC-Befehlen

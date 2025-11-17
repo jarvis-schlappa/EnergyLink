@@ -2,6 +2,7 @@ import type { ChargingStrategy, ChargingStrategyConfig, ChargingContext, E3dcLiv
 import { storage } from "./storage";
 import { log } from "./logger";
 import { e3dcClient } from "./e3dc-client";
+import { getE3dcLiveDataHub } from "./e3dc-modbus";
 
 const PHASE_VOLTAGE_1P = 230;
 const MIN_CURRENT_AMPERE = 6;
@@ -12,6 +13,11 @@ export class ChargingStrategyController {
   private sendUdpCommand: (ip: string, command: string) => Promise<any>;
   private lastE3dcData: E3dcLiveData | null = null;
   private batteryDischargeSince: Date | null = null;
+  private unsubscribeFromHub: (() => void) | null = null;
+  private runningStrategyPromise: Promise<void> | null = null;
+  private wallboxIp: string = "192.168.40.16";
+  private isShuttingDown: boolean = false;
+  private pendingE3dcData: E3dcLiveData | null = null;
   
   constructor(sendUdpCommand: (ip: string, command: string) => Promise<any>) {
     this.sendUdpCommand = sendUdpCommand;
@@ -688,6 +694,120 @@ export class ChargingStrategyController {
     }
     
     this.batteryDischargeSince = null;
+  }
+
+  /**
+   * Wrapper für processStrategy mit Promise-Tracking und Event-Queue
+   * Verhindert overlapping strategy executions bei schnellen Broadcasts
+   * Queued die neuesten E3DC-Daten wenn ein Run bereits läuft
+   */
+  private async processStrategyWithTracking(data: E3dcLiveData, wallboxIp: string): Promise<void> {
+    // Wenn shutdown aktiv, breche ab
+    if (this.isShuttingDown) {
+      log("debug", "strategy", "Shutdown aktiv - überspringe neuen Strategy Check");
+      return;
+    }
+    
+    // Wenn bereits ein Strategy Check läuft, queue die neuesten Daten
+    if (this.runningStrategyPromise) {
+      log("debug", "strategy", "Strategy Check läuft bereits - queue neue E3DC-Daten für nächsten Run");
+      this.pendingE3dcData = data;
+      await this.runningStrategyPromise;
+      return;
+    }
+    
+    // Starte neuen Strategy Check
+    this.runningStrategyPromise = (async () => {
+      try {
+        // Verarbeite aktuelle Daten
+        await this.processStrategy(data, wallboxIp);
+      } finally {
+        // While-Loop in finally: Verhindert Event-Loss bei processStrategy-Errors
+        while (this.pendingE3dcData && !this.isShuttingDown) {
+          const nextData = this.pendingE3dcData;
+          this.pendingE3dcData = null;
+          log("debug", "strategy", "Verarbeite gequeuete E3DC-Daten - PV=" + nextData.pvPower + "W, SOC=" + nextData.batterySoc + "%");
+          try {
+            await this.processStrategy(nextData, wallboxIp);
+          } catch (error) {
+            log("error", "strategy", "Fehler beim Verarbeiten gequeueter E3DC-Daten", error instanceof Error ? error.message : String(error));
+            // Continue loop auch bei Errors (verhindert Event-Loss)
+          }
+        }
+        
+        this.runningStrategyPromise = null;
+      }
+    })();
+    
+    await this.runningStrategyPromise;
+  }
+
+  /**
+   * Startet Event-Listener für E3DC-Daten
+   * Strategie: Event-driven (primär) + 15s-Timer (Fallback/Health-Check)
+   * Guards: Stoppt vorherige Subscription bei Hot-Reloads (verhindert Listener-Leaks)
+   */
+  async startEventListener(wallboxIp: string): Promise<void> {
+    // Guard: Stoppe vorherige Subscription falls vorhanden (verhindert Listener-Leaks bei Hot-Reloads)
+    if (this.unsubscribeFromHub) {
+      log("debug", "strategy", "Event-Listener bereits aktiv - stoppe vorherige Subscription");
+      await this.stopEventListener();  // Graceful shutdown: wartet auf laufenden Promise
+    }
+    
+    this.wallboxIp = wallboxIp;
+    this.isShuttingDown = false;
+    
+    log("info", "strategy", "Charging Strategy Event-Listener wird gestartet - reagiert sofort auf E3DC-Daten");
+    
+    // Event-Listener: Sofort bei neuen E3DC-Daten
+    const hub = getE3dcLiveDataHub();
+    this.unsubscribeFromHub = hub.subscribe(async (data) => {
+      // setImmediate: Nicht-blockierend, verhindert Event-Loop-Blockierung
+      setImmediate(async () => {
+        try {
+          log("debug", "strategy", `Event empfangen: Neue E3DC-Daten verfügbar - PV=${data.pvPower}W, SOC=${data.batterySoc}%`);
+          await this.processStrategyWithTracking(data, this.wallboxIp);
+        } catch (error) {
+          log(
+            "error",
+            "strategy",
+            "Fehler im Event-Handler für Charging Strategy",
+            error instanceof Error ? error.message : String(error)
+          );
+        }
+      });
+    });
+    
+    log("info", "strategy", "Event-Listener registriert - Charging Strategy wird event-driven aktualisiert");
+  }
+
+  /**
+   * Stoppt Event-Listener (graceful shutdown, analog zu FHEM stopFhemSyncScheduler)
+   * 1. Setze Shutdown-Flag (verhindert neue Strategy Checks)
+   * 2. Unsubscribe sofort (verhindert neue Events)
+   * 3. Warte auf laufenden Strategy Check (verhindert Abbruch während UDP-Kommunikation)
+   */
+  async stopEventListener(): Promise<void> {
+    log("info", "strategy", "Stopping Charging Strategy Event-Listener");
+    
+    // Setze Shutdown-Flag BEVOR unsubscribe (verhindert Race mit laufendem Event)
+    this.isShuttingDown = true;
+    
+    // Unsubscribe sofort (verhindert neue Events)
+    if (this.unsubscribeFromHub) {
+      this.unsubscribeFromHub();
+      this.unsubscribeFromHub = null;
+      log("debug", "strategy", "Event-Listener deregistriert - keine neuen Events");
+    }
+    
+    // Warte auf laufenden Strategy-Check (verhindert Abbruch während Wallbox-Kommunikation)
+    if (this.runningStrategyPromise) {
+      log("debug", "strategy", "Warte auf laufenden Strategy-Check...");
+      await this.runningStrategyPromise;
+      log("debug", "strategy", "Laufender Strategy-Check abgeschlossen");
+    }
+    
+    log("info", "strategy", "Event-Listener erfolgreich gestoppt");
   }
 
   getStatus() {

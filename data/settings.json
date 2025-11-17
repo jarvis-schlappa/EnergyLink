@@ -31,6 +31,11 @@
     "minChangeIntervalSeconds": 30,
     "inputX1Strategy": "max_without_battery"
   },
+  "fhemSync": {
+    "enabled": true,
+    "host": "127.0.0.1",
+    "port": 7072
+  },
   "demoMode": true,
   "mockWallboxPhases": 1,
   "mockWallboxPlugStatus": 7,

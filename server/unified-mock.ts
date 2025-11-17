@@ -12,6 +12,7 @@
 
 import dgram from 'dgram';
 import http from 'http';
+import net from 'net';
 import fs from 'fs/promises';
 import path from 'path';
 import { wallboxMockService } from './wallbox-mock';
@@ -20,11 +21,13 @@ import { e3dcMockService } from './e3dc-mock';
 import ModbusRTU from 'modbus-serial';
 import type { ControlState, Settings } from '@shared/schema';
 import { log } from './logger';
+import { storage } from './storage';
 
 // Port-Konfiguration
 const WALLBOX_UDP_PORT = 7090;
 const E3DC_MODBUS_PORT = 5502;
 const FHEM_HTTP_PORT = 8083;
+const FHEM_TCP_PORT = 7072;
 const HOST = '0.0.0.0';
 
 // Hilfsfunktion: Lade Control State
@@ -63,6 +66,39 @@ const parseGridChargePower = (command: string | undefined): number => {
 // FHEM Device States
 const fhemDeviceStates = new Map<string, boolean>();
 fhemDeviceStates.set('autoWallboxPV', false); // Standard: PV-Überschuss aus
+
+// =============================================================================
+// FHEM TCP SERVER (Port 7072) - Empfängt setreading-Befehle vom FHEM-Sync
+// =============================================================================
+
+const fhemTcpServer = net.createServer((socket) => {
+  const clientAddress = `${socket.remoteAddress}:${socket.remotePort}`;
+  log("debug", "fhem-mock", `[FHEM-TCP] Neue Verbindung von ${clientAddress}`);
+  
+  socket.on('data', (data) => {
+    const commands = data.toString('utf8').trim();
+    const lines = commands.split('\n').filter(line => line.trim());
+    
+    log("debug", "fhem-mock", `[FHEM-TCP] Empfangen von ${clientAddress}:`, commands);
+    
+    // Parse und logge einzelne setreading-Befehle
+    for (const line of lines) {
+      const match = line.match(/^setreading\s+(\S+)\s+(\S+)\s+(.+)$/);
+      if (match) {
+        const [, device, reading, value] = match;
+        log("debug", "fhem-mock", `[FHEM-TCP] ✓ Device: ${device}, Reading: ${reading}, Value: ${value}`);
+      }
+    }
+  });
+  
+  socket.on('end', () => {
+    log("debug", "fhem-mock", `[FHEM-TCP] Verbindung geschlossen: ${clientAddress}`);
+  });
+  
+  socket.on('error', (err) => {
+    log("error", "fhem-mock", `[FHEM-TCP] Socket-Fehler von ${clientAddress}:`, err.message);
+  });
+});
 
 // =============================================================================
 // FHEM HTTP SERVER (Port 8083)
@@ -428,6 +464,19 @@ export async function startUnifiedMock(): Promise<void> {
     fhemServer.once('error', reject);
     fhemServer.listen(FHEM_HTTP_PORT, HOST, () => {
       fhemServer.removeListener('error', reject);
+      log("info", "fhem-mock", `✅ [FHEM-HTTP] FHEM Mock läuft auf ${HOST}:${FHEM_HTTP_PORT}`);
+      log("info", "fhem-mock", `   Unterstützt FHEM-typische URLs für Status & Befehle`);
+      resolve();
+    });
+  });
+
+  // FHEM TCP Server starten (empfängt setreading-Befehle vom FHEM-Sync)
+  await new Promise<void>((resolve, reject) => {
+    fhemTcpServer.once('error', reject);
+    fhemTcpServer.listen(FHEM_TCP_PORT, HOST, () => {
+      fhemTcpServer.removeListener('error', reject);
+      log("info", "fhem-mock", `✅ [FHEM-TCP] FHEM Telnet Mock läuft auf ${HOST}:${FHEM_TCP_PORT}`);
+      log("info", "fhem-mock", `   Empfängt setreading-Befehle vom FHEM-E3DC-Sync (DEBUG-Level)`);
       resolve();
     });
   });
@@ -451,11 +500,26 @@ export async function startUnifiedMock(): Promise<void> {
     log("info", "e3dc-mock", `   Register 40067-40083 (Holding Registers) verfügbar`);
   });
 
+  // FHEM-Sync-IP auf Localhost setzen (Demo-Modus verwendet lokalen Mock)
+  const currentSettings = storage.getSettings();
+  if (currentSettings) {
+    const updatedSettings = {
+      ...currentSettings,
+      fhemSync: {
+        ...currentSettings.fhemSync,
+        host: '127.0.0.1',
+      },
+    };
+    storage.saveSettings(updatedSettings);
+    log("info", "system", "✅ FHEM-Sync IP auf 127.0.0.1 gesetzt (Demo-Modus)");
+  }
+
   log("info", "system", "\n📋 Demo-Modus Konfiguration:");
   log("info", "system", "   1. Wallbox IP: 127.0.0.1 (UDP Port 7090)");
   log("info", "system", "   2. E3DC IP: 127.0.0.1:5502 (Modbus TCP)");
   log("info", "system", "   3. FHEM Base-URL: http://127.0.0.1:8083/fhem");
-  log("info", "system", "   4. Demo-Modus in Einstellungen aktivieren\n");
+  log("info", "system", "   4. FHEM TCP Mock: 127.0.0.1:7072 (empfängt setreading-Befehle)");
+  log("info", "system", "   5. Demo-Modus in Einstellungen aktivieren\n");
 
   log("info", "system", "🔄 State-Synchronisation aktiv:");
   log("info", "system", "   - Wallbox-Leistung → E3DC Grid-Berechnung");
@@ -520,6 +584,12 @@ export async function stopUnifiedMock(): Promise<void> {
     new Promise<void>((resolve) => {
       fhemServer.close(() => {
         log("info", "fhem-mock", "   ✅ FHEM HTTP Server gestoppt");
+        resolve();
+      });
+    }),
+    new Promise<void>((resolve) => {
+      fhemTcpServer.close(() => {
+        log("info", "fhem-mock", "   ✅ FHEM TCP Server gestoppt");
         resolve();
       });
     })

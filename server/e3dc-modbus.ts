@@ -27,6 +27,121 @@ const MODBUS_PORT = 502;
 const MODBUS_TIMEOUT = 5000; // 5 Sekunden Timeout
 
 /**
+ * E3DC Live Data Hub - Event-basierte Pub/Sub-Architektur
+ * 
+ * Ermöglicht Event-driven Benachrichtigungen an Consumer (FHEM, Frontend, etc.)
+ * wenn neue E3DC-Daten verfügbar sind, ohne dass diese selbst pollen müssen.
+ * 
+ * Features:
+ * - Subscribe/Unsubscribe Pattern für Listener
+ * - Isolation: Try/Catch um jeden Callback verhindert Kettenreaktionen
+ * - Non-blocking: Callbacks laufen in setImmediate für asynchrone Ausführung
+ * - Fallback-kompatibel: getLast() für polling-basierte Consumer
+ */
+class E3dcLiveDataHub {
+  private lastData: E3dcLiveData | null = null;
+  private subscribers: Set<(data: E3dcLiveData) => void> = new Set();
+
+  /**
+   * Registriert einen Listener für neue E3DC-Daten
+   * 
+   * @param callback - Wird aufgerufen wenn neue Daten verfügbar sind
+   * @returns Unsubscribe-Funktion zum Deregistrieren
+   */
+  subscribe(callback: (data: E3dcLiveData) => void): () => void {
+    this.subscribers.add(callback);
+    log("debug", "e3dc-hub", `Listener registriert (insgesamt: ${this.subscribers.size})`);
+    
+    // Sofort mit letzten Daten benachrichtigen, falls vorhanden
+    if (this.lastData) {
+      setImmediate(() => {
+        try {
+          callback(this.lastData!);
+        } catch (error) {
+          log(
+            "error",
+            "e3dc-hub",
+            "Fehler beim initialen Callback eines Listeners",
+            error instanceof Error ? error.message : String(error)
+          );
+        }
+      });
+    }
+    
+    // Unsubscribe-Handle zurückgeben
+    return () => {
+      this.subscribers.delete(callback);
+      log("debug", "e3dc-hub", `Listener deregistriert (verbleibend: ${this.subscribers.size})`);
+    };
+  }
+
+  /**
+   * Broadcastet neue E3DC-Daten an alle registrierten Listener
+   * 
+   * @param data - Die neuen Live-Daten vom E3DC
+   */
+  emit(data: E3dcLiveData): void {
+    this.lastData = data;
+    
+    if (this.subscribers.size === 0) {
+      return; // Keine Listener, nichts zu tun
+    }
+
+    log("debug", "e3dc-hub", `Broadcasting an ${this.subscribers.size} Listener`, `PV=${data.pvPower}W, SOC=${data.batterySoc}%`);
+    
+    // Benachrichtige alle Listener (isoliert und async)
+    this.subscribers.forEach((callback) => {
+      setImmediate(() => {
+        try {
+          callback(data);
+        } catch (error) {
+          log(
+            "error",
+            "e3dc-hub",
+            "Fehler in Listener-Callback (Listener wird fortgesetzt)",
+            error instanceof Error ? error.message : String(error)
+          );
+        }
+      });
+    });
+  }
+
+  /**
+   * Gibt die zuletzt empfangenen Live-Daten zurück (Fallback für Polling)
+   * 
+   * @returns Die letzten Live-Daten oder null wenn noch keine Daten vorhanden
+   */
+  getLast(): E3dcLiveData | null {
+    return this.lastData;
+  }
+
+  /**
+   * Gibt die Anzahl der registrierten Listener zurück (für Debugging)
+   */
+  getSubscriberCount(): number {
+    return this.subscribers.size;
+  }
+}
+
+// Singleton-Instanz des Event-Hubs
+const e3dcLiveDataHub = new E3dcLiveDataHub();
+
+/**
+ * E3DC Live Data Hub-Instanz abrufen (Singleton)
+ * 
+ * Verwende dies um auf neue E3DC-Daten zu reagieren statt zu pollen:
+ * 
+ * @example
+ * const unsubscribe = getE3dcLiveDataHub().subscribe((data) => {
+ *   console.log(`Neue Daten: PV=${data.pvPower}W`);
+ * });
+ * // Später: unsubscribe();
+ */
+export function getE3dcLiveDataHub(): E3dcLiveDataHub {
+  return e3dcLiveDataHub;
+}
+
+/**
  * E3DC Modbus Service
  * 
  * Stellt Verbindung zum E3DC S10 über Modbus TCP her und liest Live-Daten aus.
@@ -35,6 +150,7 @@ export class E3dcModbusService {
   private client: ModbusRTU;
   private isConnected: boolean = false;
   private lastError: string | null = null;
+  private lastReadData: E3dcLiveData | null = null;
 
   constructor() {
     this.client = new ModbusRTU();
@@ -112,7 +228,12 @@ export class E3dcModbusService {
       // Bei Lese-Fehler: Connection als ungültig markieren
       this.isConnected = false;
       this.client.close(() => {});
-      throw error;
+      
+      // Bessere Fehlermeldung mit Details
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      const detailedMsg = `Modbus Read INT32 @ Register ${registerAddress}: ${errorMsg}`;
+      log("error", "system", detailedMsg);
+      throw new Error(detailedMsg);
     }
   }
 
@@ -127,7 +248,12 @@ export class E3dcModbusService {
       // Bei Lese-Fehler: Connection als ungültig markieren
       this.isConnected = false;
       this.client.close(() => {});
-      throw error;
+      
+      // Bessere Fehlermeldung mit Details
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      const detailedMsg = `Modbus Read UINT16 @ Register ${registerAddress}: ${errorMsg}`;
+      log("error", "system", detailedMsg);
+      throw new Error(detailedMsg);
     }
   }
 
@@ -137,6 +263,9 @@ export class E3dcModbusService {
    * @param kebaWallboxPower - Wallbox-Leistung von KEBA UDP Report 3 (immer verwendet, da E3DC keine Wallbox hat)
    */
   async readLiveData(kebaWallboxPower: number = 0): Promise<E3dcLiveData> {
+    // Timestamp SOFORT setzen (bevor Modbus-Reads starten)
+    const timestamp = new Date().toISOString();
+    
     // Keine explizite Connection-Prüfung - wenn nicht connected, 
     // werden die readInt32/readUint16 Methoden einen Fehler werfen
 
@@ -158,7 +287,7 @@ export class E3dcModbusService {
       // DEBUG: Kompakte einzeilige Ausgabe bei LogLevel DEBUG
       log("debug", "system", `E3DC Register gelesen: PV=${pvPower}W, Batterie=${batteryPower}W (SOC=${batterySoc}%), Haus=${housePower}W, Netz=${gridPower}W, Autarkie=${autarky}%, Eigenverbrauch=${selfConsumption}%, Wallbox=${kebaWallboxPower}W`);
 
-      return {
+      const liveData: E3dcLiveData = {
         pvPower,
         batteryPower,
         batterySoc,
@@ -167,13 +296,28 @@ export class E3dcModbusService {
         wallboxPower: kebaWallboxPower,
         autarky,
         selfConsumption,
-        timestamp: new Date().toISOString(),
+        timestamp,
       };
+      
+      // Cache für FHEM-Sync und andere Consumer
+      this.lastReadData = liveData;
+      
+      return liveData;
     } catch (error) {
-      this.lastError = error instanceof Error ? error.message : "Unbekannter Fehler";
+      this.lastError = error instanceof Error ? error.message : String(error);
       log("error", "system", "E3DC Fehler beim Lesen der Modbus Register", this.lastError);
-      throw new Error(`E3DC Modbus-Lesefehler: ${this.lastError}`);
+      throw error; // Original-Fehler werfen (mit Details aus readInt32/readUint16)
     }
+  }
+  
+  /**
+   * Gibt die zuletzt erfolgreich gelesenen Live-Daten zurück (Cache)
+   * Nützlich für FHEM-Sync und andere Consumer, die keine extra Modbus-Abfragen machen sollen
+   * 
+   * @returns Die letzten Live-Daten oder null wenn noch keine Daten gelesen wurden
+   */
+  getLastReadLiveData(): E3dcLiveData | null {
+    return this.lastReadData;
   }
 
   /**
