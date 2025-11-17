@@ -952,48 +952,65 @@ export default function SettingsPage() {
 
                     <Separator />
 
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={async () => {
-                        try {
-                          const settings = form.getValues();
-                          await fetch("/api/settings", {
-                            method: "POST",
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify(settings),
-                          });
-                          
-                          const response = await fetch("/api/prowl/test", {
-                            method: "POST",
-                          });
-                          
-                          if (response.ok) {
-                            toast({
-                              title: "Test-Benachrichtigung gesendet",
-                              description: "Prüfe dein Smartphone (kann bis zu 1 Minute dauern)",
+                    <div className="flex flex-col gap-2">
+                      <Button
+                        type="button"
+                        onClick={() => {
+                          const currentSettings = form.getValues();
+                          saveSettingsMutation.mutate(currentSettings);
+                        }}
+                        disabled={saveSettingsMutation.isPending}
+                        className="w-full"
+                        data-testid="button-save-prowl-settings"
+                      >
+                        {saveSettingsMutation.isPending
+                          ? "Speichern..."
+                          : "Prowl-Einstellungen speichern"}
+                      </Button>
+
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={async () => {
+                          try {
+                            const settings = form.getValues();
+                            await fetch("/api/settings", {
+                              method: "POST",
+                              headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify(settings),
                             });
-                          } else {
-                            const error = await response.json();
+                            
+                            const response = await fetch("/api/prowl/test", {
+                              method: "POST",
+                            });
+                            
+                            if (response.ok) {
+                              toast({
+                                title: "Test-Benachrichtigung gesendet",
+                                description: "Prüfe dein Smartphone (kann bis zu 1 Minute dauern)",
+                              });
+                            } else {
+                              const error = await response.json();
+                              toast({
+                                title: "Test fehlgeschlagen",
+                                description: error.error || "Prüfe API Key und Logs",
+                                variant: "destructive",
+                              });
+                            }
+                          } catch (error) {
                             toast({
-                              title: "Test fehlgeschlagen",
-                              description: error.error || "Prüfe API Key und Logs",
+                              title: "Fehler",
+                              description: "Test-Benachrichtigung konnte nicht gesendet werden",
                               variant: "destructive",
                             });
                           }
-                        } catch (error) {
-                          toast({
-                            title: "Fehler",
-                            description: "Test-Benachrichtigung konnte nicht gesendet werden",
-                            variant: "destructive",
-                          });
-                        }
-                      }}
-                      className="w-full"
-                      data-testid="button-prowl-test"
-                    >
-                      Test-Benachrichtigung senden
-                    </Button>
+                        }}
+                        className="w-full"
+                        data-testid="button-prowl-test"
+                      >
+                        Test-Benachrichtigung senden
+                      </Button>
+                    </div>
                   </div>
                 </>
               )}
