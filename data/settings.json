@@ -36,6 +36,21 @@
     "host": "127.0.0.1",
     "port": 7072
   },
+  "prowl": {
+    "enabled": true,
+    "apiKey": "1234",
+    "events": {
+      "chargingStarted": true,
+      "chargingStopped": true,
+      "currentAdjusted": false,
+      "plugConnected": false,
+      "plugDisconnected": false,
+      "batteryLockActivated": false,
+      "batteryLockDeactivated": false,
+      "strategyChanged": false,
+      "errors": false
+    }
+  },
   "demoMode": true,
   "mockWallboxPhases": 1,
   "mockWallboxPlugStatus": 7,
