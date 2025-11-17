@@ -623,6 +623,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const newPlug = newSettings?.mockWallboxPlugStatus;
       const plugChanged = oldPlug !== newPlug;
 
+      // Prüfe ob E3DC-Konfiguration sich geändert hat
+      const oldE3dc = oldSettings?.e3dc;
+      const newE3dc = newSettings?.e3dc;
+      const e3dcChanged = JSON.stringify(oldE3dc) !== JSON.stringify(newE3dc);
+
       storage.saveSettings(newSettings);
 
       // Demo-Modus: Aktualisiere Mock-Wallbox-Phasen ohne Neustart
@@ -665,23 +670,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
-      // E3DC-Konfiguration speichern wenn aktiviert
-      if (newSettings.e3dc?.enabled) {
-        try {
-          log("info", "system", "E3DC-Konfiguration wird gespeichert");
-          e3dcClient.configure(newSettings.e3dc);
-          log("info", "system", "E3DC-Konfiguration erfolgreich gespeichert");
-        } catch (error) {
-          log(
-            "error",
-            "system",
-            "Fehler beim Speichern der E3DC-Konfiguration",
-            error instanceof Error ? error.message : String(error),
-          );
+      // E3DC-Konfiguration speichern wenn sich etwas geändert hat
+      if (e3dcChanged) {
+        if (newSettings.e3dc?.enabled) {
+          try {
+            log("info", "system", "E3DC-Konfiguration wird gespeichert");
+            e3dcClient.configure(newSettings.e3dc);
+            log("info", "system", "E3DC-Konfiguration erfolgreich gespeichert");
+          } catch (error) {
+            log(
+              "error",
+              "system",
+              "Fehler beim Speichern der E3DC-Konfiguration",
+              error instanceof Error ? error.message : String(error),
+            );
+          }
+        } else if (e3dcClient.isConfigured()) {
+          e3dcClient.disconnect();
+          log("info", "system", "E3DC-Konfiguration entfernt");
         }
-      } else if (e3dcClient.isConfigured()) {
-        e3dcClient.disconnect();
-        log("info", "system", "E3DC-Konfiguration entfernt");
       }
 
       // WICHTIG: Wenn Strategie geändert wurde, Battery Lock aktivieren/deaktivieren
