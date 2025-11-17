@@ -18,6 +18,7 @@ export class ChargingStrategyController {
   private wallboxIp: string = "192.168.40.16";
   private isShuttingDown: boolean = false;
   private pendingE3dcData: E3dcLiveData | null = null;
+  private lastPlugStatus: number = 1;  // Plug-Status: 1=kein Kabel, 7=Auto bereit
   
   constructor(sendUdpCommand: (ip: string, command: string) => Promise<any>) {
     this.sendUdpCommand = sendUdpCommand;
@@ -366,11 +367,15 @@ export class ChargingStrategyController {
     const now = new Date();
     const strategy = config.activeStrategy;
     
-    log("debug", "system", `shouldStartCharging: strategy=${strategy}, surplus=${surplus}W`);
+    log("debug", "system", `shouldStartCharging: strategy=${strategy}, surplus=${surplus}W, plug=${this.lastPlugStatus}`);
     
-    // Max Power Strategien starten sofort ohne Delay
+    // Max Power Strategien starten sofort ohne Delay - ABER nur wenn Auto angeschlossen
     if (strategy === "max_with_battery" || strategy === "max_without_battery") {
-      log("debug", "system", `Max Power Strategie (${strategy}) → Sofortstart ohne Delay - return true`);
+      if (this.lastPlugStatus !== 7) {
+        log("debug", "system", `Max Power Strategie (${strategy}) → Kein Auto angeschlossen (Plug=${this.lastPlugStatus}) - return false`);
+        return false;
+      }
+      log("debug", "system", `Max Power Strategie (${strategy}) → Auto bereit (Plug=7), Sofortstart ohne Delay - return true`);
       return true;
     }
     
@@ -437,6 +442,9 @@ export class ChargingStrategyController {
       const wallboxState = report2.State;  // 0=startup, 1=idle, 2=waiting, 3=charging, 4=error, 5=auth
       const wallboxPower = report3.P || 0;  // Leistung in mW
       const currents = [report3.I1 || 0, report3.I2 || 0, report3.I3 || 0];  // Ströme in mA
+      
+      // Speichere Plug-Status (1=kein Kabel, 7=Auto bereit)
+      this.lastPlugStatus = report2.Plug || 1;
       
       // Wallbox lädt wirklich, wenn State=3 UND Power>0
       const reallyCharging = wallboxState === 3 && wallboxPower > 1000;  // >1W
