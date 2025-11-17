@@ -205,11 +205,35 @@ export default function SettingsPage() {
         inputX1Strategy: "max_without_battery" as const,
       };
 
+      const prowlDefaults = {
+        enabled: false,
+        apiKey: "",
+        events: {
+          chargingStarted: true,
+          chargingStopped: true,
+          currentAdjusted: false,
+          plugConnected: false,
+          plugDisconnected: false,
+          batteryLockActivated: false,
+          batteryLockDeactivated: false,
+          strategyChanged: false,
+          errors: false,
+        },
+      };
+
       form.reset({
         ...settings,
         chargingStrategy: {
           ...strategyDefaults,
           ...settings.chargingStrategy,
+        },
+        prowl: {
+          ...prowlDefaults,
+          ...settings.prowl,
+          events: {
+            ...prowlDefaults.events,
+            ...settings.prowl?.events,
+          },
         },
       });
       formHydratedRef.current = true;
