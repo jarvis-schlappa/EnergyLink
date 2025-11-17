@@ -713,6 +713,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         try {
           log("info", "system", `Ladestrategie gewechselt auf: ${newStrategy}`);
           await strategyController.handleStrategyChange(newStrategy);
+          
+          // Prowl-Benachrichtigung für Strategie-Wechsel
+          try {
+            if (newSettings?.prowl?.enabled && newSettings?.prowl?.events?.strategyChanged) {
+              void getProwlNotifier().sendStrategyChanged(oldStrategy || "off", newStrategy);
+            }
+          } catch (error) {
+            log("debug", "system", "Prowl-Notifier nicht initialisiert");
+          }
         } catch (error) {
           log(
             "warning",
@@ -999,6 +1008,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           .json({ error: "Strategy configuration not found" });
       }
 
+      // Alte Strategie für Prowl-Benachrichtigung speichern
+      const oldStrategy = settings.chargingStrategy.activeStrategy;
+
       const updatedConfig = {
         ...settings.chargingStrategy,
         activeStrategy: strategy,
@@ -1039,6 +1051,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       log("info", "system", `Ladestrategie gewechselt auf: ${strategy}`);
+      
+      // Prowl-Benachrichtigung für Strategie-Wechsel
+      try {
+        if (settings?.prowl?.enabled && settings?.prowl?.events?.strategyChanged) {
+          void getProwlNotifier().sendStrategyChanged(oldStrategy, strategy);
+        }
+      } catch (error) {
+        log("debug", "system", "Prowl-Notifier nicht initialisiert");
+      }
+      
       res.json({ success: true, strategy });
     } catch (error) {
       if (error instanceof z.ZodError) {
