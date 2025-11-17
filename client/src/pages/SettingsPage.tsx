@@ -172,6 +172,8 @@ export default function SettingsPage() {
           plugDisconnected: false,
           batteryLockActivated: false,
           batteryLockDeactivated: false,
+          strategyChanged: false,
+          errors: false,
         },
       },
       demoMode: false,
@@ -958,6 +960,34 @@ export default function SettingsPage() {
                               form.setValue("prowl.events.batteryLockDeactivated", checked)
                             }
                             data-testid="switch-event-battery-lock-deactivated"
+                          />
+                        </div>
+                        
+                        <div className="flex items-center justify-between">
+                          <Label htmlFor="event-strategy-changed" className="text-xs font-normal">
+                            Strategie gewechselt
+                          </Label>
+                          <Switch
+                            id="event-strategy-changed"
+                            checked={form.watch("prowl.events.strategyChanged")}
+                            onCheckedChange={(checked) =>
+                              form.setValue("prowl.events.strategyChanged", checked)
+                            }
+                            data-testid="switch-event-strategy-changed"
+                          />
+                        </div>
+                        
+                        <div className="flex items-center justify-between">
+                          <Label htmlFor="event-errors" className="text-xs font-normal">
+                            Fehler aufgetreten
+                          </Label>
+                          <Switch
+                            id="event-errors"
+                            checked={form.watch("prowl.events.errors")}
+                            onCheckedChange={(checked) =>
+                              form.setValue("prowl.events.errors", checked)
+                            }
+                            data-testid="switch-event-errors"
                           />
                         </div>
                       </div>
