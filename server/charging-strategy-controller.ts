@@ -581,6 +581,10 @@ export class ChargingStrategyController {
     try {
       const context = storage.getChargingContext();
       const settings = storage.getSettings();
+      
+      // Guard: Prüfe ob Ladung bereits aktiv ist (verhindert doppelte Benachrichtigungen)
+      const wasAlreadyActive = context.isActive;
+      
       // Für START:
       // - Im Demo-Modus: nutze mockWallboxPhases
       // - Im Produktiv-Modus: nutze physicalPhaseSwitch (User-Konfiguration, Default 3P)
@@ -602,17 +606,24 @@ export class ChargingStrategyController {
         belowThresholdSince: undefined,
       });
       
-      log("info", "system", 
-        `Ladung gestartet mit ${finalAmpere}A @ ${currentPhases}P (Strategie: ${config.activeStrategy})`
-      );
-      
-      // Prowl-Benachrichtigung (non-blocking, with initialization guard)
-      try {
-        if (settings?.prowl?.enabled && settings?.prowl?.events?.chargingStarted) {
-          void getProwlNotifier().sendChargingStarted(finalAmpere, currentPhases, config.activeStrategy);
+      // Nur beim ersten Start loggen und benachrichtigen
+      if (!wasAlreadyActive) {
+        log("info", "system", 
+          `Ladung gestartet mit ${finalAmpere}A @ ${currentPhases}P (Strategie: ${config.activeStrategy})`
+        );
+        
+        // Prowl-Benachrichtigung (non-blocking, with initialization guard)
+        try {
+          if (settings?.prowl?.enabled && settings?.prowl?.events?.chargingStarted) {
+            void getProwlNotifier().sendChargingStarted(finalAmpere, currentPhases, config.activeStrategy);
+          }
+        } catch (error) {
+          log("debug", "system", "Prowl-Notifier nicht initialisiert");
         }
-      } catch (error) {
-        log("debug", "system", "Prowl-Notifier nicht initialisiert");
+      } else {
+        log("debug", "system", 
+          `Ladung bereits aktiv - Strom aktualisiert auf ${finalAmpere}A @ ${currentPhases}P`
+        );
       }
     } catch (error) {
       log("error", "system", 
