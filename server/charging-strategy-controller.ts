@@ -58,7 +58,7 @@ export class ChargingStrategyController {
     await this.handleStrategyChange("off");
     
     // 2. Wallbox stoppen (stopCharging ist idempotent, stoppt nur wenn isActive)
-    await this.stopCharging(wallboxIp);
+    await this.stopCharging(wallboxIp, "Ladung gestoppt");
     
     // 3. Nur Strategie auf "off" setzen (stopCharging hat bereits isActive=false gesetzt)
     storage.updateChargingContext({ strategy: "off" });
@@ -112,10 +112,11 @@ export class ChargingStrategyController {
       
       try {
         log('info', 'system', 'Strategie-Wechsel: Max Power ohne Batterie → Battery Lock aktivieren');
-        await e3dcClient.lockDischarge();
         
-        // Control State aktualisieren (für Konsistenz mit UI)
+        // SOFORT Control State setzen (VOR dem await!) um Race Conditions zu vermeiden
         storage.saveControlState({ ...controlState, batteryLock: true });
+        
+        await e3dcClient.lockDischarge();
         
         // Prowl-Benachrichtigung (non-blocking, with initialization guard)
         try {
@@ -127,6 +128,8 @@ export class ChargingStrategyController {
         }
       } catch (error) {
         log('error', 'system', 'Fehler beim Aktivieren der Entladesperre', error instanceof Error ? error.message : String(error));
+        // Bei Fehler: State zurücksetzen
+        storage.saveControlState({ ...controlState, batteryLock: false });
         throw error;
       }
     } else if (newStrategy === "off" || newStrategy === "surplus_battery_prio" || 
@@ -139,10 +142,11 @@ export class ChargingStrategyController {
       
       try {
         log('info', 'system', `Strategie-Wechsel: ${newStrategy} → Battery Lock deaktivieren`);
-        await e3dcClient.unlockDischarge();
         
-        // Control State aktualisieren (für Konsistenz mit UI)
+        // SOFORT Control State setzen (VOR dem await!) um Race Conditions zu vermeiden
         storage.saveControlState({ ...controlState, batteryLock: false });
+        
+        await e3dcClient.unlockDischarge();
         
         // Prowl-Benachrichtigung (non-blocking, with initialization guard)
         try {
@@ -154,6 +158,8 @@ export class ChargingStrategyController {
         }
       } catch (error) {
         log('error', 'system', 'Fehler beim Deaktivieren der Entladesperre', error instanceof Error ? error.message : String(error));
+        // Bei Fehler: State zurücksetzen
+        storage.saveControlState({ ...controlState, batteryLock: true });
         throw error;
       }
     }
@@ -226,7 +232,7 @@ export class ChargingStrategyController {
     
     if (this.shouldStopCharging(config, surplus, liveData)) {
       log("debug", "system", `shouldStopCharging = true → stopCharging`);
-      await this.stopCharging(wallboxIp);
+      await this.stopCharging(wallboxIp, "Überschuss zu gering");
       return;
     }
     
@@ -661,7 +667,7 @@ export class ChargingStrategyController {
     }
   }
 
-  private async stopCharging(wallboxIp: string): Promise<void> {
+  private async stopCharging(wallboxIp: string, reason?: string): Promise<void> {
     const context = storage.getChargingContext();
     
     if (!context.isActive) {
@@ -688,7 +694,9 @@ export class ChargingStrategyController {
       try {
         const settingsForProwl = storage.getSettings();
         if (settingsForProwl?.prowl?.enabled && settingsForProwl?.prowl?.events?.chargingStopped) {
-          void getProwlNotifier().sendChargingStopped("Überschuss zu gering");
+          // Verwende übergebenen Grund oder Default basierend auf Strategie
+          const stopReason = reason || (context.strategy.includes('surplus') ? 'Überschuss zu gering' : 'Ladung manuell gestoppt');
+          void getProwlNotifier().sendChargingStopped(stopReason);
         }
       } catch (error) {
         log("debug", "system", "Prowl-Notifier nicht initialisiert");
@@ -714,7 +722,7 @@ export class ChargingStrategyController {
     
     // Bei Strategie-Wechsel IMMER stoppen (falls aktiv), dann neu starten
     if (context.isActive) {
-      await this.stopCharging(wallboxIp);
+      await this.stopCharging(wallboxIp, "Strategie gewechselt");
       log("info", "system", "Laufende Ladung gestoppt für Strategie-Wechsel");
     }
     
