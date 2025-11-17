@@ -726,6 +726,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       res.json({ success: true });
     } catch (error) {
+      // Detailliertes Error-Logging für Validierungsfehler
+      if (error instanceof Error) {
+        log("error", "system", "Settings-Validierung fehlgeschlagen", error.message);
+        
+        // Bei Zod-Errors: Zeige alle Fehler im Detail
+        if ('errors' in error && Array.isArray((error as any).errors)) {
+          const zodErrors = (error as any).errors;
+          zodErrors.forEach((err: any) => {
+            log("error", "system", `Validierungsfehler bei ${err.path.join('.')}: ${err.message}`);
+          });
+        }
+        
+        // Logge auch den Request-Body (ohne sensitive Daten)
+        const sanitizedBody = { ...req.body };
+        if (sanitizedBody.prowl?.apiKey) {
+          sanitizedBody.prowl.apiKey = '[REDACTED]';
+        }
+        log("error", "system", "Request-Body:", JSON.stringify(sanitizedBody, null, 2));
+      } else {
+        log("error", "system", "Unbekannter Fehler beim Speichern der Settings", String(error));
+      }
+      
       res.status(400).json({ error: "Invalid settings data" });
     }
   });
