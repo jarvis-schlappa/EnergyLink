@@ -1176,6 +1176,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
           `Netzstrom-Laden: Verwende E3DC-Integration${settings?.demoMode ? " (Demo-Modus)" : ""}`,
         );
         await e3dcClient.enableGridCharge();
+        
+        // Prowl-Benachrichtigung (non-blocking, with initialization guard)
+        try {
+          if (settings?.prowl?.enabled && settings?.prowl?.events?.gridChargingActivated) {
+            void getProwlNotifier().sendGridChargingActivated();
+          }
+        } catch (error) {
+          log("debug", "system", "Prowl-Notifier nicht initialisiert");
+        }
+        
         return;
       } catch (error) {
         const errorMessage =
@@ -1201,6 +1211,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
           `Netzstrom-Laden deaktivieren: Verwende E3DC-Integration${settings?.demoMode ? " (Demo-Modus)" : ""}`,
         );
         await e3dcClient.disableGridCharge();
+        
+        // Prowl-Benachrichtigung (non-blocking, with initialization guard)
+        try {
+          if (settings?.prowl?.enabled && settings?.prowl?.events?.gridChargingDeactivated) {
+            void getProwlNotifier().sendGridChargingDeactivated();
+          }
+        } catch (error) {
+          log("debug", "system", "Prowl-Notifier nicht initialisiert");
+        }
+        
         return;
       } catch (error) {
         const errorMessage =

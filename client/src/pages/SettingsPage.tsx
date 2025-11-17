@@ -172,6 +172,8 @@ export default function SettingsPage() {
           plugDisconnected: false,
           batteryLockActivated: false,
           batteryLockDeactivated: false,
+          gridChargingActivated: false,
+          gridChargingDeactivated: false,
           strategyChanged: false,
           errors: false,
         },
@@ -216,6 +218,8 @@ export default function SettingsPage() {
           plugDisconnected: false,
           batteryLockActivated: false,
           batteryLockDeactivated: false,
+          gridChargingActivated: false,
+          gridChargingDeactivated: false,
           strategyChanged: false,
           errors: false,
         },
@@ -984,6 +988,34 @@ export default function SettingsPage() {
                               form.setValue("prowl.events.batteryLockDeactivated", checked)
                             }
                             data-testid="switch-event-battery-lock-deactivated"
+                          />
+                        </div>
+                        
+                        <div className="flex items-center justify-between">
+                          <Label htmlFor="event-grid-charging-activated" className="text-xs font-normal">
+                            Netzstrom-Laden aktiviert
+                          </Label>
+                          <Switch
+                            id="event-grid-charging-activated"
+                            checked={form.watch("prowl.events.gridChargingActivated")}
+                            onCheckedChange={(checked) =>
+                              form.setValue("prowl.events.gridChargingActivated", checked)
+                            }
+                            data-testid="switch-event-grid-charging-activated"
+                          />
+                        </div>
+                        
+                        <div className="flex items-center justify-between">
+                          <Label htmlFor="event-grid-charging-deactivated" className="text-xs font-normal">
+                            Netzstrom-Laden deaktiviert
+                          </Label>
+                          <Switch
+                            id="event-grid-charging-deactivated"
+                            checked={form.watch("prowl.events.gridChargingDeactivated")}
+                            onCheckedChange={(checked) =>
+                              form.setValue("prowl.events.gridChargingDeactivated", checked)
+                            }
+                            data-testid="switch-event-grid-charging-deactivated"
                           />
                         </div>
                         

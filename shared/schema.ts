@@ -87,6 +87,8 @@ export const prowlEventsSchema = z.object({
   plugDisconnected: z.boolean(),
   batteryLockActivated: z.boolean(),
   batteryLockDeactivated: z.boolean(),
+  gridChargingActivated: z.boolean(),
+  gridChargingDeactivated: z.boolean(),
   strategyChanged: z.boolean(),
   errors: z.boolean(),
 });

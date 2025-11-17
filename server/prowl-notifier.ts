@@ -105,6 +105,22 @@ export class ProwlNotifier {
     );
   }
 
+  async sendGridChargingActivated(): Promise<void> {
+    await this.send(
+      "Netzstrom-Laden aktiviert",
+      "Hausbatterie wird aus dem Netz geladen",
+      0
+    );
+  }
+
+  async sendGridChargingDeactivated(): Promise<void> {
+    await this.send(
+      "Netzstrom-Laden deaktiviert",
+      "Hausbatterie wird nicht mehr aus dem Netz geladen",
+      0
+    );
+  }
+
   async sendStrategyChanged(oldStrategy: string, newStrategy: string): Promise<void> {
     await this.send(
       "Strategie gewechselt",
