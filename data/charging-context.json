@@ -1,8 +1,8 @@
 {
-  "strategy": "max_without_battery",
-  "isActive": true,
-  "currentAmpere": 32,
-  "targetAmpere": 32,
+  "strategy": "off",
+  "isActive": false,
+  "currentAmpere": 0,
+  "targetAmpere": 0,
   "currentPhases": 1,
   "adjustmentCount": 0,
   "lastAdjustmentTimes": [],

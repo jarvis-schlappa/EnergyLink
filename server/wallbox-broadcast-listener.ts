@@ -35,8 +35,59 @@ const handleBroadcast = async (data: any, rinfo: any) => {
     if (data.Plug !== undefined) {
       const plugStatus = data.Plug;
 
-      // Prüfe ob Status sich geändert hat (In-Memory-Vergleich)
-      if (lastPlugStatus !== null && lastPlugStatus !== plugStatus) {
+      // Beim ersten Broadcast: Vergleiche mit gespeichertem Status
+      if (lastPlugStatus === null) {
+        try {
+          const tracking = storage.getPlugStatusTracking();
+          const savedStatus = tracking?.lastPlugStatus;
+          
+          // Prüfe ob sich der Status seit letztem App-Lauf geändert hat
+          if (savedStatus !== undefined && savedStatus !== plugStatus) {
+            log(
+              "info",
+              "system",
+              `[Wallbox-Broadcast-Listener] Plug-Status geändert (seit letztem Start): ${savedStatus} → ${plugStatus} (von ${rinfo.address})`,
+            );
+            
+            // Speichere neuen Status
+            storage.savePlugStatusTracking({
+              lastPlugStatus: plugStatus,
+              lastPlugChange: new Date().toISOString(),
+            });
+            
+            // Prowl-Benachrichtigung senden
+            const settingsForProwl = storage.getSettings();
+            if (settingsForProwl?.prowl?.enabled) {
+              const prowl = getProwlNotifier();
+              
+              // Auto wurde angesteckt (Wechsel zu Plug=7)
+              if (plugStatus === 7 && settingsForProwl?.prowl?.events?.plugConnected) {
+                void prowl.sendPlugConnected();
+              } 
+              // Auto wurde abgesteckt (Wechsel von Plug=7 zu niedrigerem Status)
+              else if (savedStatus === 7 && plugStatus < 7 && settingsForProwl?.prowl?.events?.plugDisconnected) {
+                void prowl.sendPlugDisconnected();
+              }
+            }
+          } else {
+            // Kein Wechsel - nur initialisieren
+            storage.savePlugStatusTracking({
+              lastPlugStatus: plugStatus,
+            });
+          }
+        } catch (error) {
+          // Fallback: Initialisiere ohne Vergleich
+          storage.savePlugStatusTracking({
+            lastPlugStatus: plugStatus,
+          });
+        }
+        
+        lastPlugStatus = plugStatus;
+        return;
+      }
+
+      // Normale Broadcast-Verarbeitung (nicht der erste)
+      if (lastPlugStatus !== plugStatus) {
         log(
           "info",
           "system",
@@ -65,29 +116,22 @@ const handleBroadcast = async (data: any, rinfo: any) => {
           if (settingsForProwl?.prowl?.enabled) {
             const prowl = getProwlNotifier();
             
-            // Plug=7 = Auto angesteckt, Plug=1 = Auto abgesteckt
+            // KEBA Plug-Status-Werte:
+            // Plug=1 = Kein Kabel an Wallbox
+            // Plug=3 = Kabel angesteckt, kein Auto (Auto abgesteckt)
+            // Plug=7 = Auto angesteckt (Kabel + Auto verbunden)
+            
+            // Auto wurde angesteckt (Wechsel zu Plug=7)
             if (plugStatus === 7 && settingsForProwl?.prowl?.events?.plugConnected) {
               void prowl.sendPlugConnected();
-            } else if (plugStatus === 1 && settingsForProwl?.prowl?.events?.plugDisconnected) {
+            } 
+            // Auto wurde abgesteckt (Wechsel von Plug=7 zu niedrigerem Status)
+            else if (lastPlugStatus === 7 && plugStatus < 7 && settingsForProwl?.prowl?.events?.plugDisconnected) {
               void prowl.sendPlugDisconnected();
             }
           }
         } catch (error) {
           log("debug", "system", "Prowl-Notifier nicht initialisiert - überspringe Benachrichtigung");
-        }
-      } else if (lastPlugStatus === null) {
-        // Erster Broadcast - initialisiere Storage ohne Log (verhindert false-positive bei Startup)
-        try {
-          storage.savePlugStatusTracking({
-            lastPlugStatus: plugStatus,
-          });
-        } catch (error) {
-          log(
-            "error",
-            "system",
-            "[Wallbox-Broadcast-Listener] Fehler beim Initialisieren des Plug-Status:",
-            error instanceof Error ? error.message : String(error),
-          );
         }
       }
 

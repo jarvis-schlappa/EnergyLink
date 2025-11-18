@@ -80,6 +80,7 @@ export const fhemSyncSchema = z.object({
 export type FhemSync = z.infer<typeof fhemSyncSchema>;
 
 export const prowlEventsSchema = z.object({
+  appStarted: z.boolean(),
   chargingStarted: z.boolean(),
   chargingStopped: z.boolean(),
   currentAdjusted: z.boolean(),

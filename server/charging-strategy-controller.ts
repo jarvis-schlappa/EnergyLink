@@ -644,11 +644,15 @@ export class ChargingStrategyController {
           `Ladestrom angepasst: ${context.currentAmpere}A → ${finalAmpere}A @ ${currentPhases}P`
         );
         
-        // Prowl-Benachrichtigung (non-blocking, with initialization guard)
-        const settingsForProwl = storage.getSettings();
-        triggerProwlEvent(settingsForProwl, "currentAdjusted", (notifier) =>
-          notifier.sendCurrentAdjusted(context.currentAmpere, finalAmpere, currentPhases)
-        );
+        // Prowl-Benachrichtigung nur bei signifikanten Änderungen (>= 4A)
+        // Verhindert Spam bei kleinen Anpassungen
+        const PROWL_THRESHOLD_AMPERE = 4;
+        if (currentDiffAmpere >= PROWL_THRESHOLD_AMPERE) {
+          const settingsForProwl = storage.getSettings();
+          triggerProwlEvent(settingsForProwl, "currentAdjusted", (notifier) =>
+            notifier.sendCurrentAdjusted(context.currentAmpere, finalAmpere, currentPhases)
+          );
+        }
       } catch (error) {
         log("error", "system", 
           "Fehler beim Anpassen des Ladestroms",
@@ -662,6 +666,8 @@ export class ChargingStrategyController {
     }
   }
 
+  private lastStopNotificationTime: number = 0;
+  
   private async stopCharging(wallboxIp: string, reason?: string): Promise<void> {
     const context = storage.getChargingContext();
     
@@ -685,12 +691,23 @@ export class ChargingStrategyController {
       
       log("info", "system", "Ladung gestoppt");
       
-      // Prowl-Benachrichtigung (non-blocking, with initialization guard)
-      const settingsForProwl = storage.getSettings();
-      const stopReason = reason || (context.strategy.includes('surplus') ? 'Überschuss zu gering' : 'Ladung manuell gestoppt');
-      triggerProwlEvent(settingsForProwl, "chargingStopped", (notifier) =>
-        notifier.sendChargingStopped(stopReason)
-      );
+      // Prowl-Benachrichtigung mit Deduplication (max 1x pro 5 Sekunden)
+      const now = Date.now();
+      const timeSinceLastNotification = now - this.lastStopNotificationTime;
+      const DEDUP_THRESHOLD_MS = 5000; // 5 Sekunden
+      
+      if (timeSinceLastNotification >= DEDUP_THRESHOLD_MS) {
+        this.lastStopNotificationTime = now;
+        const settingsForProwl = storage.getSettings();
+        const stopReason = reason || (context.strategy.includes('surplus') ? 'Überschuss zu gering' : 'Ladung manuell gestoppt');
+        triggerProwlEvent(settingsForProwl, "chargingStopped", (notifier) =>
+          notifier.sendChargingStopped(stopReason)
+        );
+      } else {
+        log("debug", "system", 
+          `Prowl "Ladung gestoppt" Benachrichtigung übersprungen - zu früh nach letzter (${Math.round(timeSinceLastNotification / 1000)}s)`
+        );
+      }
     } catch (error) {
       log("error", "system", 
         "Fehler beim Stoppen der Ladung",

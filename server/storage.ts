@@ -122,6 +122,7 @@ export class MemStorage implements IStorage {
         
         // Merge mit Default Prowl Events für Backward Compatibility
         const prowlEventsDefaults = {
+          appStarted: true,
           chargingStarted: true,
           chargingStopped: true,
           currentAdjusted: false,

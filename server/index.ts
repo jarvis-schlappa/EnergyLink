@@ -6,6 +6,7 @@ import { startUnifiedMock, stopUnifiedMock } from "./unified-mock";
 import { startBroadcastListener, stopBroadcastListener } from "./wallbox-broadcast-listener";
 import { sendUdpCommand } from "./wallbox-transport";
 import { log } from "./logger";
+import { initializeProwlNotifier, triggerProwlEvent } from "./prowl-notifier";
 
 const app = express();
 
@@ -87,6 +88,15 @@ app.use((req, res, next) => {
   } catch (error) {
     log('error', 'system', '⚠️ Fehler beim Starten des Broadcast-Listeners', error instanceof Error ? error.message : String(error));
   }
+  
+  // Prowl-Notifier initialisieren (VOR dem ersten triggerProwlEvent Aufruf!)
+  const settings = storage.getSettings();
+  initializeProwlNotifier(settings);
+  
+  // Prowl-Benachrichtigung: App gestartet (nach erfolgreicher Initialisierung)
+  triggerProwlEvent(settings, "appStarted", (notifier) =>
+    notifier.sendAppStarted()
+  );
   
   const server = await registerRoutes(app);
 

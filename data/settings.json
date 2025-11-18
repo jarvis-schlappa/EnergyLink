@@ -40,6 +40,7 @@
     "enabled": true,
     "apiKey": "1234",
     "events": {
+      "appStarted": true,
       "chargingStarted": true,
       "chargingStopped": true,
       "currentAdjusted": true,

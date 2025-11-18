@@ -115,6 +115,14 @@ export class ProwlNotifier {
     );
   }
 
+  async sendAppStarted(): Promise<void> {
+    await this.send(
+      "App gestartet",
+      "EnergyLink ist bereit",
+      0
+    );
+  }
+
   async sendPlugConnected(): Promise<void> {
     await this.send(
       "Auto angesteckt",

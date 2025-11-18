@@ -195,9 +195,7 @@ function extractBaseUrlFromUrl(url: string | undefined): string | null {
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // Initialisiere Prowl-Notifier mit aktuellen Settings
-  const prowlSettings = storage.getSettings();
-  initializeProwlNotifier(prowlSettings);
+  // Prowl-Notifier wird bereits in index.ts initialisiert
   
   app.get("/api/build-info", (req, res) => {
     try {
@@ -355,20 +353,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       log("info", "wallbox", `Laden erfolgreich gestartet`);
       
-      // Prowl-Benachrichtigung für manuellen Start (ChargingStrategyController sendet nur bei automatischen Starts)
-      const context = storage.getChargingContext();
-      const finalSettings = storage.getSettings(); // Nach möglicher Strategie-Änderung
-      if (finalSettings) {
-        const currentPhases = finalSettings.demoMode 
-          ? (finalSettings.mockWallboxPhases ?? 3) 
-          : (finalSettings.chargingStrategy?.physicalPhaseSwitch ?? 3);
-        const currentAmpere = context.currentAmpere || 16; // Fallback auf 16A wenn nicht gesetzt
-        const activeStrategy = finalSettings.chargingStrategy?.activeStrategy || "off";
-        
-        triggerProwlEvent(finalSettings, "chargingStarted", (notifier) =>
-          notifier.sendChargingStarted(currentAmpere, currentPhases, activeStrategy)
-        );
-      }
+      // HINWEIS: Prowl-Benachrichtigung wird vom ChargingStrategyController gesendet
+      // Der Controller wird sofort nach dem Start durch den Scheduler getriggert
+      // und sendet die Benachrichtigung mit korrekten Parametern (Ampere, Phasen, Strategie)
       
       res.json({ success: true });
     } catch (error) {
