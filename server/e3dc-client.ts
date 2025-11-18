@@ -205,6 +205,106 @@ class E3dcClient {
     await this.executeCommand(this.config.gridChargeDisableCommand, 'Netzstrom-Laden deaktivieren');
   }
 
+  /**
+   * Führt mehrere E3DC-Befehle kombiniert in einem einzigen Aufruf aus
+   * Spart Rate-Limit-Zeit und ist atomarer
+   * 
+   * @param commands - Array von Befehlen (mit oder ohne "e3dcset" Prefix)
+   * @param commandName - Beschreibung für Logging
+   * 
+   * @example
+   * // Statt 2 Aufrufe mit 5s Pause:
+   * await lockDischarge();
+   * await enableGridCharge();
+   * 
+   * // Kombiniert in einem Aufruf:
+   * await executeCombinedCommand(['e3dcset -d 1', 'e3dcset -c 2500 -e 6000'], 'Night Charging aktivieren');
+   * // Resultat: "e3dcset -d 1 -c 2500 -e 6000"
+   */
+  async executeCombinedCommand(commands: string[], commandName: string): Promise<void> {
+    if (!this.config) {
+      throw new Error('E3DC not configured');
+    }
+
+    // Filtere leere Befehle und normalisiere (entferne "e3dcset" prefix)
+    const normalizedCommands = commands
+      .filter(cmd => cmd && cmd.trim() !== '')
+      .map(cmd => cmd.replace(/^e3dcset\s+/, '').trim())
+      .filter(cmd => cmd !== ''); // Filtere nochmal leere nach Normalisierung
+    
+    if (normalizedCommands.length === 0) {
+      log('info', 'system', `E3DC: ${commandName} - Keine Befehle konfiguriert, überspringe`);
+      return;
+    }
+
+    // Kombiniere alle Parameter zu einem einzigen Befehl
+    // Beispiel: ['-d 1', '-c 2500 -e 6000'] → '-d 1 -c 2500 -e 6000'
+    // executeCommand() kümmert sich dann um Prefix-Handling:
+    //   - Demo-Modus: Keine Änderung nötig
+    //   - Production: Prefix wird vorangestellt (z.B. /pfad/zum/e3dcset -p config -d 1 -c 2500)
+    const combinedCommand = normalizedCommands.join(' ').trim();
+    
+    await this.executeCommand(combinedCommand, commandName);
+  }
+
+  /**
+   * Aktiviert Night Charging mit Battery Lock und optional Grid Charging
+   * Kombiniert beide Befehle in einem einzigen e3dcset-Aufruf
+   */
+  async enableNightCharging(withGridCharging: boolean = true): Promise<void> {
+    if (!this.config) {
+      throw new Error('E3DC not configured');
+    }
+
+    const commands: string[] = [];
+    
+    // Battery Lock immer aktivieren
+    if (this.config.dischargeLockEnableCommand) {
+      commands.push(this.config.dischargeLockEnableCommand);
+    }
+    
+    // Grid Charging optional (abhängig von Settings)
+    if (withGridCharging && this.config.gridChargeEnableCommand) {
+      commands.push(this.config.gridChargeEnableCommand);
+    }
+
+    await this.executeCombinedCommand(
+      commands,
+      withGridCharging 
+        ? 'Night Charging aktivieren (Battery Lock + Grid Charging)'
+        : 'Night Charging aktivieren (nur Battery Lock)'
+    );
+  }
+
+  /**
+   * Deaktiviert Night Charging (Battery Lock + Grid Charging)
+   * Kombiniert beide Befehle in einem einzigen e3dcset-Aufruf
+   * 
+   * Verwendet "-a" (zurück auf Automatik) wenn konfiguriert, sonst einzelne Disable-Befehle
+   */
+  async disableNightCharging(): Promise<void> {
+    if (!this.config) {
+      throw new Error('E3DC not configured');
+    }
+
+    const commands: string[] = [];
+    
+    // Battery Lock deaktivieren
+    if (this.config.dischargeLockDisableCommand) {
+      commands.push(this.config.dischargeLockDisableCommand);
+    }
+    
+    // Grid Charging deaktivieren
+    if (this.config.gridChargeDisableCommand) {
+      commands.push(this.config.gridChargeDisableCommand);
+    }
+
+    await this.executeCombinedCommand(
+      commands,
+      'Night Charging deaktivieren (Battery Lock + Grid Charging)'
+    );
+  }
+
   isConfigured(): boolean {
     return this.config !== null && this.config.enabled === true;
   }

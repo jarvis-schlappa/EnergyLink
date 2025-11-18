@@ -47,7 +47,8 @@ async function pollE3dcData(): Promise<void> {
       try {
         const wallboxIp = settings?.wallboxIp || "127.0.0.1";
         const report3 = await sendUdpCommand(wallboxIp, "report 3");
-        wallboxPower = report3.P || 0;
+        // Power ist in Report 3 als P (in Milliwatt), dividiert durch 1.000 für Watt
+        wallboxPower = (report3.P || 0) / 1000;
       } catch (error) {
         // Wenn Wallbox nicht erreichbar, verwende 0W (non-critical)
         log(

@@ -119,7 +119,32 @@ export class MemStorage implements IStorage {
         const data = readFileSync(this.settingsFilePath, "utf-8");
         const loaded = JSON.parse(data);
         logStorage("debug", `Einstellungen geladen aus: ${this.settingsFilePath}`);
-        return loaded;
+        
+        // Merge mit Default Prowl Events für Backward Compatibility
+        const prowlEventsDefaults = {
+          chargingStarted: true,
+          chargingStopped: true,
+          currentAdjusted: false,
+          plugConnected: false,
+          plugDisconnected: false,
+          batteryLockActivated: false,
+          batteryLockDeactivated: false,
+          gridChargingActivated: false,
+          gridChargingDeactivated: false,
+          strategyChanged: false,
+          errors: false,
+        };
+        
+        return {
+          ...loaded,
+          prowl: loaded.prowl ? {
+            ...loaded.prowl,
+            events: {
+              ...prowlEventsDefaults,
+              ...loaded.prowl.events,
+            },
+          } : undefined,
+        };
       } catch (error) {
         logStorage("warning", "Fehler beim Laden der Einstellungen", error instanceof Error ? error.message : String(error));
       }

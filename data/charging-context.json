@@ -1,10 +1,10 @@
 {
-  "strategy": "surplus_battery_prio",
-  "isActive": false,
-  "currentAmpere": 0,
-  "targetAmpere": 0,
-  "currentPhases": 3,
+  "strategy": "max_without_battery",
+  "isActive": true,
+  "currentAmpere": 32,
+  "targetAmpere": 32,
+  "currentPhases": 1,
   "adjustmentCount": 0,
   "lastAdjustmentTimes": [],
-  "calculatedSurplus": 0
+  "calculatedSurplus": 1194
 }

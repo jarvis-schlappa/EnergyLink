@@ -8,8 +8,8 @@
   "pvSurplusOffUrlBackup": "http://127.0.0.1:8083/fhem?cmd.autoWallboxPV=off",
   "nightChargingSchedule": {
     "enabled": true,
-    "startTime": "00:00",
-    "endTime": "05:00"
+    "startTime": "15:51",
+    "endTime": "15:52"
   },
   "e3dc": {
     "enabled": true,
@@ -17,11 +17,11 @@
     "dischargeLockEnableCommand": "-d 1",
     "dischargeLockDisableCommand": "-a",
     "gridChargeEnableCommand": "-c 2500 -e 6000",
-    "gridChargeDisableCommand": "-a -e 0",
-    "gridChargeDuringNightCharging": false
+    "gridChargeDisableCommand": "-e 0",
+    "gridChargeDuringNightCharging": true
   },
   "chargingStrategy": {
-    "activeStrategy": "surplus_battery_prio",
+    "activeStrategy": "off",
     "minStartPowerWatt": 500,
     "stopThresholdWatt": 1000,
     "startDelaySeconds": 30,
@@ -42,13 +42,15 @@
     "events": {
       "chargingStarted": true,
       "chargingStopped": true,
-      "currentAdjusted": false,
-      "plugConnected": false,
-      "plugDisconnected": false,
-      "batteryLockActivated": false,
-      "batteryLockDeactivated": false,
-      "strategyChanged": false,
-      "errors": false
+      "currentAdjusted": true,
+      "plugConnected": true,
+      "plugDisconnected": true,
+      "batteryLockActivated": true,
+      "batteryLockDeactivated": true,
+      "gridChargingActivated": true,
+      "gridChargingDeactivated": true,
+      "strategyChanged": true,
+      "errors": true
     }
   },
   "demoMode": true,

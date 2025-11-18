@@ -1,5 +1,47 @@
-import type { Settings } from "@shared/schema";
+import type { Settings, ProwlEvents } from "@shared/schema";
 import { log } from "./logger";
+
+/**
+ * Type-safe Event-Key für Prowl-Benachrichtigungen
+ */
+export type ProwlEventKey = keyof ProwlEvents;
+
+/**
+ * Extrahiert den Wert des -e Parameters aus einem e3dcset Command String
+ * Beispiel: "-c 2500 -e 6000" → 6000
+ */
+export function extractTargetWh(command: string): number | undefined {
+  const match = command.match(/-e\s+(\d+)/);
+  return match ? parseInt(match[1], 10) : undefined;
+}
+
+/**
+ * Zentrale Funktion zum Auslösen von Prowl-Benachrichtigungen
+ * Prüft Settings, Event-Aktivierung und führt Action aus (fire-and-forget)
+ * 
+ * @param settings - Aktuelle Settings mit Prowl-Konfiguration
+ * @param eventKey - Event-Name (z.B. "chargingStarted")
+ * @param action - Async-Funktion die mit ProwlNotifier ausgeführt wird
+ */
+export function triggerProwlEvent(
+  settings: Settings | null,
+  eventKey: ProwlEventKey,
+  action: (notifier: ProwlNotifier) => Promise<void>
+): void {
+  try {
+    if (!settings?.prowl?.enabled) {
+      return;
+    }
+    
+    if (!settings.prowl.events?.[eventKey]) {
+      return;
+    }
+    
+    void action(getProwlNotifier());
+  } catch (error) {
+    log("debug", "system", "Prowl-Notifier nicht initialisiert");
+  }
+}
 
 export class ProwlNotifier {
   private apiKey: string;
@@ -105,18 +147,40 @@ export class ProwlNotifier {
     );
   }
 
-  async sendGridChargingActivated(): Promise<void> {
+  async sendGridChargingActivated(socStart?: number, targetWh?: number): Promise<void> {
+    let description = "Hausbatterie wird aus dem Netz geladen";
+    
+    // Zusätzliche Infos anhängen (nicht ersetzen!)
+    if (socStart !== undefined || targetWh !== undefined) {
+      const parts: string[] = [];
+      if (socStart !== undefined) {
+        parts.push(`Start-SOC: ${socStart}%`);
+      }
+      if (targetWh !== undefined) {
+        const kwh = (targetWh / 1000).toFixed(1);
+        parts.push(`Ziel: ${targetWh} Wh (${kwh} kWh)`);
+      }
+      description = `${description}\n\n${parts.join("\n")}`;
+    }
+    
     await this.send(
       "Netzstrom-Laden aktiviert",
-      "Hausbatterie wird aus dem Netz geladen",
+      description,
       0
     );
   }
 
-  async sendGridChargingDeactivated(): Promise<void> {
+  async sendGridChargingDeactivated(socEnd?: number): Promise<void> {
+    let description = "Hausbatterie wird nicht mehr aus dem Netz geladen";
+    
+    // SOC-Ende anhängen (nicht ersetzen!)
+    if (socEnd !== undefined) {
+      description = `${description}\n\nEnd-SOC: ${socEnd}%`;
+    }
+    
     await this.send(
       "Netzstrom-Laden deaktiviert",
-      "Hausbatterie wird nicht mehr aus dem Netz geladen",
+      description,
       0
     );
   }

@@ -730,7 +730,9 @@ export default function StatusPage() {
               {startChargingMutation.isPending || stopChargingMutation.isPending
                 ? "Wird verarbeitet..."
                 : isCharging
-                ? `Stoppe ${getStrategyLabel(settings?.chargingStrategy?.activeStrategy || "off")}`
+                ? controlState?.nightCharging
+                  ? "Stoppe zeitgesteuerte Ladung"
+                  : `Stoppe ${getStrategyLabel(settings?.chargingStrategy?.activeStrategy || "off")}`
                 : `Starte ${getStrategyLabel(settings?.chargingStrategy?.inputX1Strategy || "max_without_battery")}`}
             </Button>
 

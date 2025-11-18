@@ -3,7 +3,7 @@ import { storage } from "./storage";
 import { log } from "./logger";
 import { e3dcClient } from "./e3dc-client";
 import { getE3dcLiveDataHub } from "./e3dc-modbus";
-import { getProwlNotifier } from "./prowl-notifier";
+import { triggerProwlEvent } from "./prowl-notifier";
 
 const PHASE_VOLTAGE_1P = 230;
 const MIN_CURRENT_AMPERE = 6;
@@ -119,13 +119,9 @@ export class ChargingStrategyController {
         await e3dcClient.lockDischarge();
         
         // Prowl-Benachrichtigung (non-blocking, with initialization guard)
-        try {
-          if (settings?.prowl?.enabled && settings?.prowl?.events?.batteryLockActivated) {
-            void getProwlNotifier().sendBatteryLockActivated();
-          }
-        } catch (error) {
-          log("debug", "system", "Prowl-Notifier nicht initialisiert");
-        }
+        triggerProwlEvent(settings, "batteryLockActivated", (notifier) => 
+          notifier.sendBatteryLockActivated()
+        );
       } catch (error) {
         log('error', 'system', 'Fehler beim Aktivieren der Entladesperre', error instanceof Error ? error.message : String(error));
         // Bei Fehler: State zurücksetzen
@@ -149,13 +145,9 @@ export class ChargingStrategyController {
         await e3dcClient.unlockDischarge();
         
         // Prowl-Benachrichtigung (non-blocking, with initialization guard)
-        try {
-          if (settings?.prowl?.enabled && settings?.prowl?.events?.batteryLockDeactivated) {
-            void getProwlNotifier().sendBatteryLockDeactivated();
-          }
-        } catch (error) {
-          log("debug", "system", "Prowl-Notifier nicht initialisiert");
-        }
+        triggerProwlEvent(settings, "batteryLockDeactivated", (notifier) => 
+          notifier.sendBatteryLockDeactivated()
+        );
       } catch (error) {
         log('error', 'system', 'Fehler beim Deaktivieren der Entladesperre', error instanceof Error ? error.message : String(error));
         // Bei Fehler: State zurücksetzen
@@ -613,13 +605,9 @@ export class ChargingStrategyController {
         );
         
         // Prowl-Benachrichtigung (non-blocking, with initialization guard)
-        try {
-          if (settings?.prowl?.enabled && settings?.prowl?.events?.chargingStarted) {
-            void getProwlNotifier().sendChargingStarted(finalAmpere, currentPhases, config.activeStrategy);
-          }
-        } catch (error) {
-          log("debug", "system", "Prowl-Notifier nicht initialisiert");
-        }
+        triggerProwlEvent(settings, "chargingStarted", (notifier) =>
+          notifier.sendChargingStarted(finalAmpere, currentPhases, config.activeStrategy)
+        );
       } else {
         log("debug", "system", 
           `Ladung bereits aktiv - Strom aktualisiert auf ${finalAmpere}A @ ${currentPhases}P`
@@ -657,14 +645,10 @@ export class ChargingStrategyController {
         );
         
         // Prowl-Benachrichtigung (non-blocking, with initialization guard)
-        try {
-          const settingsForProwl = storage.getSettings();
-          if (settingsForProwl?.prowl?.enabled && settingsForProwl?.prowl?.events?.currentAdjusted) {
-            void getProwlNotifier().sendCurrentAdjusted(context.currentAmpere, finalAmpere, currentPhases);
-          }
-        } catch (error) {
-          log("debug", "system", "Prowl-Notifier nicht initialisiert");
-        }
+        const settingsForProwl = storage.getSettings();
+        triggerProwlEvent(settingsForProwl, "currentAdjusted", (notifier) =>
+          notifier.sendCurrentAdjusted(context.currentAmpere, finalAmpere, currentPhases)
+        );
       } catch (error) {
         log("error", "system", 
           "Fehler beim Anpassen des Ladestroms",
@@ -702,16 +686,11 @@ export class ChargingStrategyController {
       log("info", "system", "Ladung gestoppt");
       
       // Prowl-Benachrichtigung (non-blocking, with initialization guard)
-      try {
-        const settingsForProwl = storage.getSettings();
-        if (settingsForProwl?.prowl?.enabled && settingsForProwl?.prowl?.events?.chargingStopped) {
-          // Verwende übergebenen Grund oder Default basierend auf Strategie
-          const stopReason = reason || (context.strategy.includes('surplus') ? 'Überschuss zu gering' : 'Ladung manuell gestoppt');
-          void getProwlNotifier().sendChargingStopped(stopReason);
-        }
-      } catch (error) {
-        log("debug", "system", "Prowl-Notifier nicht initialisiert");
-      }
+      const settingsForProwl = storage.getSettings();
+      const stopReason = reason || (context.strategy.includes('surplus') ? 'Überschuss zu gering' : 'Ladung manuell gestoppt');
+      triggerProwlEvent(settingsForProwl, "chargingStopped", (notifier) =>
+        notifier.sendChargingStopped(stopReason)
+      );
     } catch (error) {
       log("error", "system", 
         "Fehler beim Stoppen der Ladung",

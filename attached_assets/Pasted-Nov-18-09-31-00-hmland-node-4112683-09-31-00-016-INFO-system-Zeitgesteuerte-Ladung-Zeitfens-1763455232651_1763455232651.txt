@@ -1,0 +1,18 @@
+Nov 18 09:31:00 hmland node[4112683]: [09:31:00,016] [INFO] [system] Zeitgesteuerte Ladung: Zeitfenster erreicht (09:31-09:33) - starte Laden
+Nov 18 09:31:00 hmland node[4112683]: [09:31:00,018] [INFO] [system] Zeitgesteuerte Ladung: Aktiviere Battery Lock + Grid Charging (kombiniert)
+Nov 18 09:31:00 hmland node[4112683]: [09:31:00,025] [INFO] [system] E3DC: Night Charging aktivieren (Battery Lock + Grid Charging) - Befehl: /opt/keba-wallbox/e3dcset -p /opt/keba-wallbox/e3dcset.config -c 2500 -e 6000
+Nov 18 09:31:02 hmland node[4112683]: [09:31:02,136] [INFO] [system] E3DC: Night Charging aktivieren (Battery Lock + Grid Charging) - Ausgabe - Setze LadeLeistung auf 2500W
+Nov 18 09:31:02 hmland node[4112683]: Manuelles Laden gestartet
+Nov 18 09:31:02 hmland node[4112683]: [09:31:02,138] [INFO] [system] E3DC: Night Charging aktivieren (Battery Lock + Grid Charging) erfolgreich ausgeführt
+Nov 18 09:31:05 hmland node[4112683]: [09:31:05,684] [INFO] [system] [Wallbox-Broadcast-Listener] State geändert: 5 → 2 (ready for charging) (von 192.168.40.16)
+Nov 18 09:31:06 hmland node[4112683]: [09:31:06,796] [INFO] [system] [Wallbox-Broadcast-Listener] State geändert: 2 → 3 (charging) (von 192.168.40.16)
+Nov 18 09:31:10 hmland node[4112683]: [09:31:10,024] [INFO] [wallbox] Ladestrom erfolgreich geändert und verifiziert - Neuer Wert: 32A (32000mA)
+Nov 18 09:33:00 hmland node[4112683]: [09:33:00,020] [INFO] [system] Zeitgesteuerte Ladung: Zeitfenster beendet - stoppe Laden
+Nov 18 09:33:00 hmland node[4112683]: [09:33:00,054] [INFO] [system] Zeitgesteuerte Ladung: Deaktiviere Battery Lock + Grid Charging (kombiniert)
+Nov 18 09:33:00 hmland node[4112683]: [09:33:00,058] [INFO] [system] E3DC: Night Charging deaktivieren (Battery Lock + Grid Charging) - Befehl: /opt/keba-wallbox/e3dcset -p /opt/keba-wallbox/e3dcset.config -a -e 0
+Nov 18 09:33:00 hmland node[4112683]: [09:33:00,096] [INFO] [system] [Wallbox-Broadcast-Listener] State geändert: 3 → 5 (authorization rejected) (von 192.168.40.16)
+Nov 18 09:33:02 hmland node[4112683]: [09:33:02,132] [INFO] [system] E3DC: Night Charging deaktivieren (Battery Lock + Grid Charging) - Ausgabe - Setze Lade-/EntladeLeistung auf Automatik
+Nov 18 09:33:02 hmland node[4112683]: Manuelles Laden gestoppt
+Nov 18 09:33:02 hmland node[4112683]: [09:33:02,134] [INFO] [system] E3DC: Night Charging deaktivieren (Battery Lock + Grid Charging) erfolgreich ausgeführt
+Nov 18 09:33:05 hmland node[4112683]: [09:33:05,208] [INFO] [system] [Wallbox-Broadcast-Listener] State geändert: 5 → 4 (error) (von 192.168.40.16)
+Nov 18 09:33:15 hmland node[4112683]: [09:33:15,653] [INFO] [system] [Wallbox-Broadcast-Listener] State geändert: 4 → 5 (authorization rejected) (von 192.168.40.16)
