@@ -289,6 +289,7 @@ export class E3dcModbusService {
       const selfConsumption = autarkySelfCons & 0xFF;
 
       // Register 40085: EMS-Status Bitflags dekodieren
+      // WICHTIG: Bit-Nummerierung könnte je nach E3DC-Firmware variieren
       const emsFlags = {
         chargeLocked: (emsStatus & 0b0000001) !== 0,        // Bit 0: Laden der Batterien ist gesperrt
         dischargeLocked: (emsStatus & 0b0000010) !== 0,     // Bit 1: Entladen der Batterien ist gesperrt
@@ -298,6 +299,9 @@ export class E3dcModbusService {
         chargeBlockActive: (emsStatus & 0b0100000) !== 0,   // Bit 5: Ladesperrzeit aktiv
         dischargeBlockActive: (emsStatus & 0b1000000) !== 0, // Bit 6: Entladesperrzeit aktiv
       };
+      
+      // DEBUG: Rohen Registerwert binär ausgeben zur Analyse
+      log("debug", "system", `E3DC EMS-Status RAW: 0x${emsStatus.toString(16).padStart(4, '0')} = 0b${emsStatus.toString(2).padStart(16, '0')}`);
 
       // DEBUG: Kompakte einzeilige Ausgabe bei LogLevel DEBUG
       log("debug", "system", `E3DC Register gelesen: PV=${pvPower}W, Batterie=${batteryPower}W (SOC=${batterySoc}%), Haus=${housePower}W, Netz=${gridPower}W, Autarkie=${autarky}%, Eigenverbrauch=${selfConsumption}%, Wallbox=${kebaWallboxPower}W`);
