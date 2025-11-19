@@ -397,6 +397,12 @@ const modbusVector = {
           else if (registerOffset === 16) {
             registerValue = Math.round(liveData.batterySoc); // SOC in % (50% = 50)
           }
+          // Emergency Power Status: Register 84 (offset 17)
+          else if (registerOffset === 17) {
+            // 0=nicht unterstützt, 1=aktiv, 2=nicht aktiv, 3=nicht verfügbar, 4=Motorschalter falsch
+            // Simuliere: 2 (nicht aktiv) wenn SOC > 20%, sonst 3 (nicht verfügbar)
+            registerValue = liveData.batterySoc > 20 ? 2 : 3;
+          }
           // EMS Status: Register 85 (offset 18) - Bitflags
           else if (registerOffset === 18) {
             // Simuliere realistische EMS-Status Bits basierend auf E3DC Control State

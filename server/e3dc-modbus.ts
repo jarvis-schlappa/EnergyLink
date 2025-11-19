@@ -21,6 +21,7 @@ const E3DC_REGISTERS = {
   GRID_POWER: 73,            // Holding Register 40074, INT32, Watt (negativ = Einspeisung)
   AUTARKY_SELFCONS: 81,      // Holding Register 40082, UINT16, High Byte = Autarkie %, Low Byte = Eigenverbrauch %
   BATTERY_SOC: 82,           // Holding Register 40083, UINT16, Prozent
+  EMERGENCY_POWER: 83,       // Holding Register 40084, UINT16, Emergency Power Status (0-4)
   EMS_STATUS: 84,            // Holding Register 40085, UINT16, Bitflags für EMS-Status
 } as const;
 
@@ -272,13 +273,14 @@ export class E3dcModbusService {
 
     try {
       // Alle E3DC Register parallel auslesen (OHNE Wallbox - die kommt von KEBA)
-      const [pvPower, batteryPower, housePower, gridPower, autarkySelfCons, batterySoc, emsStatus] = await Promise.all([
+      const [pvPower, batteryPower, housePower, gridPower, autarkySelfCons, batterySoc, emergencyPowerStatus, emsStatus] = await Promise.all([
         this.readInt32(E3DC_REGISTERS.PV_POWER),
         this.readInt32(E3DC_REGISTERS.BATTERY_POWER),
         this.readInt32(E3DC_REGISTERS.HOUSE_POWER),
         this.readInt32(E3DC_REGISTERS.GRID_POWER),
         this.readUint16(E3DC_REGISTERS.AUTARKY_SELFCONS),
         this.readUint16(E3DC_REGISTERS.BATTERY_SOC),
+        this.readUint16(E3DC_REGISTERS.EMERGENCY_POWER),
         this.readUint16(E3DC_REGISTERS.EMS_STATUS),
       ]);
 
@@ -308,6 +310,17 @@ export class E3dcModbusService {
       if (activeFlags.length > 0) {
         log("debug", "system", `E3DC EMS-Status (0x${emsStatus.toString(16).padStart(4, '0')}): ${activeFlags.join(', ')}`);
       }
+      
+      // DEBUG: Emergency Power Status dekodieren und loggen
+      const emergencyPowerStatusNames: Record<number, string> = {
+        0: 'nicht unterstützt',
+        1: 'aktiv (Stromausfall)',
+        2: 'nicht aktiv',
+        3: 'nicht verfügbar',
+        4: 'Motorschalter falsch',
+      };
+      const emergencyPowerText = emergencyPowerStatusNames[emergencyPowerStatus] || `unbekannt (${emergencyPowerStatus})`;
+      log("debug", "system", `E3DC Emergency-Power-Status (${emergencyPowerStatus}): ${emergencyPowerText}`);
 
       const liveData: E3dcLiveData = {
         pvPower,
