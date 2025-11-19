@@ -21,6 +21,7 @@ const E3DC_REGISTERS = {
   GRID_POWER: 73,            // Holding Register 40074, INT32, Watt (negativ = Einspeisung)
   AUTARKY_SELFCONS: 81,      // Holding Register 40082, UINT16, High Byte = Autarkie %, Low Byte = Eigenverbrauch %
   BATTERY_SOC: 82,           // Holding Register 40083, UINT16, Prozent
+  EMS_STATUS: 84,            // Holding Register 40085, UINT16, Bitflags für EMS-Status
 } as const;
 
 const MODBUS_PORT = 502;
@@ -271,21 +272,42 @@ export class E3dcModbusService {
 
     try {
       // Alle E3DC Register parallel auslesen (OHNE Wallbox - die kommt von KEBA)
-      const [pvPower, batteryPower, housePower, gridPower, autarkySelfCons, batterySoc] = await Promise.all([
+      const [pvPower, batteryPower, housePower, gridPower, autarkySelfCons, batterySoc, emsStatus] = await Promise.all([
         this.readInt32(E3DC_REGISTERS.PV_POWER),
         this.readInt32(E3DC_REGISTERS.BATTERY_POWER),
         this.readInt32(E3DC_REGISTERS.HOUSE_POWER),
         this.readInt32(E3DC_REGISTERS.GRID_POWER),
         this.readUint16(E3DC_REGISTERS.AUTARKY_SELFCONS),
         this.readUint16(E3DC_REGISTERS.BATTERY_SOC),
+        this.readUint16(E3DC_REGISTERS.EMS_STATUS),
       ]);
 
       // Register 40082: Autarkie (High Byte) & Eigenverbrauch (Low Byte)
       const autarky = (autarkySelfCons >> 8) & 0xFF;
       const selfConsumption = autarkySelfCons & 0xFF;
 
+      // Register 40085: EMS-Status Bitflags dekodieren
+      const emsFlags = {
+        chargeLocked: (emsStatus & 0b0000001) !== 0,        // Bit 0: Laden der Batterien ist gesperrt
+        dischargeLocked: (emsStatus & 0b0000010) !== 0,     // Bit 1: Entladen der Batterien ist gesperrt
+        emergencyPowerReady: (emsStatus & 0b0000100) !== 0, // Bit 2: Notstrom möglich (Batterien geladen)
+        weatherBasedCharge: (emsStatus & 0b0001000) !== 0,  // Bit 3: Wetterbasiertes Laden aktiv
+        curtailmentActive: (emsStatus & 0b0010000) !== 0,   // Bit 4: Abregelungs-Status (max. Einspeisung erreicht)
+        chargeBlockActive: (emsStatus & 0b0100000) !== 0,   // Bit 5: Ladesperrzeit aktiv
+        dischargeBlockActive: (emsStatus & 0b1000000) !== 0, // Bit 6: Entladesperrzeit aktiv
+      };
+
       // DEBUG: Kompakte einzeilige Ausgabe bei LogLevel DEBUG
       log("debug", "system", `E3DC Register gelesen: PV=${pvPower}W, Batterie=${batteryPower}W (SOC=${batterySoc}%), Haus=${housePower}W, Netz=${gridPower}W, Autarkie=${autarky}%, Eigenverbrauch=${selfConsumption}%, Wallbox=${kebaWallboxPower}W`);
+      
+      // DEBUG: EMS-Status separat loggen (nur wenn Flags gesetzt sind, um Logs sauber zu halten)
+      const activeFlags = Object.entries(emsFlags)
+        .filter(([_, active]) => active)
+        .map(([name]) => name);
+      
+      if (activeFlags.length > 0) {
+        log("debug", "system", `E3DC EMS-Status (0x${emsStatus.toString(16).padStart(4, '0')}): ${activeFlags.join(', ')}`);
+      }
 
       const liveData: E3dcLiveData = {
         pvPower,

@@ -397,6 +397,32 @@ const modbusVector = {
           else if (registerOffset === 16) {
             registerValue = Math.round(liveData.batterySoc); // SOC in % (50% = 50)
           }
+          // EMS Status: Register 85 (offset 18) - Bitflags
+          else if (registerOffset === 18) {
+            // Simuliere realistische EMS-Status Bits basierend auf E3DC Control State
+            const controlState = liveData.controlState || { maxDischargePower: 3000, gridCharging: false };
+            
+            let emsStatus = 0;
+            // Bit 0: Laden gesperrt (wenn gridCharging aus und SOC > 95%)
+            if (!controlState.gridCharging && liveData.batterySoc > 95) {
+              emsStatus |= 0b0000001;
+            }
+            // Bit 1: Entladen gesperrt (wenn maxDischargePower <= 1W)
+            if (controlState.maxDischargePower <= 1) {
+              emsStatus |= 0b0000010;
+            }
+            // Bit 2: Notstrom bereit (wenn SOC > 20%)
+            if (liveData.batterySoc > 20) {
+              emsStatus |= 0b0000100;
+            }
+            // Bit 5: Ladesperrzeit (simuliert zwischen 10:00-15:00 Uhr)
+            const hour = new Date().getHours();
+            if (hour >= 10 && hour < 15) {
+              emsStatus |= 0b0100000;
+            }
+            
+            registerValue = emsStatus;
+          }
           
           callback(null, registerValue);
         } catch (err) {
@@ -497,7 +523,7 @@ export async function startUnifiedMock(): Promise<void> {
 
   modbusServer.on('initialized', () => {
     log("info", "e3dc-mock", `✅ [E3DC-Modbus] E3DC S10 Mock läuft auf ${HOST}:${E3DC_MODBUS_PORT}`);
-    log("info", "e3dc-mock", `   Register 40067-40083 (Holding Registers) verfügbar`);
+    log("info", "e3dc-mock", `   Register 40067-40085 (Holding Registers) verfügbar`);
   });
 
   // FHEM-Sync-IP auf Localhost setzen (Demo-Modus verwendet lokalen Mock)
@@ -506,7 +532,8 @@ export async function startUnifiedMock(): Promise<void> {
     const updatedSettings = {
       ...currentSettings,
       fhemSync: {
-        ...currentSettings.fhemSync,
+        enabled: currentSettings.fhemSync?.enabled ?? false,
+        port: currentSettings.fhemSync?.port ?? 7072,
         host: '127.0.0.1',
       },
     };
