@@ -319,15 +319,26 @@ export class ChargingStrategyController {
     
     // WICHTIG: Phase-Logik
     // 1. Wenn NICHT aktiv:
-    //    - Im Demo-Modus: nutze mockWallboxPhases (simulierte Wallbox-Konfiguration)
-    //    - Im Produktiv-Modus: nutze physicalPhaseSwitch (User sagt wo der Schalter steht, Default 3P)
+    //    - Surplus-Strategien: IMMER 1 Phase (niedrige Startleistung ~1380W statt ~4140W)
+    //    - Max Power Strategien: nutze physicalPhaseSwitch (Benutzer stellt manuell ein)
+    //    - Im Demo-Modus: nutze mockWallboxPhases für alle Strategien
     // 2. Wenn aktiv → nutze context.currentPhases (echte erkannte Phasen aus Strömen)
+    const isMaxPowerStrategy = strategy === "max_with_battery" || strategy === "max_without_battery";
+    const isSurplusStrategy = strategy === "surplus_battery_prio" || strategy === "surplus_vehicle_prio";
+    
     const currentPhases = context.isActive 
       ? context.currentPhases 
-      : (settings?.demoMode ? (settings.mockWallboxPhases ?? 3) : (config.physicalPhaseSwitch ?? 3));
+      : (settings?.demoMode 
+          ? (settings.mockWallboxPhases ?? 3) 
+          : (isSurplusStrategy ? 1 : (config.physicalPhaseSwitch ?? 3)));
     
-    // Max Power Strategien: Immer maximaler Strom
-    const isMaxPowerStrategy = strategy === "max_with_battery" || strategy === "max_without_battery";
+    // Debug-Log für Phase-Entscheidung
+    if (!context.isActive) {
+      const phaseSource = settings?.demoMode 
+        ? `Demo-Modus (mockWallboxPhases=${settings.mockWallboxPhases})` 
+        : (isSurplusStrategy ? 'Surplus-Strategie (fest 1P)' : `Max-Power (physicalPhaseSwitch=${config.physicalPhaseSwitch})`);
+      log("debug", "system", `Phase-Logik beim Start: ${currentPhases}P via ${phaseSource}`);
+    }
     
     if (isMaxPowerStrategy) {
       const maxCurrent = currentPhases === 1 ? MAX_CURRENT_1P_AMPERE : MAX_CURRENT_3P_AMPERE;

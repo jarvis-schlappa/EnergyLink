@@ -36,6 +36,7 @@ Persistence for `WallboxStatus`, `Settings`, `ControlState`, and `PlugStatusTrac
 -   **Broadcast-Handler Architecture**: Real-time processing of Wallbox UDP broadcasts for various inputs.
 -   **Unified Mock Server**: Auto-starts in demo mode, providing realistic simulations for E3DC and household consumption, ready for Replit Autoscale.
 -   **Internal PV Surplus Charging**: Features four configurable charging strategies with automatic phase switching.
+-   **Smart Phase Selection**: Surplus strategies (surplus_battery_prio, surplus_vehicle_prio) always start with 1 phase for low minimum power requirement (~1380W instead of ~4140W), enabling automatic start even with small PV systems. Max Power strategies use physicalPhaseSwitch setting.
 -   **Potenzialfreier Kontakt (X1) Integration**: Configurable strategy selection via UDP broadcast handler.
 -   **Single-Socket UDP Architecture**: Centralized `wallboxUdpChannel` for KEBA communication.
 -   **FHEM TCP Mock Server**: Included in the unified mock for logging incoming commands.
