@@ -3,6 +3,7 @@ import { promisify } from 'util';
 import type { E3dcConfig } from '@shared/schema';
 import { log } from './logger';
 import { storage } from './storage';
+import { getE3dcModbusService } from './e3dc-modbus';
 import path from 'path';
 
 const execAsync = promisify(exec);
@@ -148,6 +149,17 @@ class E3dcClient {
       await new Promise(resolve => setTimeout(resolve, waitTime));
     }
 
+    // Modbus-Pause VOR e3dcset-Befehl (um Konflikte zu vermeiden)
+    const modbusPauseSeconds = this.config?.modbusPauseSeconds ?? 3;
+    const e3dcModbusService = getE3dcModbusService();
+    
+    if (modbusPauseSeconds > 0) {
+      log('debug', 'system', `E3DC: Modbus-Pause BEGINNT (${modbusPauseSeconds}s vor e3dcset-Befehl)`);
+      await e3dcModbusService.disconnect();
+      await new Promise(resolve => setTimeout(resolve, modbusPauseSeconds * 1000));
+      log('debug', 'system', `E3DC: Modbus-Pause ENDET (${modbusPauseSeconds}s vor e3dcset-Befehl)`);
+    }
+
     const sensitiveValues = this.getSensitiveValues();
 
     try {
@@ -174,6 +186,24 @@ class E3dcClient {
       
       log('error', 'system', `E3DC: ${commandName} fehlgeschlagen`, `Command failed: ${fullCommand} ${errorMessage}`);
       throw new Error(`Failed to execute ${commandName}`);
+    } finally {
+      // Modbus-Pause NACH e3dcset-Befehl (um Konflikte zu vermeiden)
+      if (modbusPauseSeconds > 0) {
+        log('debug', 'system', `E3DC: Modbus-Pause BEGINNT (${modbusPauseSeconds}s nach e3dcset-Befehl)`);
+        await new Promise(resolve => setTimeout(resolve, modbusPauseSeconds * 1000));
+        log('debug', 'system', `E3DC: Modbus-Pause ENDET (${modbusPauseSeconds}s nach e3dcset-Befehl)`);
+        
+        // Modbus-Verbindung wieder herstellen
+        const e3dcIp = settings?.e3dcIp;
+        if (e3dcIp) {
+          try {
+            await e3dcModbusService.connect(e3dcIp);
+            log('debug', 'system', 'E3DC: Modbus-Verbindung nach e3dcset-Befehl wiederhergestellt');
+          } catch (error) {
+            log('warning', 'system', 'E3DC: Modbus-Verbindung konnte nicht wiederhergestellt werden', error instanceof Error ? error.message : String(error));
+          }
+        }
+      }
     }
   }
 

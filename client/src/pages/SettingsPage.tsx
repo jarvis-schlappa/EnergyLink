@@ -150,6 +150,7 @@ export default function SettingsPage() {
         gridChargeEnableCommand: "",
         gridChargeDisableCommand: "",
         gridChargeDuringNightCharging: false,
+        modbusPauseSeconds: 3,
       },
       chargingStrategy: {
         activeStrategy: "off",
@@ -734,6 +735,35 @@ export default function SettingsPage() {
                                 Parameter zum Deaktivieren des Netzstrom-Ladens
                               </p>
                             </div>
+                          </div>
+
+                          <Separator />
+
+                          <div className="space-y-2">
+                            <Label
+                              htmlFor="e3dc-modbus-pause"
+                              className="text-sm font-medium"
+                            >
+                              Modbus-Pause vor/nach e3dcset
+                            </Label>
+                            <Input
+                              id="e3dc-modbus-pause"
+                              type="number"
+                              min="0"
+                              max="30"
+                              step="1"
+                              placeholder="3"
+                              {...form.register("e3dc.modbusPauseSeconds", {
+                                valueAsNumber: true,
+                              })}
+                              className="h-12"
+                              data-testid="input-e3dc-modbus-pause"
+                            />
+                            <p className="text-xs text-muted-foreground">
+                              Wartezeit in Sekunden vor und nach jedem e3dcset-Befehl.
+                              Die Modbus-Verbindung wird währenddessen getrennt, um
+                              Konflikte zu vermeiden (0-30 Sekunden, Standard: 3).
+                            </p>
                           </div>
 
                           <div className="p-3 rounded-md bg-muted">
