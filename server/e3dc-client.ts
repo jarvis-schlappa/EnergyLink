@@ -4,6 +4,7 @@ import type { E3dcConfig } from '@shared/schema';
 import { log } from './logger';
 import { storage } from './storage';
 import { getE3dcModbusService } from './e3dc-modbus';
+import { stopE3dcPoller, startE3dcPoller } from './e3dc-poller';
 import path from 'path';
 
 const execAsync = promisify(exec);
@@ -130,7 +131,14 @@ class E3dcClient {
     
     if (modbusPauseSeconds > 0) {
       log('info', 'system', `E3DC: Modbus-Pause BEGINNT (${modbusPauseSeconds}s vor e3dcset-Befehl)`);
+      
+      // Stoppe E3DC Poller (verhindert Auto-Reconnect)
+      await stopE3dcPoller();
+      
+      // Trenne Modbus-Verbindung
       await e3dcModbusService.disconnect();
+      
+      // Warte Pause-Zeit ab
       await new Promise(resolve => setTimeout(resolve, modbusPauseSeconds * 1000));
       log('info', 'system', `E3DC: Modbus-Pause ENDET (${modbusPauseSeconds}s vor e3dcset-Befehl)`);
     }
@@ -151,16 +159,9 @@ class E3dcClient {
           await new Promise(resolve => setTimeout(resolve, modbusPauseSeconds * 1000));
           log('info', 'system', `E3DC: Modbus-Pause ENDET (${modbusPauseSeconds}s nach e3dcset-Befehl)`);
           
-          // Modbus-Verbindung wieder herstellen
-          const e3dcIp = settings?.e3dcIp;
-          if (e3dcIp) {
-            try {
-              await e3dcModbusService.connect(e3dcIp);
-              log('info', 'system', 'E3DC: Modbus-Verbindung nach e3dcset-Befehl wiederhergestellt');
-            } catch (error) {
-              log('warning', 'system', 'E3DC: Modbus-Verbindung konnte nicht wiederhergestellt werden', error instanceof Error ? error.message : String(error));
-            }
-          }
+          // Starte E3DC Poller wieder (stellt automatisch Modbus-Verbindung her)
+          startE3dcPoller();
+          log('info', 'system', 'E3DC: Poller nach e3dcset-Befehl wieder gestartet');
         }
       }
       return;
@@ -216,16 +217,9 @@ class E3dcClient {
         await new Promise(resolve => setTimeout(resolve, modbusPauseSeconds * 1000));
         log('info', 'system', `E3DC: Modbus-Pause ENDET (${modbusPauseSeconds}s nach e3dcset-Befehl)`);
         
-        // Modbus-Verbindung wieder herstellen
-        const e3dcIp = settings?.e3dcIp;
-        if (e3dcIp) {
-          try {
-            await e3dcModbusService.connect(e3dcIp);
-            log('info', 'system', 'E3DC: Modbus-Verbindung nach e3dcset-Befehl wiederhergestellt');
-          } catch (error) {
-            log('warning', 'system', 'E3DC: Modbus-Verbindung konnte nicht wiederhergestellt werden', error instanceof Error ? error.message : String(error));
-          }
-        }
+        // Starte E3DC Poller wieder (stellt automatisch Modbus-Verbindung her)
+        startE3dcPoller();
+        log('info', 'system', 'E3DC: Poller nach e3dcset-Befehl wieder gestartet');
       }
     }
   }
