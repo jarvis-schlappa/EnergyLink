@@ -41,6 +41,10 @@ export default function E3dcPage() {
   const [showBatteryDrawer, setShowBatteryDrawer] = useState(false);
   const [showBuildInfoDialog, setShowBuildInfoDialog] = useState(false);
   const [relativeUpdateTime, setRelativeUpdateTime] = useState<string>("");
+  const [e3dcOperationLocks, setE3dcOperationLocks] = useState({
+    batteryLock: false,
+    gridCharging: false,
+  });
   const { toast } = useToast();
 
   // Lade Build-Info (nur einmal, keine Auto-Updates)
@@ -174,6 +178,21 @@ export default function E3dcPage() {
   const handleControlChange = (field: keyof ControlState, value: boolean) => {
     if (!controlState) return;
     
+    // Für batteryLock und gridCharging: Optimistic Update + Lock während E3DC-Pause
+    if (field === 'batteryLock' || field === 'gridCharging') {
+      // Modbus-Pause-Dauer aus Settings (Standard: 3 Sekunden, 2x für vor+nach Befehl)
+      const modbusPauseSeconds = settings?.e3dc?.modbusPauseSeconds ?? 3;
+      const totalLockDuration = modbusPauseSeconds * 2 * 1000; // In Millisekunden
+      
+      // Setze Lock für diese Operation
+      setE3dcOperationLocks(prev => ({ ...prev, [field]: true }));
+      
+      // Entferne Lock nach Pause-Dauer
+      setTimeout(() => {
+        setE3dcOperationLocks(prev => ({ ...prev, [field]: false }));
+      }, totalLockDuration);
+    }
+    
     const fullState: ControlState = {
       pvSurplus: controlState.pvSurplus,
       batteryLock: field === 'batteryLock' ? value : controlState.batteryLock,
@@ -181,7 +200,18 @@ export default function E3dcPage() {
       nightCharging: controlState.nightCharging,
     };
     
-    updateControlsMutation.mutate(fullState);
+    // Optimistic Update: Lokale State sofort aktualisieren
+    queryClient.setQueryData(["/api/controls"], fullState);
+    
+    updateControlsMutation.mutate(fullState, {
+      onError: () => {
+        // Bei Fehler: Locks sofort entfernen
+        if (field === 'batteryLock' || field === 'gridCharging') {
+          setE3dcOperationLocks(prev => ({ ...prev, [field]: false }));
+        }
+        // Cache wird durch onError in der Mutation invalidiert
+      }
+    });
   };
 
   const handleGridChargeDuringNightChange = (value: boolean) => {
@@ -191,6 +221,7 @@ export default function E3dcPage() {
       ...settings,
       e3dc: {
         enabled: settings.e3dc?.enabled || false,
+        modbusPauseSeconds: settings.e3dc?.modbusPauseSeconds ?? 3,
         prefix: settings.e3dc?.prefix,
         dischargeLockEnableCommand: settings.e3dc?.dischargeLockEnableCommand,
         dischargeLockDisableCommand: settings.e3dc?.dischargeLockDisableCommand,
@@ -459,7 +490,7 @@ export default function E3dcPage() {
                   id="battery-lock-drawer"
                   checked={controlState?.batteryLock || false}
                   onCheckedChange={(checked) => handleControlChange("batteryLock", checked)}
-                  disabled={isLoadingControls || updateControlsMutation.isPending}
+                  disabled={isLoadingControls || updateControlsMutation.isPending || e3dcOperationLocks.batteryLock}
                   data-testid="switch-battery-lock"
                 />
               </div>
@@ -481,7 +512,7 @@ export default function E3dcPage() {
                   id="grid-charging-drawer"
                   checked={controlState?.gridCharging || false}
                   onCheckedChange={(checked) => handleControlChange("gridCharging", checked)}
-                  disabled={isLoadingControls || updateControlsMutation.isPending}
+                  disabled={isLoadingControls || updateControlsMutation.isPending || e3dcOperationLocks.gridCharging}
                   data-testid="switch-grid-charging"
                 />
               </div>
