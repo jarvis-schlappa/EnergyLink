@@ -123,13 +123,47 @@ class E3dcClient {
       return;
     }
 
+    // Modbus-Pause VOR e3dcset-Befehl (um Konflikte zu vermeiden)
+    // Wird sowohl im Demo- als auch im Production-Modus angewendet
+    const modbusPauseSeconds = this.config?.modbusPauseSeconds ?? 3;
+    const e3dcModbusService = getE3dcModbusService();
+    
+    if (modbusPauseSeconds > 0) {
+      log('debug', 'system', `E3DC: Modbus-Pause BEGINNT (${modbusPauseSeconds}s vor e3dcset-Befehl)`);
+      await e3dcModbusService.disconnect();
+      await new Promise(resolve => setTimeout(resolve, modbusPauseSeconds * 1000));
+      log('debug', 'system', `E3DC: Modbus-Pause ENDET (${modbusPauseSeconds}s vor e3dcset-Befehl)`);
+    }
+
     // Im Demo-Modus: Mock-Script verwenden statt echtes CLI
     const settings = storage.getSettings();
     if (settings?.demoMode) {
       // Parse e3dcset-Befehle und konvertiere zu Mock-Format
       // Beispiel: "e3dcset -s discharge 0" → "-s discharge 0"
       const mockCommand = command.replace(/^e3dcset\s+/, '');
-      return this.executeMockCommand(mockCommand, commandName);
+      
+      try {
+        await this.executeMockCommand(mockCommand, commandName);
+      } finally {
+        // Modbus-Pause NACH e3dcset-Befehl (um Konflikte zu vermeiden)
+        if (modbusPauseSeconds > 0) {
+          log('debug', 'system', `E3DC: Modbus-Pause BEGINNT (${modbusPauseSeconds}s nach e3dcset-Befehl)`);
+          await new Promise(resolve => setTimeout(resolve, modbusPauseSeconds * 1000));
+          log('debug', 'system', `E3DC: Modbus-Pause ENDET (${modbusPauseSeconds}s nach e3dcset-Befehl)`);
+          
+          // Modbus-Verbindung wieder herstellen
+          const e3dcIp = settings?.e3dcIp;
+          if (e3dcIp) {
+            try {
+              await e3dcModbusService.connect(e3dcIp);
+              log('debug', 'system', 'E3DC: Modbus-Verbindung nach e3dcset-Befehl wiederhergestellt');
+            } catch (error) {
+              log('warning', 'system', 'E3DC: Modbus-Verbindung konnte nicht wiederhergestellt werden', error instanceof Error ? error.message : String(error));
+            }
+          }
+        }
+      }
+      return;
     }
 
     // Production-Modus: Echtes CLI verwenden
@@ -147,17 +181,6 @@ class E3dcClient {
       const waitTime = this.RATE_LIMIT_MS - timeSinceLastCommand;
       log('info', 'system', `E3DC: Rate Limiting - Warte ${(waitTime / 1000).toFixed(1)}s vor nächstem Befehl`);
       await new Promise(resolve => setTimeout(resolve, waitTime));
-    }
-
-    // Modbus-Pause VOR e3dcset-Befehl (um Konflikte zu vermeiden)
-    const modbusPauseSeconds = this.config?.modbusPauseSeconds ?? 3;
-    const e3dcModbusService = getE3dcModbusService();
-    
-    if (modbusPauseSeconds > 0) {
-      log('debug', 'system', `E3DC: Modbus-Pause BEGINNT (${modbusPauseSeconds}s vor e3dcset-Befehl)`);
-      await e3dcModbusService.disconnect();
-      await new Promise(resolve => setTimeout(resolve, modbusPauseSeconds * 1000));
-      log('debug', 'system', `E3DC: Modbus-Pause ENDET (${modbusPauseSeconds}s vor e3dcset-Befehl)`);
     }
 
     const sensitiveValues = this.getSensitiveValues();
