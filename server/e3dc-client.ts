@@ -254,8 +254,8 @@ class E3dcClient {
         const fullCommand = `tsx ${mockScriptPath} ${mockCommand}`;
         
         try {
-          const { stdout, stderr } = await execAsync(fullCommand);
-          output = stdout || stderr || '(Keine Ausgabe)';
+          const stdout = await execAsync(fullCommand);
+          output = (typeof stdout === 'string' ? stdout : (stdout as any)?.stdout || '') || '(Keine Ausgabe)';
         } catch (error) {
           output = `Fehler: ${error instanceof Error ? error.message : String(error)}`;
         }
@@ -271,9 +271,17 @@ class E3dcClient {
       log('info', 'system', `E3DC Console: Befehl wird ausgeführt: ${fullCommand}`);
 
       try {
-        const { stdout, stderr } = await execAsync(fullCommand);
-        output = stdout || stderr || '(Keine Ausgabe)';
-        log('info', 'system', `E3DC Console: Ausgabe erhalten`);
+        const result = await execAsync(fullCommand);
+        // execAsync kann entweder { stdout, stderr } oder nur stdout string sein
+        if (typeof result === 'string') {
+          output = result;
+        } else if (typeof result === 'object' && result !== null) {
+          output = (result as any).stdout || (result as any).stderr || '(Keine Ausgabe)';
+        } else {
+          output = '(Keine Ausgabe)';
+        }
+        
+        log('info', 'system', `E3DC Console: Ausgabe erhalten - ${output.substring(0, 50)}...`);
       } catch (error) {
         output = `Fehler: ${error instanceof Error ? error.message : String(error)}`;
         log('error', 'system', `E3DC Console: Befehl fehlgeschlagen`, output);
