@@ -605,6 +605,35 @@ export default function SettingsPage() {
                 <>
                   <Separator />
 
+                  <div className="space-y-2">
+                    <Label
+                      htmlFor="e3dc-polling-interval"
+                      className="text-sm font-medium"
+                    >
+                      E3DC Polling-Intervall
+                    </Label>
+                    <Input
+                      id="e3dc-polling-interval"
+                      type="number"
+                      min="5"
+                      max="60"
+                      step="1"
+                      placeholder="10"
+                      {...form.register("e3dc.pollingIntervalSeconds", {
+                        valueAsNumber: true,
+                      })}
+                      className="h-12"
+                      data-testid="input-e3dc-polling-interval"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Aktualisierungsintervall für E3DC-Daten in Sekunden.
+                      Bestimmt, wie oft die Modbus-Register ausgelesen werden
+                      (5-60 Sekunden, Standard: 10).
+                    </p>
+                  </div>
+
+                  <Separator />
+
                   <Accordion type="single" collapsible className="w-full">
                     <AccordionItem value="e3dc-config" className="border-none">
                       <div className="flex items-center justify-between">
@@ -764,35 +793,6 @@ export default function SettingsPage() {
                               Wartezeit in Sekunden vor und nach jedem e3dcset-Befehl.
                               Die Modbus-Verbindung wird währenddessen getrennt, um
                               Konflikte zu vermeiden (0-30 Sekunden, Standard: 3).
-                            </p>
-                          </div>
-
-                          <Separator />
-
-                          <div className="space-y-2">
-                            <Label
-                              htmlFor="e3dc-polling-interval"
-                              className="text-sm font-medium"
-                            >
-                              E3DC Polling-Intervall
-                            </Label>
-                            <Input
-                              id="e3dc-polling-interval"
-                              type="number"
-                              min="5"
-                              max="60"
-                              step="1"
-                              placeholder="10"
-                              {...form.register("e3dc.pollingIntervalSeconds", {
-                                valueAsNumber: true,
-                              })}
-                              className="h-12"
-                              data-testid="input-e3dc-polling-interval"
-                            />
-                            <p className="text-xs text-muted-foreground">
-                              Aktualisierungsintervall für E3DC-Daten in Sekunden.
-                              Bestimmt, wie oft die Modbus-Register ausgelesen werden
-                              (5-60 Sekunden, Standard: 10).
                             </p>
                           </div>
 
