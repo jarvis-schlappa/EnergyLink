@@ -493,9 +493,19 @@ export class ChargingStrategyController {
       // Wallbox lädt wirklich, wenn State=3 UND Power>0
       const reallyCharging = wallboxState === 3 && wallboxPower > 1000;  // >1W
       
-      // Erkenne echte Phasen aus Strömen (>500mA als "aktiv" betrachten)
-      const activePhases = currents.filter(i => i > 500).length;
-      const detectedPhases = activePhases > 0 ? (activePhases === 1 ? 1 : 3) : 3;  // Default 3P
+      // WICHTIG: Phasenerkennung nur bei Max-Power-Strategien!
+      // Bei Surplus-Strategien: IMMER 1P (das ist das Design)
+      // Wallbox mit Surplus startet mit 1P, bleibt bei 1P
+      const config = storage.getSettings()?.chargingStrategy;
+      const isMaxPowerStrategy = config?.activeStrategy === "max_with_battery" || config?.activeStrategy === "max_without_battery";
+      
+      let detectedPhases = 1;  // Standard: 1 Phase für Surplus
+      
+      if (isMaxPowerStrategy) {
+        // Nur bei Max-Power: Erkenne echte Phasen aus Strömen (>500mA als "aktiv" betrachten)
+        const activePhases = currents.filter(i => i > 500).length;
+        detectedPhases = activePhases > 0 ? (activePhases === 1 ? 1 : 3) : 3;  // Default 3P bei Max-Power
+      }
       
       // Korrigiere Context wenn nötig
       if (context.isActive && !reallyCharging) {
