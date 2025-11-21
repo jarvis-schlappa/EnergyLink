@@ -836,15 +836,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Befehl ist erforderlich" });
       }
       
-      // Kombiniere mit Prefix
-      const fullCommand = `e3dcset ${command}`;
+      // Kombiniere mit Prefix (Prefix ist bereits vollständig, nur Command anhängen)
+      const prefix = settings.e3dc.prefix || 'e3dcset';
+      const fullCommand = `${prefix} ${command}`;
       
       log("info", "system", `E3DC Console: Befehl wird ausgeführt: ${fullCommand}`);
       
       // Führe Befehl aus
       try {
         // Im Demo-Modus wird die Mock-Version verwendet, im Produktiv-Modus das echte e3dcset
-        const mockCommand = command; // e3dcset wird im executeCommand automatisch behandelt
         await e3dcClient.executeCommand(fullCommand, "e3dc-console");
         
         log("info", "system", `E3DC Console: Befehl erfolgreich ausgeführt`);
