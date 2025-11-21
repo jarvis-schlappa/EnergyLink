@@ -533,11 +533,13 @@ export class ChargingStrategyController {
       } else if (!context.isActive && reallyCharging) {
         log("info", "system", `[RECONCILE] Context sagt isActive=false, aber Wallbox lädt (State=${wallboxState}, Power=${wallboxPower}mW) → setze isActive=true`);
         const avgCurrent = Math.round((currents[0] + currents[1] + currents[2]) / 1000 / (detectedPhases || 1));
+        const now = new Date();
         storage.updateChargingContext({
           isActive: true,
           currentAmpere: avgCurrent,
           targetAmpere: avgCurrent,
           currentPhases: detectedPhases,
+          lastStartedAt: now.toISOString(),  // Stabilisierungsphase auch bei Reconciliation
         });
       } else if (context.currentPhases !== detectedPhases && reallyCharging) {
         log("info", "system", `[RECONCILE] Phasen-Korrektur: ${context.currentPhases}P → ${detectedPhases}P (gemessen aus Strömen)`);
@@ -564,6 +566,23 @@ export class ChargingStrategyController {
     }
     
     const now = new Date();
+    
+    // KRITISCH: Stabilisierungsphase nach Start!
+    // E3DC-Daten brauchen ~10-20s um die Wallbox-Last zu erfassen
+    // Ohne diese Phase: Sofortiger Stop wegen falscher Überschuss-Berechnung
+    const STABILIZATION_PERIOD_MS = 20000; // 20 Sekunden (2x Polling-Intervall)
+    
+    if (context.lastStartedAt) {
+      const timeSinceStart = now.getTime() - new Date(context.lastStartedAt).getTime();
+      
+      if (timeSinceStart < STABILIZATION_PERIOD_MS) {
+        const remainingStabilization = Math.ceil((STABILIZATION_PERIOD_MS - timeSinceStart) / 1000);
+        log("debug", "system", 
+          `[${strategy}] Stabilisierungsphase aktiv - Stop-Prüfung unterdrückt für noch ${remainingStabilization}s (E3DC-Daten müssen Wallbox-Last erfassen)`
+        );
+        return false;
+      }
+    }
     
     // WICHTIG: surplus_battery_prio & surplus_vehicle_prio berechnen den Überschuss bereits OHNE Wallbox
     // (aus E3DC-Daten, wo housePowerWithoutWallbox die Wallbox nicht enthält)
@@ -646,6 +665,7 @@ export class ChargingStrategyController {
         targetAmpere: finalAmpere,
         strategy: config.activeStrategy,
         lastAdjustment: now.toISOString(),
+        lastStartedAt: now.toISOString(),
         belowThresholdSince: undefined,
       });
       
@@ -756,6 +776,7 @@ export class ChargingStrategyController {
         belowThresholdSince: undefined,
         remainingStopDelay: undefined,  // Timer zurücksetzen!
         lastAdjustment: undefined,
+        lastStartedAt: undefined,  // Stabilisierungsphase zurücksetzen
       });
       
       this.batteryDischargeSince = null;

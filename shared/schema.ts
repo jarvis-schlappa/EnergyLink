@@ -196,6 +196,7 @@ export const chargingContextSchema = z.object({
   targetAmpere: z.number(),
   currentPhases: z.number(),
   lastAdjustment: z.string().optional(),
+  lastStartedAt: z.string().optional(), // Zeitpunkt des letzten Starts (für Stabilisierungsphase)
   startDelayTrackerSince: z.string().optional(),
   belowThresholdSince: z.string().optional(),
   adjustmentCount: z.number(),
