@@ -740,6 +740,7 @@ export class ChargingStrategyController {
         currentAmpere: 0,
         targetAmpere: 0,
         belowThresholdSince: undefined,
+        remainingStopDelay: undefined,  // Timer zurücksetzen!
         lastAdjustment: undefined,
       });
       
