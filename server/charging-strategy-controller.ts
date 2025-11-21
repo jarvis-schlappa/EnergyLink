@@ -642,7 +642,7 @@ export class ChargingStrategyController {
     
     if (currentDiffAmpere >= config.minCurrentChangeAmpere) {
       // KRITISCH: Prüfe Debounce-Zeit BEVOR Stromanpassung!
-      const debounceSeconds = config.currentChangeDebounceSeconds || 30;
+      const debounceSeconds = config.minChangeIntervalSeconds || 30;
       const lastAdjustmentTime = context.lastAdjustment ? new Date(context.lastAdjustment).getTime() : 0;
       const now = Date.now();
       const timeSinceLastAdjustmentSeconds = (now - lastAdjustmentTime) / 1000;
