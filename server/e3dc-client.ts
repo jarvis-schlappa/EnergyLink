@@ -224,6 +224,73 @@ class E3dcClient {
     }
   }
 
+  /**
+   * Öffentliche Methode für E3DC Console: Führt Befehl aus und gibt Output zurück
+   */
+  async executeConsoleCommand(command: string): Promise<string> {
+    if (!command || command.trim() === '') {
+      return 'Befehl ist leer';
+    }
+
+    const modbusPauseSeconds = this.config?.modbusPauseSeconds ?? 3;
+    const e3dcModbusService = getE3dcModbusService();
+    let output = '';
+    
+    try {
+      // Modbus-Pause VOR Befehl
+      if (modbusPauseSeconds > 0) {
+        log('info', 'system', `E3DC Console: Modbus-Pause BEGINNT (${modbusPauseSeconds}s vor Befehl)`);
+        await stopE3dcPoller();
+        await e3dcModbusService.disconnect();
+        await new Promise(resolve => setTimeout(resolve, modbusPauseSeconds * 1000));
+      }
+
+      const settings = storage.getSettings();
+      
+      // Demo-Modus
+      if (settings?.demoMode) {
+        const mockCommand = command.replace(/^e3dcset\s+/, '');
+        const mockScriptPath = path.join(process.cwd(), 'server', 'e3dcset-mock.ts');
+        const fullCommand = `tsx ${mockScriptPath} ${mockCommand}`;
+        
+        try {
+          const { stdout, stderr } = await execAsync(fullCommand);
+          output = stdout || stderr || '(Keine Ausgabe)';
+        } catch (error) {
+          output = `Fehler: ${error instanceof Error ? error.message : String(error)}`;
+        }
+        return output;
+      }
+
+      // Production-Modus
+      const prefix = this.config?.prefix?.trim() || '';
+      const fullCommand = prefix 
+        ? `${prefix} ${command}`.trim() 
+        : command;
+
+      log('info', 'system', `E3DC Console: Befehl wird ausgeführt: ${fullCommand}`);
+
+      try {
+        const { stdout, stderr } = await execAsync(fullCommand);
+        output = stdout || stderr || '(Keine Ausgabe)';
+        log('info', 'system', `E3DC Console: Ausgabe erhalten`);
+      } catch (error) {
+        output = `Fehler: ${error instanceof Error ? error.message : String(error)}`;
+        log('error', 'system', `E3DC Console: Befehl fehlgeschlagen`, output);
+      }
+
+      return output;
+    } finally {
+      // Modbus-Pause NACH Befehl
+      if (modbusPauseSeconds > 0) {
+        log('info', 'system', `E3DC Console: Modbus-Pause BEGINNT (${modbusPauseSeconds}s nach Befehl)`);
+        await new Promise(resolve => setTimeout(resolve, modbusPauseSeconds * 1000));
+        startE3dcPoller();
+        log('info', 'system', 'E3DC Console: Poller wieder gestartet');
+      }
+    }
+  }
+
   async lockDischarge(): Promise<void> {
     if (!this.config) {
       throw new Error('E3DC not configured');

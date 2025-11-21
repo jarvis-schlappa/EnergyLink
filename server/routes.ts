@@ -836,20 +836,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Befehl ist erforderlich" });
       }
       
-      // Übergebe nur den nackten Command - e3dcClient.executeCommand() fügt Prefix selbst hinzu
-      log("info", "system", `E3DC Console: Befehl wird ausgeführt: ${command}`);
-      
-      // Führe Befehl aus
+      // Führe Befehl aus und erhalte Output
       try {
-        // e3dcClient.executeCommand() kümmert sich um Prefix, Modbus-Pause, Demo-Modus etc.
-        await e3dcClient.executeCommand(command, "e3dc-console");
-        
-        log("info", "system", `E3DC Console: Befehl erfolgreich ausgeführt`);
-        res.json({ output: `✓ Befehl erfolgreich ausgeführt\n(Modbus-Pause: ${settings.e3dc.modbusPauseSeconds || 3}s)` });
+        const output = await e3dcClient.executeConsoleCommand(command);
+        res.json({ output });
       } catch (execError) {
         const errorMessage = execError instanceof Error ? execError.message : String(execError);
-        log("error", "system", `E3DC Console: Fehler beim Befehl`, errorMessage);
-        res.json({ output: `✗ Fehler: ${errorMessage}` });
+        log("error", "system", `E3DC Console: Fehler`, errorMessage);
+        res.json({ output: `Fehler: ${errorMessage}` });
       }
     } catch (error) {
       log("error", "system", "Fehler in E3DC Console", error instanceof Error ? error.message : String(error));
