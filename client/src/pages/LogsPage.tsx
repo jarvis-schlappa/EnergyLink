@@ -13,6 +13,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import {
   Dialog,
@@ -28,6 +29,7 @@ type LogCategory =
   | "wallbox"
   | "wallbox-mock"
   | "e3dc"
+  | "e3dc-poller"
   | "e3dc-mock"
   | "fhem"
   | "fhem-mock"
@@ -39,6 +41,7 @@ const ALL_CATEGORIES: LogCategory[] = [
   "wallbox",
   "wallbox-mock",
   "e3dc",
+  "e3dc-poller",
   "e3dc-mock",
   "fhem",
   "fhem-mock",
@@ -53,6 +56,7 @@ export default function LogsPage() {
   const [selectedCategories, setSelectedCategories] = useState<LogCategory[]>(
     [],
   );
+  const [textFilter, setTextFilter] = useState("");
   const [showBuildInfoDialog, setShowBuildInfoDialog] = useState(false);
 
   // Lade Build-Info (nur einmal, keine Auto-Updates)
@@ -139,6 +143,15 @@ export default function LogsPage() {
         selectedCategories.length === 0 ||
         selectedCategories.includes(log.category as LogCategory),
     )
+    .filter((log) => {
+      if (!textFilter.trim()) return true;
+      const searchText = textFilter.toLowerCase();
+      return (
+        log.message.toLowerCase().includes(searchText) ||
+        log.details?.toLowerCase().includes(searchText) ||
+        log.category.toLowerCase().includes(searchText)
+      );
+    })
     .reverse();
 
   const toggleCategory = (category: LogCategory) => {
@@ -157,6 +170,8 @@ export default function LogsPage() {
         return "Wallbox Mock";
       case "e3dc":
         return "E3DC";
+      case "e3dc-poller":
+        return "E3DC Poller";
       case "e3dc-mock":
         return "E3DC Mock";
       case "fhem":
@@ -195,6 +210,8 @@ export default function LogsPage() {
         return "bg-blue-400 text-white dark:bg-blue-500";
       case "e3dc":
         return "bg-orange-500 text-white dark:bg-orange-600";
+      case "e3dc-poller":
+        return "bg-orange-600 text-white dark:bg-orange-700";
       case "e3dc-mock":
         return "bg-orange-400 text-white dark:bg-orange-500";
       case "fhem":
@@ -332,6 +349,20 @@ export default function LogsPage() {
                     <SelectItem value="error">Nur Error</SelectItem>
                   </SelectContent>
                 </Select>
+              </div>
+
+              <div className="flex flex-col gap-2">
+                <label className="text-sm text-muted-foreground">Text-Suche</label>
+                <Input
+                  type="text"
+                  placeholder="Durchsuche Nachricht, Details und Kategorie..."
+                  value={textFilter}
+                  onChange={(e) => setTextFilter(e.target.value)}
+                  data-testid="input-text-filter"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Filtere Logs nach beliebigem Text (Groß-/Kleinschreibung wird ignoriert)
+                </p>
               </div>
 
               <div className="flex flex-col gap-3">
