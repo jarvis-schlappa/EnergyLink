@@ -234,10 +234,10 @@ export class ChargingStrategyController {
     
     if (result === null) {
       if (context.isActive) {
-        // WÄHREND aktiver Ladung: null bedeutet "zu wenig Überschuss"
-        // → Lass shouldStopCharging() mit Hysterese entscheiden!
-        // NICHT sofort stoppen, sondern warte auf Hysterese-Timer
-        log("debug", "system", `result=null && isActive → Überschuss zu gering, aber shouldStopCharging() prüft bereits mit Hysterese`);
+        // WÄHREND aktiver Ladung: null bedeutet "Überschuss unter Mindest-Anpassungsleistung"
+        // → SOFORT stoppen! Nicht ignorieren - das führt zu unnötigem Laden mit zu wenig Überschuss
+        log("info", "system", `result=null && isActive → Überschuss zu gering für Mindest-Stromänderung - Ladung wird sofort gestoppt`);
+        await this.stopCharging(wallboxIp, "Überschuss unter Mindest-Anpassungsleistung");
       }
       return;
     }
