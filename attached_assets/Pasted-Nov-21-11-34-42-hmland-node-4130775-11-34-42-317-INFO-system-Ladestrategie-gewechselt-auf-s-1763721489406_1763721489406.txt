@@ -1,0 +1,298 @@
+Nov 21 11:34:42 hmland node[4130775]: [11:34:42,317] [INFO] [system] Ladestrategie gewechselt auf: surplus_vehicle_prio
+Nov 21 11:35:20 hmland node[4130775]: [11:35:20,117] [INFO] [system] Start-Bedingung erfüllt: Überschuss 1945W > 1500W für 32.233s
+Nov 21 11:35:22 hmland node[4130775]: [11:35:22,245] [INFO] [system] Ladung gestartet mit 8A @ 1P (Strategie: surplus_vehicle_prio)
+Nov 21 11:35:24 hmland node[4130775]: [11:35:24,303] [INFO] [system] [Wallbox-Broadcast-Listener] State geändert: 5 → 2 (ready for charging) (von 192.168.40.16)
+Nov 21 11:35:25 hmland node[4130775]: [11:35:25,315] [INFO] [system] [Wallbox-Broadcast-Listener] State geändert: 2 → 3 (charging) (von 192.168.40.16)
+Nov 21 11:35:26 hmland node[4130775]: [11:35:26,444] [INFO] [system] [RECONCILE] Phasen-Korrektur: 1P → 3P (gemessen aus Strömen)
+Nov 21 11:35:26 hmland node[4130775]: [11:35:26,455] [INFO] [system] result=null && isActive → Überschuss zu gering für Mindest-Stromänderung - Ladung wird sofort gestoppt
+Nov 21 11:35:28 hmland node[4130775]: [11:35:28,544] [INFO] [system] [RECONCILE] Phasen-Korrektur: 3P → 1P (gemessen aus Strömen)
+Nov 21 11:35:29 hmland node[4130775]: [11:35:29,595] [INFO] [system] Ladung gestoppt
+Nov 21 11:35:29 hmland node[4130775]: [11:35:29,624] [INFO] [system] [Wallbox-Broadcast-Listener] State geändert: 3 → 5 (authorization rejected) (von 192.168.40.16)
+Nov 21 11:36:05 hmland node[4130775]: [11:36:05,099] [INFO] [system] Start-Bedingung erfüllt: Überschuss 2781W > 1500W für 32.348s
+Nov 21 11:36:07 hmland node[4130775]: [11:36:07,210] [INFO] [system] Ladung gestartet mit 12A @ 1P (Strategie: surplus_vehicle_prio)
+Nov 21 11:36:09 hmland node[4130775]: [11:36:09,290] [INFO] [system] [Wallbox-Broadcast-Listener] State geändert: 5 → 2 (ready for charging) (von 192.168.40.16)
+Nov 21 11:36:10 hmland node[4130775]: [11:36:10,302] [INFO] [system] [Wallbox-Broadcast-Listener] State geändert: 2 → 3 (charging) (von 192.168.40.16)
+Nov 21 11:36:11 hmland node[4130775]: [11:36:11,410] [INFO] [system] [RECONCILE] Phasen-Korrektur: 1P → 3P (gemessen aus Strömen)
+Nov 21 11:36:11 hmland node[4130775]: [11:36:11,425] [INFO] [system] result=null && isActive → Überschuss zu gering für Mindest-Stromänderung - Ladung wird sofort gestoppt
+Nov 21 11:36:13 hmland node[4130775]: [11:36:13,510] [INFO] [system] [RECONCILE] Phasen-Korrektur: 3P → 1P (gemessen aus Strömen)
+Nov 21 11:36:14 hmland node[4130775]: [11:36:14,561] [INFO] [system] Ladung gestoppt
+Nov 21 11:36:14 hmland node[4130775]: [11:36:14,602] [INFO] [system] [Wallbox-Broadcast-Listener] State geändert: 3 → 5 (authorization rejected) (von 192.168.40.16)
+Nov 21 11:36:31 hmland node[4130775]: [11:36:31,310] [INFO] [system] Log-Level auf "debug" gesetzt
+Nov 21 11:36:31 hmland node[4130775]: [11:36:31,409] [DEBUG] [wallbox] UDP-Antwort geparst für "report 3" - Daten: {"ID":"3","U1":0,"U2":0,"U3":0,"I1":0,"I2":0,"I3":0,"P":0,"PF":0,"E pres":38969,"E total":297867893,"Serial":"16314582","Sec":490998}
+Nov 21 11:36:31 hmland node[4130775]: [11:36:31,413] [DEBUG] [storage] Charging Context gespeichert in: /opt/keba-wallbox/EnergyLink/data/charging-context.json
+Nov 21 11:36:31 hmland node[4130775]: [11:36:31,414] [DEBUG] [system] Strategy: surplus_vehicle_prio, isActive: false, surplus: 2841W
+Nov 21 11:36:31 hmland node[4130775]: [11:36:31,417] [DEBUG] [system] Phase-Logik beim Start: 1P via Surplus-Strategie (fest 1P)
+Nov 21 11:36:31 hmland node[4130775]: [11:36:31,419] [DEBUG] [system] calculateTargetCurrent result: 12000mA @ 1P
+Nov 21 11:36:31 hmland node[4130775]: [11:36:31,421] [DEBUG] [system] !isActive → prüfe shouldStartCharging
+Nov 21 11:36:31 hmland node[4130775]: [11:36:31,423] [DEBUG] [system] shouldStartCharging: strategy=surplus_vehicle_prio, surplus=2841W, plug=7
+Nov 21 11:36:31 hmland node[4130775]: [11:36:31,426] [DEBUG] [storage] Charging Context gespeichert in: /opt/keba-wallbox/EnergyLink/data/charging-context.json
+Nov 21 11:36:31 hmland node[4130775]: [11:36:31,427] [DEBUG] [system] Warte noch 16.3s
+Nov 21 11:36:31 hmland node[4130775]: [11:36:31,430] [DEBUG] [system] shouldStartCharging = false → warte noch
+Nov 21 11:36:32 hmland node[4130775]: [11:36:32,987] [DEBUG] [fhem] Fallback-Timer: Health-Check FHEM-Sync
+Nov 21 11:36:32 hmland node[4130775]: [11:36:32,990] [DEBUG] [fhem] Sende cached E3DC-Daten an FHEM - Host: 192.168.40.11:7072, PV: 3429W, Haus: 588W, SOC: 90%
+Nov 21 11:36:32 hmland node[4130775]: [11:36:32,996] [DEBUG] [system] [UDP-Channel] Läuft bereits
+Nov 21 11:36:33 hmland node[4130775]: [11:36:32,999] [DEBUG] [wallbox] Sende UDP-Befehl an 192.168.40.16 - Befehl: report 3
+Nov 21 11:36:33 hmland node[4130775]: [11:36:33,010] [DEBUG] [wallbox] UDP-Antwort geparst für "report 3" - Daten: {"ID":"3","U1":0,"U2":0,"U3":0,"I1":0,"I2":0,"I3":0,"P":0,"PF":0,"E pres":38969,"E total":297867893,"Serial":"16314582","Sec":491000}
+Nov 21 11:36:33 hmland node[4130775]: [11:36:33,031] [DEBUG] [system] E3DC EMS-Status RAW: 0x0004 = 0b0000000000000100
+Nov 21 11:36:33 hmland node[4130775]: [11:36:33,034] [DEBUG] [system] E3DC Register gelesen: PV=3463W, Batterie=2853W (SOC=90%), Haus=592W, Netz=-18W, Autarkie=99%, Eigenverbrauch=94%, Wallbox=0W
+Nov 21 11:36:33 hmland node[4130775]: [11:36:33,036] [DEBUG] [system] E3DC EMS-Status (0x0004): emergencyPowerReady
+Nov 21 11:36:33 hmland node[4130775]: [11:36:33,039] [DEBUG] [system] E3DC Emergency-Power-Status (2): nicht aktiv
+Nov 21 11:36:33 hmland node[4130775]: [11:36:33,042] [DEBUG] [e3dc-hub] Broadcasting an 2 Listener - PV=3463W, SOC=90%
+Nov 21 11:36:33 hmland node[4130775]: [11:36:33,044] [DEBUG] [e3dc-poller] E3DC-Daten aktualisiert: PV=3463W, Batterie=2853W (SOC=90%), Haus=592W, Netz=-18W
+Nov 21 11:36:33 hmland node[4130775]: [11:36:33,047] [DEBUG] [fhem] Event empfangen: Neue E3DC-Daten verfügbar - PV=3463W, SOC=90%
+Nov 21 11:36:33 hmland node[4130775]: [11:36:33,051] [DEBUG] [strategy] Event empfangen: Neue E3DC-Daten verfügbar - PV=3463W, SOC=90%
+Nov 21 11:36:33 hmland node[4130775]: [11:36:33,054] [DEBUG] [system] [UDP-Channel] Läuft bereits
+Nov 21 11:36:33 hmland node[4130775]: [11:36:33,056] [DEBUG] [system] [UDP-Channel] Läuft bereits
+Nov 21 11:36:33 hmland node[4130775]: [11:36:33,059] [DEBUG] [wallbox] Sende UDP-Befehl an 192.168.40.16 - Befehl: report 2
+Nov 21 11:36:33 hmland node[4130775]: [11:36:33,219] [DEBUG] [fhem] E3DC-Daten erfolgreich an FHEM gesendet - PV: 3429W, Haus: 588W, SOC: 90%, Netz: -12W, Speicher: 2829W
+Nov 21 11:36:34 hmland node[4130775]: [11:36:34,059] [DEBUG] [wallbox] UDP-Antwort geparst für "report 2" - Daten: {"ID":"2","State":5,"Error1":0,"Error2":0,"Plug":7,"Enable sys":0,"Enable user":0,"Max curr":0,"Max curr %":1000,"Curr HW":32000,"Curr user":12000,"Curr FS":0,"Tmo FS":0,"Output":0,"Input":0,"Serial":
+Nov 21 11:36:34 hmland node[4130775]: [11:36:34,161] [DEBUG] [wallbox] Sende UDP-Befehl an 192.168.40.16 - Befehl: report 3
+Nov 21 11:36:35 hmland node[4130775]: [11:36:35,109] [DEBUG] [wallbox] UDP-Antwort geparst für "report 3" - Daten: {"ID":"3","U1":0,"U2":0,"U3":0,"I1":0,"I2":0,"I3":0,"P":0,"PF":0,"E pres":38969,"E total":297867893,"Serial":"16314582","Sec":491002}
+Nov 21 11:36:35 hmland node[4130775]: [11:36:35,112] [DEBUG] [storage] Charging Context gespeichert in: /opt/keba-wallbox/EnergyLink/data/charging-context.json
+Nov 21 11:36:35 hmland node[4130775]: [11:36:35,113] [DEBUG] [system] Strategy: surplus_vehicle_prio, isActive: false, surplus: 2871W
+Nov 21 11:36:35 hmland node[4130775]: [11:36:35,114] [DEBUG] [system] Phase-Logik beim Start: 1P via Surplus-Strategie (fest 1P)
+Nov 21 11:36:35 hmland node[4130775]: [11:36:35,116] [DEBUG] [system] calculateTargetCurrent result: 12000mA @ 1P
+Nov 21 11:36:35 hmland node[4130775]: [11:36:35,118] [DEBUG] [system] !isActive → prüfe shouldStartCharging
+Nov 21 11:36:35 hmland node[4130775]: [11:36:35,120] [DEBUG] [system] shouldStartCharging: strategy=surplus_vehicle_prio, surplus=2871W, plug=7
+Nov 21 11:36:35 hmland node[4130775]: [11:36:35,123] [DEBUG] [storage] Charging Context gespeichert in: /opt/keba-wallbox/EnergyLink/data/charging-context.json
+Nov 21 11:36:35 hmland node[4130775]: [11:36:35,124] [DEBUG] [system] Warte noch 12.6s
+Nov 21 11:36:35 hmland node[4130775]: [11:36:35,126] [DEBUG] [system] shouldStartCharging = false → warte noch
+Nov 21 11:36:37 hmland node[4130775]: [11:36:37,977] [DEBUG] [strategy] Fallback-Timer: Health-Check Charging Strategy
+Nov 21 11:36:37 hmland node[4130775]: [11:36:37,981] [DEBUG] [system] [UDP-Channel] Läuft bereits
+Nov 21 11:36:37 hmland node[4130775]: [11:36:37,983] [DEBUG] [wallbox] Sende UDP-Befehl an 192.168.40.16 - Befehl: report 3
+Nov 21 11:36:37 hmland node[4130775]: [11:36:37,996] [DEBUG] [system] [UDP-Channel] Läuft bereits
+Nov 21 11:36:38 hmland node[4130775]: [11:36:38,009] [DEBUG] [wallbox] UDP-Antwort geparst für "report 3" - Daten: {"ID":"3","U1":0,"U2":0,"U3":0,"I1":0,"I2":0,"I3":0,"P":0,"PF":0,"E pres":38969,"E total":297867893,"Serial":"16314582","Sec":491005}
+Nov 21 11:36:38 hmland node[4130775]: [11:36:38,044] [DEBUG] [system] E3DC EMS-Status RAW: 0x0004 = 0b0000000000000100
+Nov 21 11:36:38 hmland node[4130775]: [11:36:38,045] [DEBUG] [system] E3DC Register gelesen: PV=3468W, Batterie=2862W (SOC=90%), Haus=608W, Netz=2W, Autarkie=98%, Eigenverbrauch=96%, Wallbox=0W
+Nov 21 11:36:38 hmland node[4130775]: [11:36:38,047] [DEBUG] [system] E3DC EMS-Status (0x0004): emergencyPowerReady
+Nov 21 11:36:38 hmland node[4130775]: [11:36:38,049] [DEBUG] [system] E3DC Emergency-Power-Status (2): nicht aktiv
+Nov 21 11:36:38 hmland node[4130775]: [11:36:38,050] [DEBUG] [system] Strategy Check: surplus_vehicle_prio
+Nov 21 11:36:38 hmland node[4130775]: [11:36:38,052] [DEBUG] [system] [UDP-Channel] Läuft bereits
+Nov 21 11:36:38 hmland node[4130775]: [11:36:38,054] [DEBUG] [system] [UDP-Channel] Läuft bereits
+Nov 21 11:36:38 hmland node[4130775]: [11:36:38,056] [DEBUG] [wallbox] Sende UDP-Befehl an 192.168.40.16 - Befehl: report 3
+Nov 21 11:36:39 hmland node[4130775]: [11:36:39,059] [DEBUG] [wallbox] UDP-Antwort geparst für "report 3" - Daten: {"ID":"3","U1":0,"U2":0,"U3":0,"I1":0,"I2":0,"I3":0,"P":0,"PF":0,"E pres":38969,"E total":297867893,"Serial":"16314582","Sec":491006}
+Nov 21 11:36:39 hmland node[4130775]: [11:36:39,103] [DEBUG] [system] E3DC EMS-Status RAW: 0x0004 = 0b0000000000000100
+Nov 21 11:36:39 hmland node[4130775]: [11:36:39,105] [DEBUG] [system] E3DC Register gelesen: PV=3439W, Batterie=2868W (SOC=90%), Haus=553W, Netz=-18W, Autarkie=98%, Eigenverbrauch=96%, Wallbox=0W
+Nov 21 11:36:39 hmland node[4130775]: [11:36:39,108] [DEBUG] [system] E3DC EMS-Status (0x0004): emergencyPowerReady
+Nov 21 11:36:39 hmland node[4130775]: [11:36:39,110] [DEBUG] [system] E3DC Emergency-Power-Status (2): nicht aktiv
+Nov 21 11:36:39 hmland node[4130775]: [11:36:39,112] [DEBUG] [e3dc-hub] Broadcasting an 2 Listener - PV=3439W, SOC=90%
+Nov 21 11:36:39 hmland node[4130775]: [11:36:39,115] [DEBUG] [e3dc-poller] E3DC-Daten aktualisiert: PV=3439W, Batterie=2868W (SOC=90%), Haus=553W, Netz=-18W
+Nov 21 11:36:39 hmland node[4130775]: [11:36:39,118] [DEBUG] [fhem] Event empfangen: Neue E3DC-Daten verfügbar - PV=3439W, SOC=90%
+Nov 21 11:36:39 hmland node[4130775]: [11:36:39,120] [DEBUG] [fhem] Sende cached E3DC-Daten an FHEM - Host: 192.168.40.11:7072, PV: 3439W, Haus: 553W, SOC: 90%
+Nov 21 11:36:39 hmland node[4130775]: [11:36:39,125] [DEBUG] [strategy] Event empfangen: Neue E3DC-Daten verfügbar - PV=3439W, SOC=90%
+Nov 21 11:36:39 hmland node[4130775]: [11:36:39,127] [DEBUG] [system] [UDP-Channel] Läuft bereits
+Nov 21 11:36:39 hmland node[4130775]: [11:36:39,130] [DEBUG] [system] [UDP-Channel] Läuft bereits
+Nov 21 11:36:39 hmland node[4130775]: [11:36:39,133] [DEBUG] [wallbox] Sende UDP-Befehl an 192.168.40.16 - Befehl: report 2
+Nov 21 11:36:39 hmland node[4130775]: [11:36:39,375] [DEBUG] [fhem] E3DC-Daten erfolgreich an FHEM gesendet - PV: 3439W, Haus: 553W, SOC: 90%, Netz: -18W, Speicher: 2868W
+Nov 21 11:36:40 hmland node[4130775]: [11:36:40,109] [DEBUG] [wallbox] UDP-Antwort geparst für "report 2" - Daten: {"ID":"2","State":5,"Error1":0,"Error2":0,"Plug":7,"Enable sys":0,"Enable user":0,"Max curr":0,"Max curr %":1000,"Curr HW":32000,"Curr user":12000,"Curr FS":0,"Tmo FS":0,"Output":0,"Input":0,"Serial":
+Nov 21 11:36:40 hmland node[4130775]: [11:36:40,210] [DEBUG] [wallbox] Sende UDP-Befehl an 192.168.40.16 - Befehl: report 3
+Nov 21 11:36:41 hmland node[4130775]: [11:36:41,159] [DEBUG] [wallbox] UDP-Antwort geparst für "report 3" - Daten: {"ID":"3","U1":0,"U2":0,"U3":0,"I1":0,"I2":0,"I3":0,"P":0,"PF":0,"E pres":38969,"E total":297867893,"Serial":"16314582","Sec":491008}
+Nov 21 11:36:41 hmland node[4130775]: [11:36:41,162] [DEBUG] [storage] Charging Context gespeichert in: /opt/keba-wallbox/EnergyLink/data/charging-context.json
+Nov 21 11:36:41 hmland node[4130775]: [11:36:41,163] [DEBUG] [system] Strategy: surplus_vehicle_prio, isActive: false, surplus: 2860W
+Nov 21 11:36:41 hmland node[4130775]: [11:36:41,165] [DEBUG] [system] Phase-Logik beim Start: 1P via Surplus-Strategie (fest 1P)
+Nov 21 11:36:41 hmland node[4130775]: [11:36:41,167] [DEBUG] [system] calculateTargetCurrent result: 12000mA @ 1P
+Nov 21 11:36:41 hmland node[4130775]: [11:36:41,168] [DEBUG] [system] !isActive → prüfe shouldStartCharging
+Nov 21 11:36:41 hmland node[4130775]: [11:36:41,170] [DEBUG] [system] shouldStartCharging: strategy=surplus_vehicle_prio, surplus=2860W, plug=7
+Nov 21 11:36:41 hmland node[4130775]: [11:36:41,173] [DEBUG] [storage] Charging Context gespeichert in: /opt/keba-wallbox/EnergyLink/data/charging-context.json
+Nov 21 11:36:41 hmland node[4130775]: [11:36:41,174] [DEBUG] [system] Warte noch 6.5s
+Nov 21 11:36:41 hmland node[4130775]: [11:36:41,175] [DEBUG] [system] shouldStartCharging = false → warte noch
+Nov 21 11:36:41 hmland node[4130775]: [11:36:41,260] [DEBUG] [wallbox] Sende UDP-Befehl an 192.168.40.16 - Befehl: report 2
+Nov 21 11:36:42 hmland node[4130775]: [11:36:42,209] [DEBUG] [wallbox] UDP-Antwort geparst für "report 2" - Daten: {"ID":"2","State":5,"Error1":0,"Error2":0,"Plug":7,"Enable sys":0,"Enable user":0,"Max curr":0,"Max curr %":1000,"Curr HW":32000,"Curr user":12000,"Curr FS":0,"Tmo FS":0,"Output":0,"Input":0,"Serial":
+Nov 21 11:36:42 hmland node[4130775]: [11:36:42,312] [DEBUG] [wallbox] Sende UDP-Befehl an 192.168.40.16 - Befehl: report 3
+Nov 21 11:36:42 hmland node[4130775]: [11:36:42,988] [DEBUG] [fhem] Fallback-Timer: Health-Check FHEM-Sync
+Nov 21 11:36:42 hmland node[4130775]: [11:36:42,990] [DEBUG] [fhem] Sende cached E3DC-Daten an FHEM - Host: 192.168.40.11:7072, PV: 3439W, Haus: 553W, SOC: 90%
+Nov 21 11:36:42 hmland node[4130775]: [11:36:42,996] [DEBUG] [system] [UDP-Channel] Läuft bereits
+Nov 21 11:36:43 hmland node[4130775]: [11:36:43,214] [DEBUG] [fhem] E3DC-Daten erfolgreich an FHEM gesendet - PV: 3439W, Haus: 553W, SOC: 90%, Netz: -18W, Speicher: 2868W
+Nov 21 11:36:43 hmland node[4130775]: [11:36:43,259] [DEBUG] [wallbox] UDP-Antwort geparst für "report 3" - Daten: {"ID":"3","U1":0,"U2":0,"U3":0,"I1":0,"I2":0,"I3":0,"P":0,"PF":0,"E pres":38969,"E total":297867893,"Serial":"16314582","Sec":491010}
+Nov 21 11:36:43 hmland node[4130775]: [11:36:43,262] [DEBUG] [storage] Charging Context gespeichert in: /opt/keba-wallbox/EnergyLink/data/charging-context.json
+Nov 21 11:36:43 hmland node[4130775]: [11:36:43,263] [DEBUG] [system] Strategy: surplus_vehicle_prio, isActive: false, surplus: 2886W
+Nov 21 11:36:43 hmland node[4130775]: [11:36:43,265] [DEBUG] [system] Phase-Logik beim Start: 1P via Surplus-Strategie (fest 1P)
+Nov 21 11:36:43 hmland node[4130775]: [11:36:43,266] [DEBUG] [system] calculateTargetCurrent result: 13000mA @ 1P
+Nov 21 11:36:43 hmland node[4130775]: [11:36:43,268] [DEBUG] [system] !isActive → prüfe shouldStartCharging
+Nov 21 11:36:43 hmland node[4130775]: [11:36:43,269] [DEBUG] [system] shouldStartCharging: strategy=surplus_vehicle_prio, surplus=2886W, plug=7
+Nov 21 11:36:43 hmland node[4130775]: [11:36:43,272] [DEBUG] [storage] Charging Context gespeichert in: /opt/keba-wallbox/EnergyLink/data/charging-context.json
+Nov 21 11:36:43 hmland node[4130775]: [11:36:43,272] [DEBUG] [system] Warte noch 4.4s
+Nov 21 11:36:43 hmland node[4130775]: [11:36:43,274] [DEBUG] [system] shouldStartCharging = false → warte noch
+Nov 21 11:36:43 hmland node[4130775]: [11:36:43,361] [DEBUG] [wallbox] Sende UDP-Befehl an 192.168.40.16 - Befehl: report 3
+Nov 21 11:36:44 hmland node[4130775]: [11:36:44,309] [DEBUG] [wallbox] UDP-Antwort geparst für "report 3" - Daten: {"ID":"3","U1":0,"U2":0,"U3":0,"I1":0,"I2":0,"I3":0,"P":0,"PF":0,"E pres":38969,"E total":297867893,"Serial":"16314582","Sec":491011}
+Nov 21 11:36:44 hmland node[4130775]: [11:36:44,325] [DEBUG] [system] E3DC EMS-Status RAW: 0x0004 = 0b0000000000000100
+Nov 21 11:36:44 hmland node[4130775]: [11:36:44,328] [DEBUG] [system] E3DC Register gelesen: PV=3513W, Batterie=2910W (SOC=90%), Haus=600W, Netz=-3W, Autarkie=98%, Eigenverbrauch=96%, Wallbox=0W
+Nov 21 11:36:44 hmland node[4130775]: [11:36:44,330] [DEBUG] [system] E3DC EMS-Status (0x0004): emergencyPowerReady
+Nov 21 11:36:44 hmland node[4130775]: [11:36:44,333] [DEBUG] [system] E3DC Emergency-Power-Status (2): nicht aktiv
+Nov 21 11:36:44 hmland node[4130775]: [11:36:44,336] [DEBUG] [e3dc-hub] Broadcasting an 2 Listener - PV=3513W, SOC=90%
+Nov 21 11:36:44 hmland node[4130775]: [11:36:44,338] [DEBUG] [e3dc-poller] E3DC-Daten aktualisiert: PV=3513W, Batterie=2910W (SOC=90%), Haus=600W, Netz=-3W
+Nov 21 11:36:44 hmland node[4130775]: [11:36:44,342] [DEBUG] [fhem] Event empfangen: Neue E3DC-Daten verfügbar - PV=3513W, SOC=90%
+Nov 21 11:36:44 hmland node[4130775]: [11:36:44,344] [DEBUG] [fhem] Sende cached E3DC-Daten an FHEM - Host: 192.168.40.11:7072, PV: 3513W, Haus: 600W, SOC: 90%
+Nov 21 11:36:44 hmland node[4130775]: [11:36:44,349] [DEBUG] [strategy] Event empfangen: Neue E3DC-Daten verfügbar - PV=3513W, SOC=90%
+Nov 21 11:36:44 hmland node[4130775]: [11:36:44,353] [DEBUG] [system] [UDP-Channel] Läuft bereits
+Nov 21 11:36:44 hmland node[4130775]: [11:36:44,355] [DEBUG] [system] [UDP-Channel] Läuft bereits
+Nov 21 11:36:44 hmland node[4130775]: [11:36:44,358] [DEBUG] [wallbox] Sende UDP-Befehl an 192.168.40.16 - Befehl: report 2
+Nov 21 11:36:44 hmland node[4130775]: [11:36:44,568] [DEBUG] [fhem] E3DC-Daten erfolgreich an FHEM gesendet - PV: 3513W, Haus: 600W, SOC: 90%, Netz: -3W, Speicher: 2910W
+Nov 21 11:36:45 hmland node[4130775]: [11:36:45,359] [DEBUG] [wallbox] UDP-Antwort geparst für "report 2" - Daten: {"ID":"2","State":5,"Error1":0,"Error2":0,"Plug":7,"Enable sys":0,"Enable user":0,"Max curr":0,"Max curr %":1000,"Curr HW":32000,"Curr user":12000,"Curr FS":0,"Tmo FS":0,"Output":0,"Input":0,"Serial":
+Nov 21 11:36:45 hmland node[4130775]: [11:36:45,461] [DEBUG] [wallbox] Sende UDP-Befehl an 192.168.40.16 - Befehl: report 3
+Nov 21 11:36:46 hmland node[4130775]: [11:36:46,409] [DEBUG] [wallbox] UDP-Antwort geparst für "report 3" - Daten: {"ID":"3","U1":0,"U2":0,"U3":0,"I1":0,"I2":0,"I3":0,"P":0,"PF":0,"E pres":38969,"E total":297867893,"Serial":"16314582","Sec":491013}
+Nov 21 11:36:46 hmland node[4130775]: [11:36:46,412] [DEBUG] [storage] Charging Context gespeichert in: /opt/keba-wallbox/EnergyLink/data/charging-context.json
+Nov 21 11:36:46 hmland node[4130775]: [11:36:46,413] [DEBUG] [system] Strategy: surplus_vehicle_prio, isActive: false, surplus: 2913W
+Nov 21 11:36:46 hmland node[4130775]: [11:36:46,414] [DEBUG] [system] Phase-Logik beim Start: 1P via Surplus-Strategie (fest 1P)
+Nov 21 11:36:46 hmland node[4130775]: [11:36:46,416] [DEBUG] [system] calculateTargetCurrent result: 13000mA @ 1P
+Nov 21 11:36:46 hmland node[4130775]: [11:36:46,418] [DEBUG] [system] !isActive → prüfe shouldStartCharging
+Nov 21 11:36:46 hmland node[4130775]: [11:36:46,420] [DEBUG] [system] shouldStartCharging: strategy=surplus_vehicle_prio, surplus=2913W, plug=7
+Nov 21 11:36:46 hmland node[4130775]: [11:36:46,423] [DEBUG] [storage] Charging Context gespeichert in: /opt/keba-wallbox/EnergyLink/data/charging-context.json
+Nov 21 11:36:46 hmland node[4130775]: [11:36:46,423] [DEBUG] [system] Warte noch 1.3s
+Nov 21 11:36:46 hmland node[4130775]: [11:36:46,425] [DEBUG] [system] shouldStartCharging = false → warte noch
+Nov 21 11:36:47 hmland node[4130775]: [11:36:47,997] [DEBUG] [system] [UDP-Channel] Läuft bereits
+Nov 21 11:36:48 hmland node[4130775]: [11:36:47,999] [DEBUG] [wallbox] Sende UDP-Befehl an 192.168.40.16 - Befehl: report 3
+Nov 21 11:36:48 hmland node[4130775]: [11:36:48,009] [DEBUG] [wallbox] UDP-Antwort geparst für "report 3" - Daten: {"ID":"3","U1":0,"U2":0,"U3":0,"I1":0,"I2":0,"I3":0,"P":0,"PF":0,"E pres":38969,"E total":297867893,"Serial":"16314582","Sec":491015}
+Nov 21 11:36:48 hmland node[4130775]: [11:36:48,026] [DEBUG] [system] E3DC EMS-Status RAW: 0x0004 = 0b0000000000000100
+Nov 21 11:36:48 hmland node[4130775]: [11:36:48,028] [DEBUG] [system] E3DC Register gelesen: PV=3452W, Batterie=2928W (SOC=90%), Haus=501W, Netz=-23W, Autarkie=97%, Eigenverbrauch=97%, Wallbox=0W
+Nov 21 11:36:48 hmland node[4130775]: [11:36:48,030] [DEBUG] [system] E3DC EMS-Status (0x0004): emergencyPowerReady
+Nov 21 11:36:48 hmland node[4130775]: [11:36:48,031] [DEBUG] [system] E3DC Emergency-Power-Status (2): nicht aktiv
+Nov 21 11:36:48 hmland node[4130775]: [11:36:48,033] [DEBUG] [e3dc-hub] Broadcasting an 2 Listener - PV=3452W, SOC=90%
+Nov 21 11:36:48 hmland node[4130775]: [11:36:48,035] [DEBUG] [e3dc-poller] E3DC-Daten aktualisiert: PV=3452W, Batterie=2928W (SOC=90%), Haus=501W, Netz=-23W
+Nov 21 11:36:48 hmland node[4130775]: [11:36:48,037] [DEBUG] [fhem] Event empfangen: Neue E3DC-Daten verfügbar - PV=3452W, SOC=90%
+Nov 21 11:36:48 hmland node[4130775]: [11:36:48,039] [DEBUG] [fhem] Sende cached E3DC-Daten an FHEM - Host: 192.168.40.11:7072, PV: 3452W, Haus: 501W, SOC: 90%
+Nov 21 11:36:48 hmland node[4130775]: [11:36:48,042] [DEBUG] [strategy] Event empfangen: Neue E3DC-Daten verfügbar - PV=3452W, SOC=90%
+Nov 21 11:36:48 hmland node[4130775]: [11:36:48,044] [DEBUG] [system] [UDP-Channel] Läuft bereits
+Nov 21 11:36:48 hmland node[4130775]: [11:36:48,046] [DEBUG] [system] [UDP-Channel] Läuft bereits
+Nov 21 11:36:48 hmland node[4130775]: [11:36:48,048] [DEBUG] [wallbox] Sende UDP-Befehl an 192.168.40.16 - Befehl: report 2
+Nov 21 11:36:48 hmland node[4130775]: [11:36:48,260] [DEBUG] [fhem] E3DC-Daten erfolgreich an FHEM gesendet - PV: 3452W, Haus: 501W, SOC: 90%, Netz: -23W, Speicher: 2928W
+Nov 21 11:36:49 hmland node[4130775]: [11:36:49,059] [DEBUG] [wallbox] UDP-Antwort geparst für "report 2" - Daten: {"ID":"2","State":5,"Error1":0,"Error2":0,"Plug":7,"Enable sys":0,"Enable user":0,"Max curr":0,"Max curr %":1000,"Curr HW":32000,"Curr user":12000,"Curr FS":0,"Tmo FS":0,"Output":0,"Input":0,"Serial":
+Nov 21 11:36:49 hmland node[4130775]: [11:36:49,160] [DEBUG] [wallbox] Sende UDP-Befehl an 192.168.40.16 - Befehl: report 3
+Nov 21 11:36:50 hmland node[4130775]: [11:36:50,109] [DEBUG] [wallbox] UDP-Antwort geparst für "report 3" - Daten: {"ID":"3","U1":0,"U2":0,"U3":0,"I1":0,"I2":0,"I3":0,"P":0,"PF":0,"E pres":38969,"E total":297867893,"Serial":"16314582","Sec":491017}
+Nov 21 11:36:50 hmland node[4130775]: [11:36:50,115] [DEBUG] [storage] Charging Context gespeichert in: /opt/keba-wallbox/EnergyLink/data/charging-context.json
+Nov 21 11:36:50 hmland node[4130775]: [11:36:50,116] [DEBUG] [system] Strategy: surplus_vehicle_prio, isActive: false, surplus: 2951W
+Nov 21 11:36:50 hmland node[4130775]: [11:36:50,119] [DEBUG] [system] Phase-Logik beim Start: 1P via Surplus-Strategie (fest 1P)
+Nov 21 11:36:50 hmland node[4130775]: [11:36:50,122] [DEBUG] [system] calculateTargetCurrent result: 13000mA @ 1P
+Nov 21 11:36:50 hmland node[4130775]: [11:36:50,125] [DEBUG] [system] !isActive → prüfe shouldStartCharging
+Nov 21 11:36:50 hmland node[4130775]: [11:36:50,127] [DEBUG] [system] shouldStartCharging: strategy=surplus_vehicle_prio, surplus=2951W, plug=7
+Nov 21 11:36:50 hmland node[4130775]: [11:36:50,131] [DEBUG] [storage] Charging Context gespeichert in: /opt/keba-wallbox/EnergyLink/data/charging-context.json
+Nov 21 11:36:50 hmland node[4130775]: [11:36:50,132] [INFO] [system] Start-Bedingung erfüllt: Überschuss 2951W > 1500W für 32.415s
+Nov 21 11:36:50 hmland node[4130775]: [11:36:50,137] [DEBUG] [storage] Charging Context gespeichert in: /opt/keba-wallbox/EnergyLink/data/charging-context.json
+Nov 21 11:36:50 hmland node[4130775]: [11:36:50,138] [DEBUG] [system] shouldStartCharging = true → startCharging mit 13000mA @ 1P
+Nov 21 11:36:50 hmland node[4130775]: [11:36:50,141] [DEBUG] [system] [UDP-Channel] Läuft bereits
+Nov 21 11:36:50 hmland node[4130775]: [11:36:50,143] [DEBUG] [wallbox] Sende UDP-Befehl an 192.168.40.16 - Befehl: ena 1
+Nov 21 11:36:51 hmland node[4130775]: [11:36:51,159] [DEBUG] [wallbox] UDP-Antwort geparst für "ena 1" - Daten: {"TCH-OK":"done"}
+Nov 21 11:36:51 hmland node[4130775]: [11:36:51,162] [DEBUG] [system] [UDP-Channel] Läuft bereits
+Nov 21 11:36:51 hmland node[4130775]: [11:36:51,165] [DEBUG] [wallbox] Sende UDP-Befehl an 192.168.40.16 - Befehl: curr 13000
+Nov 21 11:36:51 hmland node[4130775]: [11:36:51,214] [DEBUG] [wallbox] Antwort ignoriert (passt nicht zu "curr 13000") - Daten: {"Enable sys":1}
+Nov 21 11:36:52 hmland node[4130775]: [11:36:52,227] [DEBUG] [wallbox] Antwort ignoriert (passt nicht zu "curr 13000") - Daten: {"Max curr":12000}
+Nov 21 11:36:52 hmland node[4130775]: [11:36:52,277] [DEBUG] [wallbox] UDP-Antwort geparst für "curr 13000" - Daten: {"TCH-OK":"done"}
+Nov 21 11:36:52 hmland node[4130775]: [11:36:52,282] [DEBUG] [storage] Charging Context gespeichert in: /opt/keba-wallbox/EnergyLink/data/charging-context.json
+Nov 21 11:36:52 hmland node[4130775]: [11:36:52,283] [INFO] [system] Ladung gestartet mit 13A @ 1P (Strategie: surplus_vehicle_prio)
+Nov 21 11:36:52 hmland node[4130775]: [11:36:52,654] [DEBUG] [system] Prowl-Benachrichtigung gesendet: Ladung gestartet
+Nov 21 11:36:52 hmland node[4130775]: [11:36:52,978] [DEBUG] [strategy] Fallback-Timer: Health-Check Charging Strategy
+Nov 21 11:36:52 hmland node[4130775]: [11:36:52,982] [DEBUG] [system] [UDP-Channel] Läuft bereits
+Nov 21 11:36:52 hmland node[4130775]: [11:36:52,985] [DEBUG] [wallbox] Sende UDP-Befehl an 192.168.40.16 - Befehl: report 3
+Nov 21 11:36:52 hmland node[4130775]: [11:36:52,989] [DEBUG] [fhem] Fallback-Timer: Health-Check FHEM-Sync
+Nov 21 11:36:52 hmland node[4130775]: [11:36:52,991] [DEBUG] [fhem] Sende cached E3DC-Daten an FHEM - Host: 192.168.40.11:7072, PV: 3452W, Haus: 501W, SOC: 90%
+Nov 21 11:36:53 hmland node[4130775]: [11:36:52,999] [DEBUG] [system] [UDP-Channel] Läuft bereits
+Nov 21 11:36:53 hmland node[4130775]: [11:36:53,220] [DEBUG] [fhem] E3DC-Daten erfolgreich an FHEM gesendet - PV: 3452W, Haus: 501W, SOC: 90%, Netz: -23W, Speicher: 2928W
+Nov 21 11:36:53 hmland node[4130775]: [11:36:53,327] [DEBUG] [wallbox] UDP-Antwort geparst für "report 3" - Daten: {"ID":"3","U1":0,"U2":0,"U3":0,"I1":0,"I2":0,"I3":0,"P":0,"PF":0,"E pres":38969,"E total":297867893,"Serial":"16314582","Sec":491020}
+Nov 21 11:36:53 hmland node[4130775]: [11:36:53,343] [DEBUG] [system] E3DC EMS-Status RAW: 0x0004 = 0b0000000000000100
+Nov 21 11:36:53 hmland node[4130775]: [11:36:53,345] [DEBUG] [system] E3DC Register gelesen: PV=3539W, Batterie=2922W (SOC=90%), Haus=618W, Netz=1W, Autarkie=98%, Eigenverbrauch=97%, Wallbox=0W
+Nov 21 11:36:53 hmland node[4130775]: [11:36:53,348] [DEBUG] [system] E3DC EMS-Status (0x0004): emergencyPowerReady
+Nov 21 11:36:53 hmland node[4130775]: [11:36:53,351] [DEBUG] [system] E3DC Emergency-Power-Status (2): nicht aktiv
+Nov 21 11:36:53 hmland node[4130775]: [11:36:53,353] [DEBUG] [system] Strategy Check: surplus_vehicle_prio
+Nov 21 11:36:53 hmland node[4130775]: [11:36:53,363] [DEBUG] [system] [UDP-Channel] Läuft bereits
+Nov 21 11:36:53 hmland node[4130775]: [11:36:53,366] [DEBUG] [system] [UDP-Channel] Läuft bereits
+Nov 21 11:36:53 hmland node[4130775]: [11:36:53,369] [DEBUG] [wallbox] Sende UDP-Befehl an 192.168.40.16 - Befehl: report 3
+Nov 21 11:36:54 hmland node[4130775]: [11:36:54,338] [DEBUG] [wallbox] Antwort ignoriert (passt nicht zu "report 3") - Daten: {"State":2}
+Nov 21 11:36:54 hmland node[4130775]: [11:36:54,341] [INFO] [system] [Wallbox-Broadcast-Listener] State geändert: 5 → 2 (ready for charging) (von 192.168.40.16)
+Nov 21 11:36:54 hmland node[4130775]: [11:36:54,378] [DEBUG] [wallbox] UDP-Antwort geparst für "report 3" - Daten: {"ID":"3","U1":241,"U2":0,"U3":0,"I1":0,"I2":0,"I3":0,"P":0,"PF":0,"E pres":38969,"E total":297867893,"Serial":"16314582","Sec":491021}
+Nov 21 11:36:54 hmland node[4130775]: [11:36:54,398] [DEBUG] [system] E3DC EMS-Status RAW: 0x0004 = 0b0000000000000100
+Nov 21 11:36:54 hmland node[4130775]: [11:36:54,400] [DEBUG] [system] E3DC Register gelesen: PV=3537W, Batterie=2928W (SOC=90%), Haus=628W, Netz=19W, Autarkie=98%, Eigenverbrauch=97%, Wallbox=0W
+Nov 21 11:36:54 hmland node[4130775]: [11:36:54,403] [DEBUG] [system] E3DC EMS-Status (0x0004): emergencyPowerReady
+Nov 21 11:36:54 hmland node[4130775]: [11:36:54,406] [DEBUG] [system] E3DC Emergency-Power-Status (2): nicht aktiv
+Nov 21 11:36:54 hmland node[4130775]: [11:36:54,408] [DEBUG] [e3dc-hub] Broadcasting an 2 Listener - PV=3537W, SOC=90%
+Nov 21 11:36:54 hmland node[4130775]: [11:36:54,411] [DEBUG] [e3dc-poller] E3DC-Daten aktualisiert: PV=3537W, Batterie=2928W (SOC=90%), Haus=628W, Netz=19W
+Nov 21 11:36:54 hmland node[4130775]: [11:36:54,414] [DEBUG] [fhem] Event empfangen: Neue E3DC-Daten verfügbar - PV=3537W, SOC=90%
+Nov 21 11:36:54 hmland node[4130775]: [11:36:54,417] [DEBUG] [fhem] Sende cached E3DC-Daten an FHEM - Host: 192.168.40.11:7072, PV: 3537W, Haus: 628W, SOC: 90%
+Nov 21 11:36:54 hmland node[4130775]: [11:36:54,421] [DEBUG] [strategy] Event empfangen: Neue E3DC-Daten verfügbar - PV=3537W, SOC=90%
+Nov 21 11:36:54 hmland node[4130775]: [11:36:54,425] [DEBUG] [system] [UDP-Channel] Läuft bereits
+Nov 21 11:36:54 hmland node[4130775]: [11:36:54,428] [DEBUG] [system] [UDP-Channel] Läuft bereits
+Nov 21 11:36:54 hmland node[4130775]: [11:36:54,431] [DEBUG] [wallbox] Sende UDP-Befehl an 192.168.40.16 - Befehl: report 2
+Nov 21 11:36:54 hmland node[4130775]: [11:36:54,476] [DEBUG] [wallbox] Antwort ignoriert (passt nicht zu "report 2") - Daten: {"Max curr":13000}
+Nov 21 11:36:54 hmland node[4130775]: [11:36:54,643] [DEBUG] [fhem] E3DC-Daten erfolgreich an FHEM gesendet - PV: 3537W, Haus: 628W, SOC: 90%, Netz: 19W, Speicher: 2928W
+Nov 21 11:36:55 hmland node[4130775]: [11:36:55,349] [DEBUG] [wallbox] Antwort ignoriert (passt nicht zu "report 2") - Daten: {"State":3}
+Nov 21 11:36:55 hmland node[4130775]: [11:36:55,351] [INFO] [system] [Wallbox-Broadcast-Listener] State geändert: 2 → 3 (charging) (von 192.168.40.16)
+Nov 21 11:36:55 hmland node[4130775]: [11:36:55,428] [DEBUG] [wallbox] UDP-Antwort geparst für "report 2" - Daten: {"ID":"2","State":3,"Error1":0,"Error2":0,"Plug":7,"Enable sys":1,"Enable user":1,"Max curr":13000,"Max curr %":216,"Curr HW":32000,"Curr user":13000,"Curr FS":0,"Tmo FS":0,"Output":0,"Input":0,"Seria
+Nov 21 11:36:55 hmland node[4130775]: [11:36:55,529] [DEBUG] [wallbox] Sende UDP-Befehl an 192.168.40.16 - Befehl: report 3
+Nov 21 11:36:56 hmland node[4130775]: [11:36:56,478] [DEBUG] [wallbox] UDP-Antwort geparst für "report 3" - Daten: {"ID":"3","U1":241,"U2":0,"U3":0,"I1":416,"I2":0,"I3":0,"P":17604,"PF":0,"E pres":38969,"E total":297867893,"Serial":"16314582","Sec":491023}
+Nov 21 11:36:56 hmland node[4130775]: [11:36:56,480] [INFO] [system] [RECONCILE] Phasen-Korrektur: 1P → 3P (gemessen aus Strömen)
+Nov 21 11:36:56 hmland node[4130775]: [11:36:56,483] [DEBUG] [storage] Charging Context gespeichert in: /opt/keba-wallbox/EnergyLink/data/charging-context.json
+Nov 21 11:36:56 hmland node[4130775]: [11:36:56,488] [DEBUG] [storage] Charging Context gespeichert in: /opt/keba-wallbox/EnergyLink/data/charging-context.json
+Nov 21 11:36:56 hmland node[4130775]: [11:36:56,488] [DEBUG] [system] Strategy: surplus_vehicle_prio, isActive: true, surplus: 2921W
+Nov 21 11:36:56 hmland node[4130775]: [11:36:56,490] [DEBUG] [system] calculateTargetCurrent result: null
+Nov 21 11:36:56 hmland node[4130775]: [11:36:56,492] [INFO] [system] result=null && isActive → Überschuss zu gering für Mindest-Stromänderung - Ladung wird sofort gestoppt
+Nov 21 11:36:56 hmland node[4130775]: [11:36:56,493] [DEBUG] [system] [UDP-Channel] Läuft bereits
+Nov 21 11:36:56 hmland node[4130775]: [11:36:56,495] [DEBUG] [wallbox] Sende UDP-Befehl an 192.168.40.16 - Befehl: report 2
+Nov 21 11:36:57 hmland node[4130775]: [11:36:57,528] [DEBUG] [wallbox] UDP-Antwort geparst für "report 2" - Daten: {"ID":"2","State":3,"Error1":0,"Error2":0,"Plug":7,"Enable sys":1,"Enable user":1,"Max curr":13000,"Max curr %":216,"Curr HW":32000,"Curr user":13000,"Curr FS":0,"Tmo FS":0,"Output":0,"Input":0,"Seria
+Nov 21 11:36:57 hmland node[4130775]: [11:36:57,631] [DEBUG] [wallbox] Sende UDP-Befehl an 192.168.40.16 - Befehl: report 3
+Nov 21 11:36:58 hmland node[4130775]: [11:36:57,998] [DEBUG] [system] [UDP-Channel] Läuft bereits
+Nov 21 11:36:58 hmland node[4130775]: [11:36:58,578] [DEBUG] [wallbox] UDP-Antwort geparst für "report 3" - Daten: {"ID":"3","U1":241,"U2":0,"U3":0,"I1":6626,"I2":0,"I3":0,"P":38988,"PF":870,"E pres":38969,"E total":297867893,"Serial":"16314582","Sec":491025}
+Nov 21 11:36:58 hmland node[4130775]: [11:36:58,580] [INFO] [system] [RECONCILE] Phasen-Korrektur: 3P → 1P (gemessen aus Strömen)
+Nov 21 11:36:58 hmland node[4130775]: [11:36:58,583] [DEBUG] [storage] Charging Context gespeichert in: /opt/keba-wallbox/EnergyLink/data/charging-context.json
+Nov 21 11:36:58 hmland node[4130775]: [11:36:58,587] [DEBUG] [storage] Charging Context gespeichert in: /opt/keba-wallbox/EnergyLink/data/charging-context.json
+Nov 21 11:36:58 hmland node[4130775]: [11:36:58,588] [DEBUG] [system] Strategy: surplus_vehicle_prio, isActive: true, surplus: 2909W
+Nov 21 11:36:58 hmland node[4130775]: [11:36:58,590] [DEBUG] [system] calculateTargetCurrent result: 13000mA @ 1P
+Nov 21 11:36:58 hmland node[4130775]: [11:36:58,592] [DEBUG] [system] isActive → adjustCurrent mit 13000mA @ 1P
+Nov 21 11:36:58 hmland node[4130775]: [11:36:58,594] [DEBUG] [storage] Charging Context gespeichert in: /opt/keba-wallbox/EnergyLink/data/charging-context.json
+Nov 21 11:36:58 hmland node[4130775]: [11:36:58,679] [DEBUG] [wallbox] Sende UDP-Befehl an 192.168.40.16 - Befehl: ena 0
+Nov 21 11:36:59 hmland node[4130775]: [11:36:59,628] [DEBUG] [wallbox] UDP-Antwort geparst für "ena 0" - Daten: {"TCH-OK":"done"}
+Nov 21 11:36:59 hmland node[4130775]: [11:36:59,632] [DEBUG] [storage] Charging Context gespeichert in: /opt/keba-wallbox/EnergyLink/data/charging-context.json
+Nov 21 11:36:59 hmland node[4130775]: [11:36:59,633] [INFO] [system] Ladung gestoppt
+Nov 21 11:36:59 hmland node[4130775]: [11:36:59,661] [INFO] [system] [Wallbox-Broadcast-Listener] State geändert: 3 → 5 (authorization rejected) (von 192.168.40.16)
+Nov 21 11:36:59 hmland node[4130775]: [11:36:59,731] [DEBUG] [wallbox] Sende UDP-Befehl an 192.168.40.16 - Befehl: report 3
+Nov 21 11:37:00 hmland node[4130775]: [11:37:00,010] [DEBUG] [system] Prowl-Benachrichtigung gesendet: Ladung gestoppt
+Nov 21 11:37:00 hmland node[4130775]: [11:37:00,018] [DEBUG] [system] Scheduler für zeitgesteuerte Ladung läuft - Aktuelle Zeit: 11:37, Zeitsteuerung aktiviert: true, Zeitfenster: 00:00-05:00
+Nov 21 11:37:00 hmland node[4130775]: [11:37:00,678] [DEBUG] [wallbox] UDP-Antwort geparst für "report 3" - Daten: {"ID":"3","U1":238,"U2":0,"U3":0,"I1":11411,"I2":0,"I3":0,"P":2652566,"PF":989,"E pres":38979,"E total":297867893,"Serial":"16314582","Sec":491027}
+Nov 21 11:37:00 hmland node[4130775]: [11:37:00,696] [DEBUG] [system] E3DC EMS-Status RAW: 0x0004 = 0b0000000000000100
+Nov 21 11:37:00 hmland node[4130775]: [11:37:00,698] [DEBUG] [system] E3DC Register gelesen: PV=3524W, Batterie=690W (SOC=90%), Haus=3225W, Netz=391W, Autarkie=82%, Eigenverbrauch=99%, Wallbox=2652.566W
+Nov 21 11:37:00 hmland node[4130775]: [11:37:00,700] [DEBUG] [system] E3DC EMS-Status (0x0004): emergencyPowerReady
+Nov 21 11:37:00 hmland node[4130775]: [11:37:00,701] [DEBUG] [system] E3DC Emergency-Power-Status (2): nicht aktiv
+Nov 21 11:37:00 hmland node[4130775]: [11:37:00,703] [DEBUG] [e3dc-hub] Broadcasting an 2 Listener - PV=3524W, SOC=90%
+Nov 21 11:37:00 hmland node[4130775]: [11:37:00,705] [DEBUG] [e3dc-poller] E3DC-Daten aktualisiert: PV=3524W, Batterie=690W (SOC=90%), Haus=3225W, Netz=391W
+Nov 21 11:37:00 hmland node[4130775]: [11:37:00,707] [DEBUG] [fhem] Event empfangen: Neue E3DC-Daten verfügbar - PV=3524W, SOC=90%
+Nov 21 11:37:00 hmland node[4130775]: [11:37:00,709] [DEBUG] [fhem] Sende cached E3DC-Daten an FHEM - Host: 192.168.40.11:7072, PV: 3524W, Haus: 3225W, SOC: 90%
+Nov 21 11:37:00 hmland node[4130775]: [11:37:00,712] [DEBUG] [strategy] Event empfangen: Neue E3DC-Daten verfügbar - PV=3524W, SOC=90%
+Nov 21 11:37:00 hmland node[4130775]: [11:37:00,714] [DEBUG] [system] [UDP-Channel] Läuft bereits
+Nov 21 11:37:00 hmland node[4130775]: [11:37:00,715] [DEBUG] [system] [UDP-Channel] Läuft bereits
+Nov 21 11:37:00 hmland node[4130775]: [11:37:00,717] [DEBUG] [wallbox] Sende UDP-Befehl an 192.168.40.16 - Befehl: report 2
+Nov 21 11:37:00 hmland node[4130775]: [11:37:00,929] [DEBUG] [fhem] E3DC-Daten erfolgreich an FHEM gesendet - PV: 3524W, Haus: 3225W, SOC: 90%, Netz: 391W, Speicher: 690W
+Nov 21 11:37:01 hmland node[4130775]: [11:37:01,728] [DEBUG] [wallbox] UDP-Antwort geparst für "report 2" - Daten: {"ID":"2","State":5,"Error1":0,"Error2":0,"Plug":7,"Enable sys":0,"Enable user":0,"Max curr":0,"Max curr %":1000,"Curr HW":32000,"Curr user":13000,"Curr FS":0,"Tmo FS":0,"Output":0,"Input":0,"Serial":
+Nov 21 11:37:01 hmland node[4130775]: [11:37:01,829] [DEBUG] [wallbox] Sende UDP-Befehl an 192.168.40.16 - Befehl: report 3
+Nov 21 11:37:02 hmland node[4130775]: [11:37:02,778] [DEBUG] [wallbox] UDP-Antwort geparst für "report 3" - Daten: {"ID":"3","U1":239,"U2":0,"U3":0,"I1":7721,"I2":0,"I3":0,"P":1840134,"PF":994,"E pres":38991,"E total":297867893,"Serial":"16314582","Sec":491029}
+Nov 21 11:37:02 hmland node[4130775]: [11:37:02,781] [DEBUG] [storage] Charging Context gespeichert in: /opt/keba-wallbox/EnergyLink/data/charging-context.json
+Nov 21 11:37:02 hmland node[4130775]: [11:37:02,781] [DEBUG] [system] Strategy: surplus_vehicle_prio, isActive: false, surplus: 2951.566W
+Nov 21 11:37:02 hmland node[4130775]: [11:37:02,783] [DEBUG] [system] Phase-Logik beim Start: 1P via Surplus-Strategie (fest 1P)
+Nov 21 11:37:02 hmland node[4130775]: [11:37:02,785] [DEBUG] [system] calculateTargetCurrent result: 13000mA @ 1P
+Nov 21 11:37:02 hmland node[4130775]: [11:37:02,786] [DEBUG] [system] !isActive → prüfe shouldStartCharging
+Nov 21 11:37:02 hmland node[4130775]: [11:37:02,788] [DEBUG] [system] shouldStartCharging: strategy=surplus_vehicle_prio, surplus=2951.566W, plug=7
+Nov 21 11:37:02 hmland node[4130775]: [11:37:02,791] [DEBUG] [storage] Charging Context gespeichert in: /opt/keba-wallbox/EnergyLink/data/charging-context.json
+Nov 21 11:37:02 hmland node[4130775]: [11:37:02,791] [DEBUG] [system] Start-Delay gestartet: Überschuss 2951.566W > 1500W - warte 30s
+Nov 21 11:37:02 hmland node[4130775]: [11:37:02,793] [DEBUG] [system] shouldStartCharging = false → warte noch
+Nov 21 11:37:02 hmland node[4130775]: [11:37:02,990] [DEBUG] [fhem] Fallback-Timer: Health-Check FHEM-Sync
+Nov 21 11:37:02 hmland node[4130775]: [11:37:02,991] [DEBUG] [fhem] Sende cached E3DC-Daten an FHEM - Host: 192.168.40.11:7072, PV: 3524W, Haus: 3225W, SOC: 90%
+Nov 21 11:37:03 hmland node[4130775]: [11:37:02,998] [DEBUG] [system] [UDP-Channel] Läuft bereits
+Nov 21 11:37:03 hmland node[4130775]: [11:37:03,000] [DEBUG] [wallbox] Sende UDP-Befehl an 192.168.40.16 - Befehl: report 3
+Nov 21 11:37:03 hmland node[4130775]: [11:37:03,217] [DEBUG] [fhem] E3DC-Daten erfolgreich an FHEM gesendet - PV: 3524W, Haus: 3225W, SOC: 90%, Netz: 391W, Speicher: 690W
+Nov 21 11:37:03 hmland node[4130775]: [11:37:03,828] [DEBUG] [wallbox] UDP-Antwort geparst für "report 3" - Daten: {"ID":"3","U1":0,"U2":0,"U3":0,"I1":0,"I2":0,"I3":0,"P":0,"PF":0,"E pres":38999,"E total":297867893,"Serial":"16314582","Sec":491030}
+Nov 21 11:37:03 hmland node[4130775]: [11:37:03,839] [DEBUG] [system] E3DC EMS-Status RAW: 0x0004 = 0b0000000000000100
+Nov 21 11:37:03 hmland node[4130775]: [11:37:03,841] [DEBUG] [system] E3DC Register gelesen: PV=3565W, Batterie=1101W (SOC=90%), Haus=1493W, Netz=-971W, Autarkie=90%, Eigenverbrauch=85%, Wallbox=0W
+Nov 21 11:37:03 hmland node[4130775]: [11:37:03,843] [DEBUG] [system] E3DC EMS-Status (0x0004): emergencyPowerReady
+Nov 21 11:37:03 hmland node[4130775]: [11:37:03,845] [DEBUG] [system] E3DC Emergency-Power-Status (2): nicht aktiv
+Nov 21 11:37:03 hmland node[4130775]: [11:37:03,846] [DEBUG] [e3dc-hub] Broadcasting an 2 Listener - PV=3565W, SOC=90%
+Nov 21 11:37:03 hmland node[4130775]: [11:37:03,847] [DEBUG] [e3dc-poller] E3DC-Daten aktualisiert: PV=3565W, Batterie=1101W (SOC=90%), Haus=1493W, Netz=-971W
+Nov 21 11:37:03 hmland node[4130775]: [11:37:03,849] [DEBUG] [fhem] Event empfangen: Neue E3DC-Daten verfügbar - PV=3565W, SOC=90%
+Nov 21 11:37:03 hmland node[4130775]: [11:37:03,850] [DEBUG] [fhem] Sende cached E3DC-Daten an FHEM - Host: 192.168.40.11:7072, PV: 3565W, Haus: 1493W, SOC: 90%
+Nov 21 11:37:03 hmland node[4130775]: [11:37:03,853] [DEBUG] [strategy] Event empfangen: Neue E3DC-Daten verfügbar - PV=3565W, SOC=90%
+Nov 21 11:37:03 hmland node[4130775]: [11:37:03,855] [DEBUG] [system] [UDP-Channel] Läuft bereits
+Nov 21 11:37:03 hmland node[4130775]: [11:37:03,857] [DEBUG] [system] [UDP-Channel] Läuft bereits
+Nov 21 11:37:03 hmland node[4130775]: [11:37:03,859] [DEBUG] [wallbox] Sende UDP-Befehl an 192.168.40.16 - Befehl: report 2
+Nov 21 11:37:04 hmland node[4130775]: [11:37:04,077] [DEBUG] [fhem] E3DC-Daten erfolgreich an FHEM gesendet - PV: 3565W, Haus: 1493W, SOC: 90%, Netz: -971W, Speicher: 1101W
+Nov 21 11:37:04 hmland node[4130775]: [11:37:04,878] [DEBUG] [wallbox] UDP-Antwort geparst für "report 2" - Daten: {"ID":"2","State":5,"Error1":0,"Error2":0,"Plug":7,"Enable sys":0,"Enable user":0,"Max curr":0,"Max curr %":1000,"Curr HW":32000,"Curr user":13000,"Curr FS":0,"Tmo FS":0,"Output":0,"Input":0,"Serial":
+Nov 21 11:37:04 hmland node[4130775]: [11:37:04,979] [DEBUG] [wallbox] Sende UDP-Befehl an 192.168.40.16 - Befehl: report 3
+Nov 21 11:37:05 hmland node[4130775]: [11:37:05,640] [INFO] [system] Log-Level auf "info" gesetzt
+Nov 21 11:37:10 hmland node[4130775]: [11:37:10,315] [INFO] [system] Ladestrategie gewechselt auf: off
+Nov 21 11:37:15 hmland node[4130775]: [11:37:15,404] [INFO] [system] [ChargingStrategyController] Strategie auf "off" → Wallbox wird gestoppt
+Nov 21 11:37:15 hmland node[4130775]: [11:37:15,410] [INFO] [system] [ChargingStrategyController] Wallbox gestoppt, Strategie auf "off" gesetzt
