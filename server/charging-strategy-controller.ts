@@ -276,21 +276,22 @@ export class ChargingStrategyController {
     switch (strategy) {
       case "surplus_battery_prio":
         // Batterie-Priorisierung: HAUSBATTERIE wird bevorzugt geladen
-        // Batterie bekommt zuerst bis zu MAX_BATTERY_CHARGING_POWER (3000W)
-        // Nur der verbleibende Überschuss geht an die Wallbox
-        // Wenn Rest < Mindestleistung (1380W @ 6A 1P), startet/läuft Wallbox nicht
+        // KRITISCH: Verwende die TATSÄCHLICHE Batterieladeleistung aus E3DC-Daten!
+        // Bei hohem SOC kann Batterie nicht mehr 3000W aufnehmen - sonst wird verfügbarer
+        // Überschuss für Wallbox falsch berechnet!
         const totalSurplus = liveData.pvPower - housePowerWithoutWallbox;
         
-        // Batterie bekommt maximal 3000W, kann aber weniger bekommen wenn Überschuss kleiner ist
-        const batteryGetsPower = Math.min(totalSurplus, MAX_BATTERY_CHARGING_POWER);
+        // Batterie lädt gerade mit dieser Leistung (bei SOC=100% nur noch ~800W statt 3000W!)
+        // Wenn batteryPower negativ (Entladung), dann 0 verwenden
+        const actualBatteryCharging = Math.max(0, liveData.batteryPower);
         
         // Rest geht an Wallbox
-        const surplusForWallbox = totalSurplus - batteryGetsPower;
+        const surplusForWallbox = totalSurplus - actualBatteryCharging;
         const surplusWithMargin = surplusForWallbox * 0.90; // 10% Sicherheitsmarge
         
         log("debug", "system", 
           `[surplus_battery_prio] PV=${liveData.pvPower}W, Haus(ohne WB)=${housePowerWithoutWallbox}W, ` +
-          `Total-Überschuss=${totalSurplus}W, Batterie-Reserve=${batteryGetsPower}W, ` +
+          `Total-Überschuss=${totalSurplus}W, Batterie lädt tatsächlich=${actualBatteryCharging}W (SOC=${liveData.batterySoc}%), ` +
           `Für Wallbox=${surplusForWallbox}W, Mit Marge=${Math.round(surplusWithMargin)}W`
         );
         
