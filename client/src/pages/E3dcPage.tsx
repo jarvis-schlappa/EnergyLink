@@ -242,6 +242,7 @@ export default function E3dcPage() {
       e3dc: {
         enabled: settings.e3dc?.enabled || false,
         modbusPauseSeconds: settings.e3dc?.modbusPauseSeconds ?? 3,
+        pollingIntervalSeconds: settings.e3dc?.pollingIntervalSeconds ?? 10,
         prefix: settings.e3dc?.prefix,
         dischargeLockEnableCommand: settings.e3dc?.dischargeLockEnableCommand,
         dischargeLockDisableCommand: settings.e3dc?.dischargeLockDisableCommand,
