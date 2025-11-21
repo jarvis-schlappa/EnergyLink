@@ -641,14 +641,33 @@ export class ChargingStrategyController {
     const currentDiffAmpere = Math.abs(finalAmpere - context.currentAmpere);
     
     if (currentDiffAmpere >= config.minCurrentChangeAmpere) {
+      // KRITISCH: Prüfe Debounce-Zeit BEVOR Stromanpassung!
+      const debounceSeconds = config.currentChangeDebounceSeconds || 30;
+      const lastAdjustmentTime = context.lastAdjustment ? new Date(context.lastAdjustment).getTime() : 0;
+      const now = Date.now();
+      const timeSinceLastAdjustmentSeconds = (now - lastAdjustmentTime) / 1000;
+      
+      if (timeSinceLastAdjustmentSeconds < debounceSeconds) {
+        // Zu wenig Zeit vergangen - nur targetAmpere updaten, aber nicht senden!
+        const remainingSeconds = Math.ceil(debounceSeconds - timeSinceLastAdjustmentSeconds);
+        log("debug", "system", 
+          `Ladestrom-Anpassung gepuffert: ${context.currentAmpere}A → ${finalAmpere}A (Debounce: noch ${remainingSeconds}s warten)`
+        );
+        storage.updateChargingContext({
+          targetAmpere: finalAmpere,
+        });
+        return; // Früher Abbruch - nicht senden!
+      }
+      
+      // Genug Zeit vergangen - Strom anpassen
       try {
         await this.sendUdpCommand(wallboxIp, `curr ${targetCurrentMa}`);
         
-        const now = new Date();
+        const nowDate = new Date();
         storage.updateChargingContext({
           currentAmpere: finalAmpere,
           targetAmpere: finalAmpere,
-          lastAdjustment: now.toISOString(),
+          lastAdjustment: nowDate.toISOString(),
         });
         
         log("info", "system", 
