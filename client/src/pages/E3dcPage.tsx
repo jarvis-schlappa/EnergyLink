@@ -1,5 +1,5 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Battery, Home as HomeIcon, Sun, Grid3x3, TrendingUp, TrendingDown, AlertCircle, PlugZap, ShieldOff, Zap, Clock, Settings as SettingsIcon, Info } from "lucide-react";
+import { Battery, Home as HomeIcon, Sun, Grid3x3, TrendingUp, TrendingDown, AlertCircle, PlugZap, ShieldOff, Zap, Clock, Settings as SettingsIcon, Info, Play } from "lucide-react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import type { E3dcLiveData, Settings, ControlState } from "@shared/schema";
 import { buildInfoSchema } from "@shared/schema";
@@ -7,6 +7,7 @@ import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import { useState, useEffect } from "react";
 import { format } from "date-fns";
 import { de } from "date-fns/locale";
@@ -40,11 +41,14 @@ import { useToast } from "@/hooks/use-toast";
 export default function E3dcPage() {
   const [showBatteryDrawer, setShowBatteryDrawer] = useState(false);
   const [showBuildInfoDialog, setShowBuildInfoDialog] = useState(false);
+  const [showE3dcConsole, setShowE3dcConsole] = useState(false);
   const [relativeUpdateTime, setRelativeUpdateTime] = useState<string>("");
   const [e3dcOperationLocks, setE3dcOperationLocks] = useState({
     batteryLock: false,
     gridCharging: false,
   });
+  const [commandInput, setCommandInput] = useState("");
+  const [commandOutput, setCommandOutput] = useState("");
   const { toast } = useToast();
 
   // Lade Build-Info (nur einmal, keine Auto-Updates)
@@ -93,6 +97,19 @@ export default function E3dcPage() {
     },
     onError: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/settings"] });
+    },
+  });
+
+  // Mutation für E3DC Command Execution
+  const executeCommandMutation = useMutation({
+    mutationFn: (command: string) =>
+      apiRequest("POST", "/api/e3dc/execute-command", { command }),
+    onSuccess: (data: { output: string }) => {
+      setCommandOutput(data.output);
+    },
+    onError: (error) => {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      setCommandOutput(`Fehler: ${errorMessage}`);
     },
   });
 
@@ -426,7 +443,11 @@ export default function E3dcPage() {
             </div>
 
             {/* Effizienzwerte */}
-            <Card>
+            <Card 
+              className={`${isE3dcEnabled ? 'cursor-pointer hover-elevate active-elevate-2' : ''}`}
+              onClick={() => isE3dcEnabled && setShowE3dcConsole(true)}
+              data-testid="card-efficiency"
+            >
               <CardHeader className="pb-3">
                 <CardTitle className="text-base">Effizienz</CardTitle>
               </CardHeader>
@@ -547,6 +568,54 @@ export default function E3dcPage() {
           </div>
         </DrawerContent>
       </Drawer>
+
+      {/* E3DC Console Dialog */}
+      <Dialog open={showE3dcConsole} onOpenChange={setShowE3dcConsole}>
+        <DialogContent className="max-w-2xl" data-testid="dialog-e3dc-console">
+          <DialogHeader>
+            <DialogTitle>E3DC Console</DialogTitle>
+            <DialogDescription>
+              Direktes Ausführen von e3dcset Befehlen (ohne Prefix)
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="flex gap-2">
+              <Input
+                type="text"
+                placeholder="z.B.: -s discharge 1  oder  -c 3000"
+                value={commandInput}
+                onChange={(e) => setCommandInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    executeCommandMutation.mutate(commandInput);
+                  }
+                }}
+                disabled={executeCommandMutation.isPending}
+                data-testid="input-e3dc-command"
+              />
+              <Button
+                onClick={() => executeCommandMutation.mutate(commandInput)}
+                disabled={executeCommandMutation.isPending || !commandInput.trim()}
+                data-testid="button-execute-command"
+              >
+                <Play className="w-4 h-4 mr-2" />
+                Run
+              </Button>
+            </div>
+            
+            {/* Output Display (ca. 10 Zeilen) */}
+            <div className="bg-muted rounded-md p-3 font-mono text-sm min-h-[200px] max-h-[240px] overflow-y-auto border">
+              <div className="text-muted-foreground whitespace-pre-wrap break-words" data-testid="text-command-output">
+                {commandOutput || "Output wird hier angezeigt..."}
+              </div>
+            </div>
+
+            <p className="text-xs text-muted-foreground">
+              Der e3dcset-Prefix wird automatisch hinzugefügt. Geben Sie nur die Parameter ein.
+            </p>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={showBuildInfoDialog} onOpenChange={setShowBuildInfoDialog}>
         <DialogContent className="max-w-md" data-testid="dialog-build-info">
