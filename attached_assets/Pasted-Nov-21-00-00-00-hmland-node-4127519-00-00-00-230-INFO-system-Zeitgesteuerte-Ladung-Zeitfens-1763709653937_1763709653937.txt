@@ -1,0 +1,51 @@
+Nov 21 00:00:00 hmland node[4127519]: [00:00:00,230] [INFO] [system] Zeitgesteuerte Ladung: Zeitfenster erreicht (00:00-05:00) - starte Laden
+Nov 21 00:00:00 hmland node[4127519]: [00:00:00,237] [INFO] [system] Zeitgesteuerte Ladung: Aktiviere Battery Lock + Grid Charging (kombiniert)
+Nov 21 00:00:00 hmland node[4127519]: [00:00:00,243] [INFO] [system] E3DC: Modbus-Pause BEGINNT (30s vor e3dcset-Befehl)
+Nov 21 00:00:30 hmland node[4127519]: [00:00:30,250] [INFO] [system] E3DC: Modbus-Pause ENDET (30s vor e3dcset-Befehl)
+Nov 21 00:00:30 hmland node[4127519]: [00:00:30,253] [INFO] [system] E3DC: Night Charging aktivieren (Battery Lock + Grid Charging) - Befehl: /opt/keba-wallbox/e3dcset -p /opt/keba-wallbox/e3dcset.config -d 1 -c 2500 -e 6000
+Nov 21 00:00:32 hmland node[4127519]: [00:00:32,323] [INFO] [system] E3DC: Night Charging aktivieren (Battery Lock + Grid Charging) - Ausgabe - Setze LadeLeistung auf 2500W
+Nov 21 00:00:32 hmland node[4127519]: Setze EntladeLeistung auf 1W
+Nov 21 00:00:32 hmland node[4127519]: Manuelles Laden gestartet
+Nov 21 00:00:32 hmland node[4127519]: [00:00:32,325] [INFO] [system] E3DC: Night Charging aktivieren (Battery Lock + Grid Charging) erfolgreich ausgeführt
+Nov 21 00:00:32 hmland node[4127519]: [00:00:32,328] [INFO] [system] E3DC: Modbus-Pause BEGINNT (30s nach e3dcset-Befehl)
+Nov 21 00:01:00 hmland node[4127519]: [00:01:00,232] [INFO] [system] Zeitgesteuerte Ladung: Zeitfenster erreicht (00:00-05:00) - starte Laden
+Nov 21 00:01:00 hmland node[4127519]: [00:01:00,234] [INFO] [system] Zeitgesteuerte Ladung: Aktiviere Battery Lock + Grid Charging (kombiniert)
+Nov 21 00:01:00 hmland node[4127519]: [00:01:00,237] [INFO] [system] E3DC: Modbus-Pause BEGINNT (30s vor e3dcset-Befehl)
+Nov 21 00:01:02 hmland node[4127519]: [00:01:02,332] [INFO] [system] E3DC: Modbus-Pause ENDET (30s nach e3dcset-Befehl)
+Nov 21 00:01:02 hmland node[4127519]: [00:01:02,334] [INFO] [e3dc-poller] E3DC-Background-Poller wird gestartet - Update-Intervall: 5 Sekunden
+Nov 21 00:01:02 hmland node[4127519]: [00:01:02,335] [INFO] [system] E3DC: Poller nach e3dcset-Befehl wieder gestartet
+Nov 21 00:01:30 hmland node[4127519]: [00:01:30,242] [INFO] [system] E3DC: Modbus-Pause ENDET (30s vor e3dcset-Befehl)
+Nov 21 00:01:30 hmland node[4127519]: [00:01:30,245] [INFO] [system] E3DC: Night Charging aktivieren (Battery Lock + Grid Charging) - Befehl: /opt/keba-wallbox/e3dcset -p /opt/keba-wallbox/e3dcset.config -d 1 -c 2500 -e 6000
+Nov 21 00:01:32 hmland node[4127519]: [00:01:32,312] [INFO] [system] E3DC: Night Charging aktivieren (Battery Lock + Grid Charging) - Ausgabe - Setze LadeLeistung auf 2500W
+Nov 21 00:01:32 hmland node[4127519]: Setze EntladeLeistung auf 1W
+Nov 21 00:01:32 hmland node[4127519]: Manuelles Laden abgeleht.
+Nov 21 00:01:32 hmland node[4127519]: [00:01:32,315] [INFO] [system] E3DC: Night Charging aktivieren (Battery Lock + Grid Charging) erfolgreich ausgeführt
+Nov 21 00:01:32 hmland node[4127519]: [00:01:32,318] [INFO] [system] E3DC: Modbus-Pause BEGINNT (30s nach e3dcset-Befehl)
+Nov 21 00:02:02 hmland node[4127519]: [00:02:02,322] [INFO] [system] E3DC: Modbus-Pause ENDET (30s nach e3dcset-Befehl)
+Nov 21 00:02:02 hmland node[4127519]: [00:02:02,324] [INFO] [e3dc-poller] E3DC-Background-Poller wird gestartet - Update-Intervall: 5 Sekunden
+Nov 21 00:02:02 hmland node[4127519]: [00:02:02,325] [INFO] [system] E3DC: Poller nach e3dcset-Befehl wieder gestartet
+Nov 21 05:00:00 hmland node[4127519]: [05:00:00,953] [INFO] [system] Zeitgesteuerte Ladung: Zeitfenster beendet - stoppe Laden
+Nov 21 05:00:00 hmland node[4127519]: [05:00:00,985] [INFO] [system] Zeitgesteuerte Ladung: Deaktiviere Battery Lock + Grid Charging (kombiniert)
+Nov 21 05:00:00 hmland node[4127519]: [05:00:00,988] [INFO] [system] E3DC: Modbus-Pause BEGINNT (30s vor e3dcset-Befehl)
+Nov 21 05:00:01 hmland node[4127519]: [05:00:01,040] [INFO] [system] [Wallbox-Broadcast-Listener] State geändert: 5 → 1 (not ready for charging) (von 192.168.40.16)
+Nov 21 05:00:30 hmland node[4127519]: [05:00:30,992] [INFO] [system] E3DC: Modbus-Pause ENDET (30s vor e3dcset-Befehl)
+Nov 21 05:00:30 hmland node[4127519]: [05:00:30,994] [INFO] [system] E3DC: Night Charging deaktivieren (Battery Lock + Grid Charging) - Befehl: /opt/keba-wallbox/e3dcset -p /opt/keba-wallbox/e3dcset.config -a -e 0
+Nov 21 05:00:33 hmland node[4127519]: [05:00:33,063] [INFO] [system] E3DC: Night Charging deaktivieren (Battery Lock + Grid Charging) - Ausgabe - Setze Lade-/EntladeLeistung auf Automatik
+Nov 21 05:00:33 hmland node[4127519]: Manuelles Laden gestoppt
+Nov 21 05:00:33 hmland node[4127519]: [05:00:33,066] [INFO] [system] E3DC: Night Charging deaktivieren (Battery Lock + Grid Charging) erfolgreich ausgeführt
+Nov 21 05:00:33 hmland node[4127519]: [05:00:33,068] [INFO] [system] E3DC: Modbus-Pause BEGINNT (30s nach e3dcset-Befehl)
+Nov 21 05:01:00 hmland node[4127519]: [05:01:00,955] [INFO] [system] Zeitgesteuerte Ladung: Zeitfenster beendet - stoppe Laden
+Nov 21 05:01:00 hmland node[4127519]: [05:01:00,984] [INFO] [system] Zeitgesteuerte Ladung: Deaktiviere Battery Lock + Grid Charging (kombiniert)
+Nov 21 05:01:00 hmland node[4127519]: [05:01:00,986] [INFO] [system] E3DC: Modbus-Pause BEGINNT (30s vor e3dcset-Befehl)
+Nov 21 05:01:03 hmland node[4127519]: [05:01:03,073] [INFO] [system] E3DC: Modbus-Pause ENDET (30s nach e3dcset-Befehl)
+Nov 21 05:01:03 hmland node[4127519]: [05:01:03,074] [INFO] [e3dc-poller] E3DC-Background-Poller wird gestartet - Update-Intervall: 5 Sekunden
+Nov 21 05:01:03 hmland node[4127519]: [05:01:03,076] [INFO] [system] E3DC: Poller nach e3dcset-Befehl wieder gestartet
+Nov 21 05:01:30 hmland node[4127519]: [05:01:30,989] [INFO] [system] E3DC: Modbus-Pause ENDET (30s vor e3dcset-Befehl)
+Nov 21 05:01:31 hmland node[4127519]: [05:01:30,992] [INFO] [system] E3DC: Night Charging deaktivieren (Battery Lock + Grid Charging) - Befehl: /opt/keba-wallbox/e3dcset -p /opt/keba-wallbox/e3dcset.config -a -e 0
+Nov 21 05:01:33 hmland node[4127519]: [05:01:33,077] [INFO] [system] E3DC: Night Charging deaktivieren (Battery Lock + Grid Charging) - Ausgabe - Setze Lade-/EntladeLeistung auf Automatik
+Nov 21 05:01:33 hmland node[4127519]: Manuelles Laden gestoppt
+Nov 21 05:01:33 hmland node[4127519]: [05:01:33,080] [INFO] [system] E3DC: Night Charging deaktivieren (Battery Lock + Grid Charging) erfolgreich ausgeführt
+Nov 21 05:01:33 hmland node[4127519]: [05:01:33,083] [INFO] [system] E3DC: Modbus-Pause BEGINNT (30s nach e3dcset-Befehl)
+Nov 21 05:02:03 hmland node[4127519]: [05:02:03,086] [INFO] [system] E3DC: Modbus-Pause ENDET (30s nach e3dcset-Befehl)
+Nov 21 05:02:03 hmland node[4127519]: [05:02:03,088] [INFO] [e3dc-poller] E3DC-Background-Poller wird gestartet - Update-Intervall: 5 Sekunden
+Nov 21 05:02:03 hmland node[4127519]: [05:02:03,089] [INFO] [system] E3DC: Poller nach e3dcset-Befehl wieder gestartet

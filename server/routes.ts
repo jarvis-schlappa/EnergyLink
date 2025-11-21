@@ -1376,9 +1376,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
   };
 
   // Scheduler für zeitgesteuerte Ladung
+  let isNightChargingOperationInProgress = false;
 
   const checkNightChargingSchedule = async () => {
     try {
+      // Lock-Mechanismus: Verhindert parallele E3DC-Operationen
+      if (isNightChargingOperationInProgress) {
+        log(
+          "debug",
+          "system",
+          `Scheduler für zeitgesteuerte Ladung: E3DC-Operation läuft bereits - überspringe diesen Tick`,
+        );
+        return;
+      }
+
       const settings = storage.getSettings();
       const schedule = settings?.nightChargingSchedule;
       const currentState = storage.getControlState();
@@ -1400,10 +1411,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
             `Zeitgesteuerte Ladung: Zeitsteuerung deaktiviert - stoppe Laden`,
           );
 
-          // Stoppe die Wallbox (kann fehlschlagen)
-          if (settings?.wallboxIp) {
-            try {
-              await sendUdpCommand(settings.wallboxIp, "ena 0");
+          // try/finally für garantierte Lock-Freigabe (Lock MUSS innerhalb try gesetzt werden!)
+          try {
+            // Lock setzen: Verhindert parallele E3DC-Operationen
+            isNightChargingOperationInProgress = true;
+            
+            // KRITISCH: Setze nightCharging=false SOFORT, BEVOR der lange async E3DC-Befehl läuft
+            storage.saveControlState({
+              ...currentState,
+              nightCharging: false,
+              batteryLock: false,
+              gridCharging: false,
+            });
+
+            // Stoppe die Wallbox (kann fehlschlagen)
+            if (settings?.wallboxIp) {
+              try {
+                await sendUdpCommand(settings.wallboxIp, "ena 0");
               
               // Prowl-Benachrichtigung: Ladung gestoppt (non-blocking)
               triggerProwlEvent(settings, "chargingStopped", (notifier) =>
@@ -1419,13 +1443,221 @@ export async function registerRoutes(app: Express): Promise<Server> {
             }
           }
 
+            // Deaktiviere Battery Lock + Grid Charging (KOMBINIERT in einem e3dcset-Aufruf!)
+            if (e3dcClient.isConfigured()) {
+              try {
+                log(
+                  "info",
+                  "system",
+                  `Zeitgesteuerte Ladung: Deaktiviere Battery Lock + Grid Charging (Scheduler deaktiviert, kombiniert)`,
+                );
+                
+                // KOMBINIERTER Aufruf: Battery Lock + Grid Charging deaktivieren in einem e3dcset-Befehl
+                await e3dcClient.disableNightCharging();
+                
+                // Prowl-Benachrichtigung: Battery Lock deaktiviert (non-blocking)
+                triggerProwlEvent(settings, "batteryLockDeactivated", (notifier) =>
+                  notifier.sendBatteryLockDeactivated()
+                );
+                
+                // Prowl-Benachrichtigung: Grid Charging deaktiviert mit SOC-Ende (falls war aktiv, non-blocking)
+                if (currentState.gridCharging) {
+                  const e3dcData = getE3dcModbusService().getLastReadLiveData();
+                  const socEnd = e3dcData?.batterySoc;
+                  triggerProwlEvent(settings, "gridChargingDeactivated", (notifier) =>
+                    notifier.sendGridChargingDeactivated(socEnd)
+                  );
+                }
+              } catch (error) {
+                log(
+                  "error",
+                  "system",
+                  "Fehler beim Deaktivieren von Night Charging (Scheduler deaktiviert) - State wird zurückgerollt",
+                  error instanceof Error ? error.message : String(error),
+                );
+                // Rollback: Setze KOMPLETTEN State zurück (inkl. gridCharging!)
+                storage.saveControlState(currentState);
+                return; // Abbruch
+              }
+            } else {
+              log(
+                "warning",
+                "system",
+                `Zeitgesteuerte Ladung: E3DC nicht konfiguriert - Battery Lock nicht deaktiviert`,
+              );
+            }
+          } finally {
+            // Lock IMMER freigeben, auch bei Fehlern
+            isNightChargingOperationInProgress = false;
+          }
+        }
+        return;
+      }
+
+      const isInTimeWindow = isTimeInRange(
+        currentTime,
+        schedule.startTime,
+        schedule.endTime,
+      );
+
+      if (isInTimeWindow && !currentState.nightCharging) {
+        log(
+          "info",
+          "system",
+          `Zeitgesteuerte Ladung: Zeitfenster erreicht (${schedule.startTime}-${schedule.endTime}) - starte Laden`,
+        );
+
+        // try/finally für garantierte Lock-Freigabe (Lock MUSS innerhalb try gesetzt werden!)
+        try {
+          // Lock setzen: Verhindert parallele E3DC-Operationen
+          isNightChargingOperationInProgress = true;
+          
+          // KRITISCH: Setze nightCharging=true SOFORT, BEVOR der lange async E3DC-Befehl läuft
+          // Verhindert dass der nächste Scheduler-Tick (00:01) den Befehl nochmal ausführt
+          const withGridCharging = e3dcClient.isConfigured() && e3dcClient.isGridChargeDuringNightChargingEnabled();
+          storage.saveControlState({
+            ...currentState,
+            nightCharging: true,
+            batteryLock: true,
+            gridCharging: withGridCharging,
+          });
+
+          // Aktiviere Batterie-Entladesperre + optional Grid Charging (KOMBINIERT in einem e3dcset-Aufruf!)
+          let gridChargingSuccess = false;
+          if (e3dcClient.isConfigured()) {
+            try {
+              log(
+                "info",
+                "system",
+                withGridCharging
+                  ? `Zeitgesteuerte Ladung: Aktiviere Battery Lock + Grid Charging (kombiniert)`
+                  : `Zeitgesteuerte Ladung: Aktiviere Battery Lock`,
+              );
+              
+              // KOMBINIERTER Aufruf: Battery Lock + Grid Charging in einem e3dcset-Befehl
+              await e3dcClient.enableNightCharging(withGridCharging);
+              gridChargingSuccess = true;
+              
+              // Prowl-Benachrichtigung: Battery Lock aktiviert (non-blocking)
+              triggerProwlEvent(settings, "batteryLockActivated", (notifier) =>
+                notifier.sendBatteryLockActivated()
+              );
+              
+              // Prowl-Benachrichtigung: Grid Charging aktiviert mit SOC und Zielmenge (falls aktiviert, non-blocking)
+              if (withGridCharging) {
+                const e3dcData = getE3dcModbusService().getLastReadLiveData();
+                const socStart = e3dcData?.batterySoc;
+                const targetWh = settings?.e3dc?.gridChargeEnableCommand 
+                  ? extractTargetWh(settings.e3dc.gridChargeEnableCommand)
+                  : undefined;
+                triggerProwlEvent(settings, "gridChargingActivated", (notifier) =>
+                  notifier.sendGridChargingActivated(socStart, targetWh)
+                );
+              }
+            } catch (error) {
+              log(
+                "error",
+                "system",
+                "Fehler beim Aktivieren von Night Charging - State wird zurückgerollt",
+                error instanceof Error ? error.message : String(error),
+              );
+              // Rollback: Setze KOMPLETTEN State zurück (inkl. gridCharging!)
+              storage.saveControlState(currentState);
+              return; // Abbruch, keine Wallbox-Aktivierung
+            }
+          } else {
+            log(
+              "warning",
+              "system",
+              `Zeitgesteuerte Ladung: E3DC nicht konfiguriert - Battery Lock nicht aktiviert`,
+            );
+          }
+
+          // Korrigiere gridCharging-State basierend auf tatsächlichem Ergebnis
+          if (gridChargingSuccess && withGridCharging) {
+            // State war korrekt, nichts zu tun
+          } else {
+            // Grid Charging wurde nicht aktiviert (z.B. E3DC nicht konfiguriert)
+            storage.saveControlState({
+              ...currentState,
+              nightCharging: true,
+              batteryLock: true,
+              gridCharging: false,
+            });
+          }
+
+          // Dann starte die Wallbox (kann fehlschlagen, aber Batterie-Sperre ist bereits aktiv)
+          if (settings?.wallboxIp) {
+            try {
+              await sendUdpCommand(settings.wallboxIp, "ena 1");
+              
+              // Prowl-Benachrichtigung: Ladung gestartet (non-blocking)
+              const context = storage.getChargingContext();
+              const phases = context.currentPhases || 1;
+              const current = phases === 1 ? 32 : 16;
+              triggerProwlEvent(settings, "chargingStarted", (notifier) =>
+                notifier.sendChargingStarted(current, phases, "Nachtladung")
+              );
+            } catch (error) {
+              log(
+                "error",
+                "system",
+                "Zeitgesteuerte Ladung: Fehler beim Starten der Wallbox (Batterie-Sperre ist aktiv)",
+                error instanceof Error ? error.message : String(error),
+              );
+            }
+          }
+        } finally {
+          // Lock IMMER freigeben, auch bei Fehlern
+          isNightChargingOperationInProgress = false;
+        }
+      } else if (!isInTimeWindow && currentState.nightCharging) {
+        log(
+          "info",
+          "system",
+          `Zeitgesteuerte Ladung: Zeitfenster beendet - stoppe Laden`,
+        );
+
+        // try/finally für garantierte Lock-Freigabe (Lock MUSS innerhalb try gesetzt werden!)
+        try {
+          // Lock setzen: Verhindert parallele E3DC-Operationen
+          isNightChargingOperationInProgress = true;
+          
+          // KRITISCH: Setze nightCharging=false SOFORT, BEVOR der lange async E3DC-Befehl läuft
+          // Verhindert dass der nächste Scheduler-Tick (05:01) den Befehl nochmal ausführt
+          storage.saveControlState({
+            ...currentState,
+            nightCharging: false,
+            batteryLock: false,
+            gridCharging: false,
+          });
+
+          // Stoppe die Wallbox (kann fehlschlagen)
+          if (settings?.wallboxIp) {
+            try {
+              await sendUdpCommand(settings.wallboxIp, "ena 0");
+              
+              // Prowl-Benachrichtigung: Ladung gestoppt (non-blocking)
+              triggerProwlEvent(settings, "chargingStopped", (notifier) =>
+                notifier.sendChargingStopped("Zeitfenster beendet")
+              );
+            } catch (error) {
+              log(
+                "error",
+                "system",
+                "Zeitgesteuerte Ladung: Fehler beim Stoppen der Wallbox",
+                error instanceof Error ? error.message : String(error),
+              );
+            }
+          }
+
           // Deaktiviere Battery Lock + Grid Charging (KOMBINIERT in einem e3dcset-Aufruf!)
           if (e3dcClient.isConfigured()) {
             try {
               log(
                 "info",
                 "system",
-                `Zeitgesteuerte Ladung: Deaktiviere Battery Lock + Grid Charging (Scheduler deaktiviert, kombiniert)`,
+                `Zeitgesteuerte Ladung: Deaktiviere Battery Lock + Grid Charging (kombiniert)`,
               );
               
               // KOMBINIERTER Aufruf: Battery Lock + Grid Charging deaktivieren in einem e3dcset-Befehl
@@ -1448,9 +1680,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
               log(
                 "error",
                 "system",
-                "Fehler beim Deaktivieren von Night Charging (Scheduler deaktiviert)",
+                "Fehler beim Deaktivieren von Night Charging - State wird zurückgerollt",
                 error instanceof Error ? error.message : String(error),
               );
+              // Rollback: Setze KOMPLETTEN State zurück (inkl. gridCharging!)
+              storage.saveControlState(currentState);
+              return; // Abbruch
             }
           } else {
             log(
@@ -1459,181 +1694,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
               `Zeitgesteuerte Ladung: E3DC nicht konfiguriert - Battery Lock nicht deaktiviert`,
             );
           }
-
-          storage.saveControlState({
-            ...currentState,
-            nightCharging: false,
-            batteryLock: false,
-            gridCharging: false,
-          });
+        } finally {
+          // Lock IMMER freigeben, auch bei Fehlern
+          isNightChargingOperationInProgress = false;
         }
-        return;
-      }
-
-      const isInTimeWindow = isTimeInRange(
-        currentTime,
-        schedule.startTime,
-        schedule.endTime,
-      );
-
-      if (isInTimeWindow && !currentState.nightCharging) {
-        log(
-          "info",
-          "system",
-          `Zeitgesteuerte Ladung: Zeitfenster erreicht (${schedule.startTime}-${schedule.endTime}) - starte Laden`,
-        );
-
-        // Aktiviere Batterie-Entladesperre + optional Grid Charging (KOMBINIERT in einem e3dcset-Aufruf!)
-        let gridChargingActive = false;
-        if (e3dcClient.isConfigured()) {
-          const withGridCharging = e3dcClient.isGridChargeDuringNightChargingEnabled();
-          
-          try {
-            log(
-              "info",
-              "system",
-              withGridCharging
-                ? `Zeitgesteuerte Ladung: Aktiviere Battery Lock + Grid Charging (kombiniert)`
-                : `Zeitgesteuerte Ladung: Aktiviere Battery Lock`,
-            );
-            
-            // KOMBINIERTER Aufruf: Battery Lock + Grid Charging in einem e3dcset-Befehl
-            await e3dcClient.enableNightCharging(withGridCharging);
-            gridChargingActive = withGridCharging;
-            
-            // Prowl-Benachrichtigung: Battery Lock aktiviert (non-blocking)
-            triggerProwlEvent(settings, "batteryLockActivated", (notifier) =>
-              notifier.sendBatteryLockActivated()
-            );
-            
-            // Prowl-Benachrichtigung: Grid Charging aktiviert mit SOC und Zielmenge (falls aktiviert, non-blocking)
-            if (gridChargingActive) {
-              const e3dcData = getE3dcModbusService().getLastReadLiveData();
-              const socStart = e3dcData?.batterySoc;
-              const targetWh = settings?.e3dc?.gridChargeEnableCommand 
-                ? extractTargetWh(settings.e3dc.gridChargeEnableCommand)
-                : undefined;
-              triggerProwlEvent(settings, "gridChargingActivated", (notifier) =>
-                notifier.sendGridChargingActivated(socStart, targetWh)
-              );
-            }
-          } catch (error) {
-            log(
-              "error",
-              "system",
-              "Fehler beim Aktivieren von Night Charging",
-              error instanceof Error ? error.message : String(error),
-            );
-          }
-        } else {
-          log(
-            "warning",
-            "system",
-            `Zeitgesteuerte Ladung: E3DC nicht konfiguriert - Battery Lock nicht aktiviert`,
-          );
-        }
-
-        // Dann starte die Wallbox (kann fehlschlagen, aber Batterie-Sperre ist bereits aktiv)
-        if (settings?.wallboxIp) {
-          try {
-            await sendUdpCommand(settings.wallboxIp, "ena 1");
-            
-            // Prowl-Benachrichtigung: Ladung gestartet (non-blocking)
-            const context = storage.getChargingContext();
-            const phases = context.currentPhases || 1;
-            const current = phases === 1 ? 32 : 16;
-            triggerProwlEvent(settings, "chargingStarted", (notifier) =>
-              notifier.sendChargingStarted(current, phases, "Nachtladung")
-            );
-          } catch (error) {
-            log(
-              "error",
-              "system",
-              "Zeitgesteuerte Ladung: Fehler beim Starten der Wallbox (Batterie-Sperre ist aktiv)",
-              error instanceof Error ? error.message : String(error),
-            );
-          }
-        }
-
-        storage.saveControlState({
-          ...currentState,
-          nightCharging: true,
-          batteryLock: true,
-          gridCharging: gridChargingActive,
-        });
-      } else if (!isInTimeWindow && currentState.nightCharging) {
-        log(
-          "info",
-          "system",
-          `Zeitgesteuerte Ladung: Zeitfenster beendet - stoppe Laden`,
-        );
-
-        // Stoppe die Wallbox (kann fehlschlagen)
-        if (settings?.wallboxIp) {
-          try {
-            await sendUdpCommand(settings.wallboxIp, "ena 0");
-            
-            // Prowl-Benachrichtigung: Ladung gestoppt (non-blocking)
-            triggerProwlEvent(settings, "chargingStopped", (notifier) =>
-              notifier.sendChargingStopped("Zeitfenster beendet")
-            );
-          } catch (error) {
-            log(
-              "error",
-              "system",
-              "Zeitgesteuerte Ladung: Fehler beim Stoppen der Wallbox",
-              error instanceof Error ? error.message : String(error),
-            );
-          }
-        }
-
-        // Deaktiviere Battery Lock + Grid Charging (KOMBINIERT in einem e3dcset-Aufruf!)
-        if (e3dcClient.isConfigured()) {
-          try {
-            log(
-              "info",
-              "system",
-              `Zeitgesteuerte Ladung: Deaktiviere Battery Lock + Grid Charging (kombiniert)`,
-            );
-            
-            // KOMBINIERTER Aufruf: Battery Lock + Grid Charging deaktivieren in einem e3dcset-Befehl
-            await e3dcClient.disableNightCharging();
-            
-            // Prowl-Benachrichtigung: Battery Lock deaktiviert (non-blocking)
-            triggerProwlEvent(settings, "batteryLockDeactivated", (notifier) =>
-              notifier.sendBatteryLockDeactivated()
-            );
-            
-            // Prowl-Benachrichtigung: Grid Charging deaktiviert mit SOC-Ende (falls war aktiv, non-blocking)
-            if (currentState.gridCharging) {
-              const e3dcData = getE3dcModbusService().getLastReadLiveData();
-              const socEnd = e3dcData?.batterySoc;
-              triggerProwlEvent(settings, "gridChargingDeactivated", (notifier) =>
-                notifier.sendGridChargingDeactivated(socEnd)
-              );
-            }
-          } catch (error) {
-            log(
-              "error",
-              "system",
-              "Fehler beim Deaktivieren von Night Charging",
-              error instanceof Error ? error.message : String(error),
-            );
-          }
-        } else {
-          log(
-            "warning",
-            "system",
-            `Zeitgesteuerte Ladung: E3DC nicht konfiguriert - Battery Lock nicht deaktiviert`,
-          );
-        }
-
-        storage.saveControlState({
-          ...currentState,
-          nightCharging: false,
-          batteryLock: false,
-          gridCharging: false,
-        });
       }
     } catch (error) {
       log(
