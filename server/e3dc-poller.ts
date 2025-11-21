@@ -6,9 +6,9 @@ import { sendUdpCommand } from "./wallbox-transport";
 /**
  * E3DC-Background-Poller
  * 
- * Liest alle 5 Sekunden E3DC-Daten im Hintergrund, damit FHEM und andere
- * Consumer immer aktuelle Werte bekommen - unabhängig von aktiven Clients
- * oder laufenden Charging-Strategien.
+ * Liest in konfigurierbarem Intervall (Standard: 10s) E3DC-Daten im Hintergrund,
+ * damit FHEM und andere Consumer immer aktuelle Werte bekommen - unabhängig von
+ * aktiven Clients oder laufenden Charging-Strategien.
  */
 
 // Module-scope handles
@@ -87,10 +87,15 @@ async function pollE3dcData(): Promise<void> {
 }
 
 /**
- * Startet den E3DC-Background-Poller (alle 5 Sekunden)
+ * Startet den E3DC-Background-Poller
  */
 export function startE3dcPoller(): NodeJS.Timeout {
-  log("info", "e3dc-poller", "E3DC-Background-Poller wird gestartet", "Update-Intervall: 5 Sekunden");
+  // Lese Polling-Intervall aus Einstellungen (Default: 10 Sekunden)
+  const settings = storage.getSettings();
+  const pollingIntervalSeconds = settings?.e3dc?.pollingIntervalSeconds ?? 10;
+  const pollingIntervalMs = pollingIntervalSeconds * 1000;
+  
+  log("info", "e3dc-poller", "E3DC-Background-Poller wird gestartet", `Update-Intervall: ${pollingIntervalSeconds} Sekunden`);
 
   // Initialer Poll nach 2s (lässt Server-Start Zeit für Initialisierung)
   initialPollerTimeout = setTimeout(async () => {
@@ -98,10 +103,10 @@ export function startE3dcPoller(): NodeJS.Timeout {
     await pollE3dcData();
   }, 2000);
 
-  // Danach alle 5 Sekunden
+  // Danach alle X Sekunden (konfigurierbar)
   const interval = setInterval(async () => {
     await pollE3dcData();
-  }, 5000);
+  }, pollingIntervalMs);
   
   pollerInterval = interval;
   return interval;
