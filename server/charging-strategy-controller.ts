@@ -9,6 +9,7 @@ const PHASE_VOLTAGE_1P = 230;
 const MIN_CURRENT_AMPERE = 6;
 const MAX_CURRENT_1P_AMPERE = 32;
 const MAX_CURRENT_3P_AMPERE = 16;
+const MAX_BATTERY_CHARGING_POWER = 3000; // Batterie max Ladeleistung für surplus_battery_prio
 
 export class ChargingStrategyController {
   private sendUdpCommand: (ip: string, command: string) => Promise<any>;
@@ -264,18 +265,22 @@ export class ChargingStrategyController {
     switch (strategy) {
       case "surplus_battery_prio":
         // Batterie-Priorisierung: HAUSBATTERIE wird bevorzugt geladen
-        // Wallbox bekommt nur, was NACH der Batterie-Ladung übrig bleibt
-        // Formel: (PV - Haus) - Batterie-Aufnahme
-        // batteryPower: positiv = Batterie lädt, negativ = Batterie entlädt
+        // Batterie bekommt zuerst bis zu MAX_BATTERY_CHARGING_POWER (3000W)
+        // Nur der verbleibende Überschuss geht an die Wallbox
+        // Wenn Rest < Mindestleistung (1380W @ 6A 1P), startet/läuft Wallbox nicht
         const totalSurplus = liveData.pvPower - housePowerWithoutWallbox;
-        const batteryConsumption = Math.max(0, liveData.batteryPower); // Nur wenn Batterie lädt
-        const surplusAfterBattery = totalSurplus - batteryConsumption;
-        const surplusWithMargin = surplusAfterBattery * 0.90; // 10% Sicherheitsmarge
+        
+        // Batterie bekommt maximal 3000W, kann aber weniger bekommen wenn Überschuss kleiner ist
+        const batteryGetsPower = Math.min(totalSurplus, MAX_BATTERY_CHARGING_POWER);
+        
+        // Rest geht an Wallbox
+        const surplusForWallbox = totalSurplus - batteryGetsPower;
+        const surplusWithMargin = surplusForWallbox * 0.90; // 10% Sicherheitsmarge
         
         log("debug", "system", 
           `[surplus_battery_prio] PV=${liveData.pvPower}W, Haus(ohne WB)=${housePowerWithoutWallbox}W, ` +
-          `Batterie=${liveData.batteryPower}W, Total-Überschuss=${totalSurplus}W, ` +
-          `Nach Batterie=${surplusAfterBattery}W, Mit Marge=${Math.round(surplusWithMargin)}W`
+          `Total-Überschuss=${totalSurplus}W, Batterie-Reserve=${batteryGetsPower}W, ` +
+          `Für Wallbox=${surplusForWallbox}W, Mit Marge=${Math.round(surplusWithMargin)}W`
         );
         
         return Math.max(0, surplusWithMargin);
