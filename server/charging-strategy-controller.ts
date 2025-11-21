@@ -568,9 +568,12 @@ export class ChargingStrategyController {
     const now = new Date();
     
     // KRITISCH: Stabilisierungsphase nach Start!
-    // E3DC-Daten brauchen ~10-20s um die Wallbox-Last zu erfassen
+    // E3DC-Daten brauchen Zeit, um die Wallbox-Last zu erfassen
+    // Dauer = 2× Polling-Intervall (damit mindestens 1-2 E3DC-Updates erfolgen)
     // Ohne diese Phase: Sofortiger Stop wegen falscher Überschuss-Berechnung
-    const STABILIZATION_PERIOD_MS = 20000; // 20 Sekunden (2x Polling-Intervall)
+    const settings = storage.getSettings();
+    const pollingIntervalSeconds = settings?.e3dc?.pollingIntervalSeconds || 10;
+    const STABILIZATION_PERIOD_MS = pollingIntervalSeconds * 2 * 1000;
     
     if (context.lastStartedAt) {
       const timeSinceStart = now.getTime() - new Date(context.lastStartedAt).getTime();
@@ -578,7 +581,7 @@ export class ChargingStrategyController {
       if (timeSinceStart < STABILIZATION_PERIOD_MS) {
         const remainingStabilization = Math.ceil((STABILIZATION_PERIOD_MS - timeSinceStart) / 1000);
         log("debug", "system", 
-          `[${strategy}] Stabilisierungsphase aktiv - Stop-Prüfung unterdrückt für noch ${remainingStabilization}s (E3DC-Daten müssen Wallbox-Last erfassen)`
+          `[${strategy}] Stabilisierungsphase aktiv (${pollingIntervalSeconds}s × 2) - Stop-Prüfung unterdrückt für noch ${remainingStabilization}s (E3DC-Daten müssen Wallbox-Last erfassen)`
         );
         return false;
       }
