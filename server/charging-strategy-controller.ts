@@ -276,22 +276,35 @@ export class ChargingStrategyController {
     switch (strategy) {
       case "surplus_battery_prio":
         // Batterie-Priorisierung: HAUSBATTERIE wird bevorzugt geladen
-        // KRITISCH: Verwende die TATSÄCHLICHE Batterieladeleistung aus E3DC-Daten!
-        // Bei hohem SOC kann Batterie nicht mehr 3000W aufnehmen - sonst wird verfügbarer
-        // Überschuss für Wallbox falsch berechnet!
+        // Hybride Logik für Batterie-Reservierung:
+        // - Bis 95% SOC: Theoretische 3000W Reservierung (Batterie kann noch voll laden)
+        // - Ab 95% SOC: Tatsächliche Batterieladeleistung (Ladung wird gedrosselt)
         const totalSurplus = liveData.pvPower - housePowerWithoutWallbox;
         
-        // Batterie lädt gerade mit dieser Leistung (bei SOC=100% nur noch ~800W statt 3000W!)
-        // Wenn batteryPower negativ (Entladung), dann 0 verwenden
-        const actualBatteryCharging = Math.max(0, liveData.batteryPower);
+        let batteryReservation: number;
+        const SOC_THRESHOLD = 95;
+        
+        if (liveData.batterySoc < SOC_THRESHOLD) {
+          // Bis 95% SOC: Batterie bekommt theoretisch bis zu 3000W
+          batteryReservation = Math.min(totalSurplus, MAX_BATTERY_CHARGING_POWER);
+          log("debug", "system", 
+            `[surplus_battery_prio] SOC=${liveData.batterySoc}% < ${SOC_THRESHOLD}% → Theoretische Reservierung: ${batteryReservation}W`
+          );
+        } else {
+          // Ab 95% SOC: Verwende tatsächliche Batterieladeleistung (bei SOC=100% nur noch ~800W)
+          batteryReservation = Math.max(0, liveData.batteryPower);
+          log("debug", "system", 
+            `[surplus_battery_prio] SOC=${liveData.batterySoc}% ≥ ${SOC_THRESHOLD}% → Tatsächliche Ladeleistung: ${batteryReservation}W`
+          );
+        }
         
         // Rest geht an Wallbox
-        const surplusForWallbox = totalSurplus - actualBatteryCharging;
+        const surplusForWallbox = totalSurplus - batteryReservation;
         const surplusWithMargin = surplusForWallbox * 0.90; // 10% Sicherheitsmarge
         
         log("debug", "system", 
           `[surplus_battery_prio] PV=${liveData.pvPower}W, Haus(ohne WB)=${housePowerWithoutWallbox}W, ` +
-          `Total-Überschuss=${totalSurplus}W, Batterie lädt tatsächlich=${actualBatteryCharging}W (SOC=${liveData.batterySoc}%), ` +
+          `Total-Überschuss=${totalSurplus}W, Batterie-Reserve=${batteryReservation}W (SOC=${liveData.batterySoc}%), ` +
           `Für Wallbox=${surplusForWallbox}W, Mit Marge=${Math.round(surplusWithMargin)}W`
         );
         
