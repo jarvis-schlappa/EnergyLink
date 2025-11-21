@@ -102,8 +102,10 @@ export default function E3dcPage() {
 
   // Mutation für E3DC Command Execution
   const executeCommandMutation = useMutation({
-    mutationFn: (command: string) =>
-      apiRequest("POST", "/api/e3dc/execute-command", { command }),
+    mutationFn: async (command: string) => {
+      const res = await apiRequest("POST", "/api/e3dc/execute-command", { command });
+      return res as { output: string };
+    },
     onSuccess: (data: { output: string }) => {
       setCommandOutput(data.output);
     },

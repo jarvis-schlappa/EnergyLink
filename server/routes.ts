@@ -821,6 +821,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post("/api/e3dc/execute-command", async (req, res) => {
+    try {
+      const settings = storage.getSettings();
+      
+      // E3DC muss aktiviert sein
+      if (!settings?.e3dc?.enabled) {
+        return res.status(400).json({ error: "E3DC ist nicht aktiviert" });
+      }
+      
+      // Validiere Input
+      const { command } = req.body;
+      if (!command || typeof command !== 'string' || command.trim() === '') {
+        return res.status(400).json({ error: "Befehl ist erforderlich" });
+      }
+      
+      // Kombiniere mit Prefix
+      const fullCommand = `e3dcset ${command}`;
+      
+      log("info", "system", `E3DC Console: Befehl wird ausgeführt: ${fullCommand}`);
+      
+      // Führe Befehl aus
+      try {
+        // Im Demo-Modus wird die Mock-Version verwendet, im Produktiv-Modus das echte e3dcset
+        const mockCommand = command; // e3dcset wird im executeCommand automatisch behandelt
+        await e3dcClient.executeCommand(fullCommand, "e3dc-console");
+        
+        log("info", "system", `E3DC Console: Befehl erfolgreich ausgeführt`);
+        res.json({ output: `✓ Befehl ausgeführt: ${fullCommand}\n(Modbus-Pause: ${settings.e3dc.modbusPauseSeconds || 3}s)` });
+      } catch (execError) {
+        const errorMessage = execError instanceof Error ? execError.message : String(execError);
+        log("error", "system", `E3DC Console: Fehler beim Befehl`, errorMessage);
+        res.json({ output: `✗ Fehler: ${errorMessage}\n\nBefehl: ${fullCommand}` });
+      }
+    } catch (error) {
+      log("error", "system", "Fehler in E3DC Console", error instanceof Error ? error.message : String(error));
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
   app.post("/api/prowl/test", async (req, res) => {
     try {
       const settings = storage.getSettings();
