@@ -836,23 +836,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Befehl ist erforderlich" });
       }
       
-      // Kombiniere mit Prefix (Prefix ist bereits vollständig, nur Command anhängen)
-      const prefix = settings.e3dc.prefix || 'e3dcset';
-      const fullCommand = `${prefix} ${command}`;
-      
-      log("info", "system", `E3DC Console: Befehl wird ausgeführt: ${fullCommand}`);
+      // Übergebe nur den nackten Command - e3dcClient.executeCommand() fügt Prefix selbst hinzu
+      log("info", "system", `E3DC Console: Befehl wird ausgeführt: ${command}`);
       
       // Führe Befehl aus
       try {
-        // Im Demo-Modus wird die Mock-Version verwendet, im Produktiv-Modus das echte e3dcset
-        await e3dcClient.executeCommand(fullCommand, "e3dc-console");
+        // e3dcClient.executeCommand() kümmert sich um Prefix, Modbus-Pause, Demo-Modus etc.
+        await e3dcClient.executeCommand(command, "e3dc-console");
         
         log("info", "system", `E3DC Console: Befehl erfolgreich ausgeführt`);
-        res.json({ output: `✓ Befehl ausgeführt: ${fullCommand}\n(Modbus-Pause: ${settings.e3dc.modbusPauseSeconds || 3}s)` });
+        res.json({ output: `✓ Befehl erfolgreich ausgeführt\n(Modbus-Pause: ${settings.e3dc.modbusPauseSeconds || 3}s)` });
       } catch (execError) {
         const errorMessage = execError instanceof Error ? execError.message : String(execError);
         log("error", "system", `E3DC Console: Fehler beim Befehl`, errorMessage);
-        res.json({ output: `✗ Fehler: ${errorMessage}\n\nBefehl: ${fullCommand}` });
+        res.json({ output: `✗ Fehler: ${errorMessage}` });
       }
     } catch (error) {
       log("error", "system", "Fehler in E3DC Console", error instanceof Error ? error.message : String(error));
