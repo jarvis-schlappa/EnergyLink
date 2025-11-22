@@ -1,0 +1,264 @@
+-- Journal begins at Wed 2023-05-03 05:23:19 CEST. --
+Nov 22 12:29:00 hmland node[4172988]: [12:29:00,391] [INFO] [system] Charging-Strategy-Fallback-Timer gestoppt
+Nov 22 12:29:00 hmland node[4172988]: [12:29:00,393] [INFO] [system] Night-Charging-Scheduler gestoppt
+Nov 22 12:29:00 hmland node[4172988]: [12:29:00,396] [INFO] [fhem] Event-Listener deregistriert
+Nov 22 12:29:00 hmland node[4172988]: [12:29:00,397] [INFO] [fhem] FHEM-E3DC-Sync-Scheduler gestoppt
+Nov 22 12:29:00 hmland node[4172988]: [12:29:00,400] [INFO] [e3dc-poller] E3DC-Background-Poller gestoppt
+Nov 22 12:29:00 hmland node[4172988]: [12:29:00,402] [INFO] [system] Alle Scheduler erfolgreich gestoppt
+Nov 22 12:29:00 hmland systemd[1]: keba-wallbox.service: Succeeded.
+Nov 22 12:29:00 hmland systemd[1]: Stopped KEBA Wallbox Control PWA.
+Nov 22 12:29:00 hmland systemd[1]: keba-wallbox.service: Consumed 59.923s CPU time.
+Nov 22 12:29:00 hmland systemd[1]: Started KEBA Wallbox Control PWA.
+Nov 22 12:29:03 hmland node[4173622]: [12:29:03,902] [DEBUG] [storage] Einstellungen geladen aus: /opt/keba-wallbox/EnergyLink/data/settings.json
+Nov 22 12:29:03 hmland node[4173622]: [12:29:03,923] [DEBUG] [storage] Control State geladen aus: /opt/keba-wallbox/EnergyLink/data/control-state.json
+Nov 22 12:29:03 hmland node[4173622]: [12:29:03,926] [DEBUG] [storage] Plug Tracking geladen aus: /opt/keba-wallbox/EnergyLink/data/plug-tracking.json
+Nov 22 12:29:03 hmland node[4173622]: [12:29:03,928] [DEBUG] [storage] Charging Context geladen aus: /opt/keba-wallbox/EnergyLink/data/charging-context.json
+Nov 22 12:29:04 hmland node[4173622]: [12:29:04,137] [INFO] [system] ✅ [UDP-Channel] Wallbox UDP-Kanal läuft auf Port 7090
+Nov 22 12:29:04 hmland node[4173622]: [12:29:04,142] [INFO] [system] ✅ UDP-Channel gestartet (Production-Modus)
+Nov 22 12:29:04 hmland node[4173622]: [12:29:04,146] [INFO] [system] ✅ [Wallbox-Broadcast-Listener] Lauscht auf Wallbox-Broadcasts (Port 7090)
+Nov 22 12:29:04 hmland node[4173622]: [12:29:04,149] [INFO] [system]    - Input → Ladestrategie-Wechsel (X1=1: 'max_without_battery', X1=0: 'Aus')
+Nov 22 12:29:04 hmland node[4173622]: [12:29:04,151] [INFO] [system]    - Plug → Kabelstatus-Tracking in Echtzeit
+Nov 22 12:29:04 hmland node[4173622]: [12:29:04,153] [INFO] [system]    - State → Wallbox-Status-Änderungen
+Nov 22 12:29:04 hmland node[4173622]: [12:29:04,155] [INFO] [system]    - E pres → Session-Energie während Ladung
+Nov 22 12:29:04 hmland node[4173622]: [12:29:04,700] [INFO] [system] E3DC-Konfiguration beim Start geladen
+Nov 22 12:29:04 hmland node[4173622]: [12:29:04,703] [INFO] [system] Scheduler für zeitgesteuerte Ladung wird gestartet - prüft jede volle Minute
+Nov 22 12:29:04 hmland node[4173622]: [12:29:04,709] [DEBUG] [system] Scheduler-Synchronisation: Nächste Prüfung in 56s zur vollen Minute
+Nov 22 12:29:04 hmland node[4173622]: [12:29:04,722] [DEBUG] [system] Scheduler für zeitgesteuerte Ladung läuft - Aktuelle Zeit: 12:29, Zeitsteuerung aktiviert: true, Zeitfenster: 00:00-05:00
+Nov 22 12:29:04 hmland node[4173622]: [12:29:04,728] [INFO] [strategy] Charging Strategy Event-Listener wird gestartet - reagiert sofort auf E3DC-Daten
+Nov 22 12:29:04 hmland node[4173622]: [12:29:04,734] [DEBUG] [e3dc-hub] Listener registriert (insgesamt: 1)
+Nov 22 12:29:04 hmland node[4173622]: [12:29:04,737] [INFO] [strategy] Event-Listener registriert - Charging Strategy wird event-driven aktualisiert
+Nov 22 12:29:04 hmland node[4173622]: [12:29:04,740] [INFO] [system] Charging Strategy Scheduler wird gestartet - Event-driven (primär) + 15s-Timer (Fallback)
+Nov 22 12:29:04 hmland node[4173622]: [12:29:04,744] [INFO] [e3dc-poller] E3DC-Background-Poller wird gestartet - Update-Intervall: 10 Sekunden
+Nov 22 12:29:04 hmland node[4173622]: [12:29:04,746] [INFO] [fhem] FHEM-E3DC-Sync wird gestartet - Strategie: Event-Listener (primär) + 10s-Timer (Fallback)
+Nov 22 12:29:04 hmland node[4173622]: [12:29:04,751] [DEBUG] [e3dc-hub] Listener registriert (insgesamt: 2)
+Nov 22 12:29:04 hmland node[4173622]: [12:29:04,753] [INFO] [fhem] Event-Listener registriert - FHEM wird sofort bei neuen E3DC-Daten aktualisiert
+Nov 22 12:29:04 hmland node[4173622]: [12:29:04,756] [INFO] [system] SSE-Server für Wallbox-Status-Updates bereit
+Nov 22 12:29:04 hmland node[4173622]: [12:29:04,758] [INFO] [system] ✅ SSE-Server bereit auf /api/wallbox/stream
+Nov 22 12:29:04 hmland node[4173622]: 12:29:04 PM [express] serving on port 8080
+Nov 22 12:29:05 hmland node[4173622]: [12:29:05,274] [DEBUG] [system] Prowl-Benachrichtigung gesendet: App gestartet
+Nov 22 12:29:06 hmland node[4173622]: [12:29:06,765] [DEBUG] [system] E3DC Modbus TCP Verbindung zu 192.168.40.200:502 hergestellt
+Nov 22 12:29:06 hmland node[4173622]: [12:29:06,768] [DEBUG] [system] [UDP-Channel] Läuft bereits
+Nov 22 12:29:06 hmland node[4173622]: [12:29:06,770] [DEBUG] [system] [Wallbox-Transport] Persistenter Message-Handler registriert
+Nov 22 12:29:06 hmland node[4173622]: [12:29:06,773] [DEBUG] [wallbox] Sende UDP-Befehl an 192.168.40.16 - Befehl: report 3
+Nov 22 12:29:06 hmland node[4173622]: [12:29:06,787] [DEBUG] [wallbox] UDP-Antwort geparst für "report 3" - Daten: {"ID":"3","U1":238,"U2":0,"U3":0,"I1":6059,"I2":0,"I3":0,"P":1435440,"PF":993,"E pres":53020,"E total":298144081,"Serial":"16314582","Sec":580554}
+Nov 22 12:29:06 hmland node[4173622]: [12:29:06,822] [DEBUG] [system] E3DC EMS-Status RAW: 0x0004 = 0b0000000000000100
+Nov 22 12:29:06 hmland node[4173622]: [12:29:06,824] [DEBUG] [system] E3DC Register gelesen: PV=2820W, Batterie=-1563W (SOC=68%), Haus=4376W, Netz=-7W, Autarkie=99%, Eigenverbrauch=99%, Wallbox=1435.44W
+Nov 22 12:29:06 hmland node[4173622]: [12:29:06,827] [DEBUG] [system] E3DC EMS-Status (0x0004): emergencyPowerReady
+Nov 22 12:29:06 hmland node[4173622]: [12:29:06,829] [DEBUG] [system] E3DC Emergency-Power-Status (2): nicht aktiv
+Nov 22 12:29:06 hmland node[4173622]: [12:29:06,832] [DEBUG] [e3dc-hub] Broadcasting an 2 Listener - PV=2820W, SOC=68%
+Nov 22 12:29:06 hmland node[4173622]: [12:29:06,834] [DEBUG] [e3dc-poller] E3DC-Daten aktualisiert: PV=2820W, Batterie=-1563W (SOC=68%), Haus=4376W, Netz=-7W
+Nov 22 12:29:06 hmland node[4173622]: [12:29:06,837] [DEBUG] [fhem] Event empfangen: Neue E3DC-Daten verfügbar - PV=2820W, SOC=68%
+Nov 22 12:29:06 hmland node[4173622]: [12:29:06,843] [DEBUG] [fhem] Sende cached E3DC-Daten an FHEM - Host: 192.168.40.11:7072, PV: 2820W, Haus: 4376W, SOC: 68%
+Nov 22 12:29:06 hmland node[4173622]: [12:29:06,850] [DEBUG] [strategy] Event empfangen: Neue E3DC-Daten verfügbar - PV=2820W, SOC=68%
+Nov 22 12:29:06 hmland node[4173622]: [12:29:06,854] [INFO] [system] [ChargingStrategyController] Strategie auf "off" → Wallbox wird gestoppt
+Nov 22 12:29:06 hmland node[4173622]: [12:29:06,858] [DEBUG] [system] Battery Lock bereits deaktiviert - überspringe
+Nov 22 12:29:06 hmland node[4173622]: [12:29:06,862] [DEBUG] [system] [UDP-Channel] Läuft bereits
+Nov 22 12:29:06 hmland node[4173622]: [12:29:06,864] [DEBUG] [wallbox] Sende UDP-Befehl an 192.168.40.16 - Befehl: ena 0
+Nov 22 12:29:07 hmland node[4173622]: [12:29:07,086] [DEBUG] [fhem] E3DC-Daten erfolgreich an FHEM gesendet - PV: 2820W, Haus: 4376W, SOC: 68%, Netz: -7W, Speicher: -1563W
+Nov 22 12:29:07 hmland node[4173622]: [12:29:07,834] [DEBUG] [wallbox] UDP-Antwort geparst für "ena 0" - Daten: {"TCH-OK":"done"}
+Nov 22 12:29:07 hmland node[4173622]: [12:29:07,839] [DEBUG] [storage] Charging Context gespeichert in: /opt/keba-wallbox/EnergyLink/data/charging-context.json
+Nov 22 12:29:07 hmland node[4173622]: [12:29:07,840] [INFO] [system] Ladung gestoppt
+Nov 22 12:29:07 hmland node[4173622]: [12:29:07,851] [DEBUG] [storage] Charging Context gespeichert in: /opt/keba-wallbox/EnergyLink/data/charging-context.json
+Nov 22 12:29:07 hmland node[4173622]: [12:29:07,854] [DEBUG] [storage] Einstellungen gespeichert in: /opt/keba-wallbox/EnergyLink/data/settings.json
+Nov 22 12:29:07 hmland node[4173622]: [12:29:07,855] [INFO] [system] [ChargingStrategyController] Wallbox gestoppt, Strategie auf "off" gesetzt
+Nov 22 12:29:07 hmland node[4173622]: [12:29:07,978] [DEBUG] [system] Prowl-Benachrichtigung gesendet: Ladung gestoppt
+Nov 22 12:29:09 hmland node[4173622]: [12:29:09,757] [DEBUG] [fhem] Sende cached E3DC-Daten an FHEM - Host: 192.168.40.11:7072, PV: 2820W, Haus: 4376W, SOC: 68%
+Nov 22 12:29:09 hmland node[4173622]: [12:29:09,976] [DEBUG] [fhem] E3DC-Daten erfolgreich an FHEM gesendet - PV: 2820W, Haus: 4376W, SOC: 68%, Netz: -7W, Speicher: -1563W
+Nov 22 12:29:14 hmland node[4173622]: [12:29:14,750] [DEBUG] [system] [UDP-Channel] Läuft bereits
+Nov 22 12:29:14 hmland node[4173622]: [12:29:14,753] [DEBUG] [wallbox] Sende UDP-Befehl an 192.168.40.16 - Befehl: report 3
+Nov 22 12:29:14 hmland node[4173622]: [12:29:14,758] [DEBUG] [fhem] Fallback-Timer: Health-Check FHEM-Sync
+Nov 22 12:29:14 hmland node[4173622]: [12:29:14,761] [DEBUG] [fhem] Sende cached E3DC-Daten an FHEM - Host: 192.168.40.11:7072, PV: 2820W, Haus: 4376W, SOC: 68%
+Nov 22 12:29:14 hmland node[4173622]: [12:29:14,785] [DEBUG] [wallbox] UDP-Antwort geparst für "report 3" - Daten: {"ID":"3","U1":0,"U2":0,"U3":0,"I1":0,"I2":0,"I3":0,"P":0,"PF":0,"E pres":53026,"E total":298144081,"Serial":"16314582","Sec":580562}
+Nov 22 12:29:14 hmland node[4173622]: [12:29:14,977] [DEBUG] [system] E3DC EMS-Status RAW: 0x0004 = 0b0000000000000100
+Nov 22 12:29:14 hmland node[4173622]: [12:29:14,980] [DEBUG] [system] E3DC Register gelesen: PV=2811W, Batterie=-168W (SOC=68%), Haus=2936W, Netz=-43W, Autarkie=99%, Eigenverbrauch=95%, Wallbox=0W
+Nov 22 12:29:14 hmland node[4173622]: [12:29:14,983] [DEBUG] [system] E3DC EMS-Status (0x0004): emergencyPowerReady
+Nov 22 12:29:14 hmland node[4173622]: [12:29:14,986] [DEBUG] [system] E3DC Emergency-Power-Status (2): nicht aktiv
+Nov 22 12:29:14 hmland node[4173622]: [12:29:14,988] [DEBUG] [e3dc-hub] Broadcasting an 2 Listener - PV=2811W, SOC=68%
+Nov 22 12:29:14 hmland node[4173622]: [12:29:14,991] [DEBUG] [e3dc-poller] E3DC-Daten aktualisiert: PV=2811W, Batterie=-168W (SOC=68%), Haus=2936W, Netz=-43W
+Nov 22 12:29:15 hmland node[4173622]: [12:29:14,996] [DEBUG] [fhem] Event empfangen: Neue E3DC-Daten verfügbar - PV=2811W, SOC=68%
+Nov 22 12:29:15 hmland node[4173622]: [12:29:15,001] [DEBUG] [strategy] Event empfangen: Neue E3DC-Daten verfügbar - PV=2811W, SOC=68%
+Nov 22 12:29:15 hmland node[4173622]: [12:29:15,004] [DEBUG] [system] [ChargingStrategyController] Wallbox bereits gestoppt und Strategie auf "off" - überspringe
+Nov 22 12:29:15 hmland node[4173622]: [12:29:15,010] [DEBUG] [fhem] E3DC-Daten erfolgreich an FHEM gesendet - PV: 2820W, Haus: 4376W, SOC: 68%, Netz: -7W, Speicher: -1563W
+Nov 22 12:29:19 hmland node[4173622]: [12:29:19,744] [DEBUG] [strategy] Fallback-Timer: Health-Check Charging Strategy
+Nov 22 12:29:19 hmland node[4173622]: [12:29:19,747] [DEBUG] [system] [ChargingStrategyController] Wallbox bereits gestoppt und Strategie auf "off" - überspringe
+Nov 22 12:29:24 hmland node[4173622]: [12:29:24,506] [DEBUG] [system] [UDP-Channel] Läuft bereits
+Nov 22 12:29:24 hmland node[4173622]: [12:29:24,509] [DEBUG] [wallbox] Sende UDP-Befehl an 192.168.40.16 - Befehl: report 1
+Nov 22 12:29:24 hmland node[4173622]: [12:29:24,557] [INFO] [system] [SSE] Client verbunden: 20eb0al (1 gesamt)
+Nov 22 12:29:24 hmland node[4173622]: [12:29:24,561] [DEBUG] [system] [SSE] Ping-System gestartet
+Nov 22 12:29:24 hmland node[4173622]: [12:29:24,564] [DEBUG] [wallbox] UDP-Antwort geparst für "report 1" - Daten: {"ID":"1","Product":"KC-P20-EC240130-000            ","Serial":"16314582","Firmware":"KEBA P20 v 2.5a3 (160613-061001)","Sec":580572}
+Nov 22 12:29:24 hmland node[4173622]: [12:29:24,567] [DEBUG] [system] [UDP-Channel] Läuft bereits
+Nov 22 12:29:24 hmland node[4173622]: [12:29:24,569] [DEBUG] [wallbox] Sende UDP-Befehl an 192.168.40.16 - Befehl: report 2
+Nov 22 12:29:24 hmland node[4173622]: [12:29:24,749] [DEBUG] [system] [UDP-Channel] Läuft bereits
+Nov 22 12:29:24 hmland node[4173622]: [12:29:24,758] [DEBUG] [fhem] Fallback-Timer: Health-Check FHEM-Sync
+Nov 22 12:29:24 hmland node[4173622]: [12:29:24,759] [DEBUG] [fhem] Sende cached E3DC-Daten an FHEM - Host: 192.168.40.11:7072, PV: 2811W, Haus: 2936W, SOC: 68%
+Nov 22 12:29:25 hmland node[4173622]: [12:29:25,018] [DEBUG] [fhem] E3DC-Daten erfolgreich an FHEM gesendet - PV: 2811W, Haus: 2936W, SOC: 68%, Netz: -43W, Speicher: -168W
+Nov 22 12:29:25 hmland node[4173622]: [12:29:25,585] [DEBUG] [wallbox] UDP-Antwort geparst für "report 2" - Daten: {"ID":"2","State":5,"Error1":0,"Error2":0,"Plug":7,"Enable sys":0,"Enable user":0,"Max curr":0,"Max curr %":1000,"Curr HW":32000,"Curr user":6000,"Curr FS":0,"Tmo FS":0,"Output":0,"Input":0,"Serial":"
+Nov 22 12:29:25 hmland node[4173622]: [12:29:25,589] [DEBUG] [storage] Plug Tracking gespeichert in: /opt/keba-wallbox/EnergyLink/data/plug-tracking.json
+Nov 22 12:29:25 hmland node[4173622]: [12:29:25,590] [DEBUG] [system] [UDP-Channel] Läuft bereits
+Nov 22 12:29:25 hmland node[4173622]: [12:29:25,592] [DEBUG] [wallbox] Sende UDP-Befehl an 192.168.40.16 - Befehl: report 3
+Nov 22 12:29:26 hmland node[4173622]: [12:29:26,635] [DEBUG] [wallbox] UDP-Antwort geparst für "report 3" - Daten: {"ID":"3","U1":0,"U2":0,"U3":0,"I1":0,"I2":0,"I3":0,"P":0,"PF":0,"E pres":53026,"E total":298144081,"Serial":"16314582","Sec":580574}
+Nov 22 12:29:26 hmland node[4173622]: [12:29:26,659] [DEBUG] [system] E3DC EMS-Status RAW: 0x0004 = 0b0000000000000100
+Nov 22 12:29:26 hmland node[4173622]: [12:29:26,661] [DEBUG] [system] E3DC Register gelesen: PV=2784W, Batterie=-90W (SOC=68%), Haus=2872W, Netz=-2W, Autarkie=99%, Eigenverbrauch=99%, Wallbox=0W
+Nov 22 12:29:26 hmland node[4173622]: [12:29:26,663] [DEBUG] [system] E3DC EMS-Status (0x0004): emergencyPowerReady
+Nov 22 12:29:26 hmland node[4173622]: [12:29:26,665] [DEBUG] [system] E3DC Emergency-Power-Status (2): nicht aktiv
+Nov 22 12:29:26 hmland node[4173622]: [12:29:26,666] [DEBUG] [e3dc-hub] Broadcasting an 2 Listener - PV=2784W, SOC=68%
+Nov 22 12:29:26 hmland node[4173622]: [12:29:26,669] [DEBUG] [e3dc-poller] E3DC-Daten aktualisiert: PV=2784W, Batterie=-90W (SOC=68%), Haus=2872W, Netz=-2W
+Nov 22 12:29:26 hmland node[4173622]: [12:29:26,671] [DEBUG] [fhem] Event empfangen: Neue E3DC-Daten verfügbar - PV=2784W, SOC=68%
+Nov 22 12:29:26 hmland node[4173622]: [12:29:26,673] [DEBUG] [fhem] Sende cached E3DC-Daten an FHEM - Host: 192.168.40.11:7072, PV: 2784W, Haus: 2872W, SOC: 68%
+Nov 22 12:29:26 hmland node[4173622]: [12:29:26,676] [DEBUG] [strategy] Event empfangen: Neue E3DC-Daten verfügbar - PV=2784W, SOC=68%
+Nov 22 12:29:26 hmland node[4173622]: [12:29:26,678] [DEBUG] [system] [ChargingStrategyController] Wallbox bereits gestoppt und Strategie auf "off" - überspringe
+Nov 22 12:29:26 hmland node[4173622]: [12:29:26,737] [DEBUG] [wallbox] Sende UDP-Befehl an 192.168.40.16 - Befehl: report 3
+Nov 22 12:29:26 hmland node[4173622]: [12:29:26,893] [DEBUG] [fhem] E3DC-Daten erfolgreich an FHEM gesendet - PV: 2784W, Haus: 2872W, SOC: 68%, Netz: -2W, Speicher: -90W
+Nov 22 12:29:27 hmland node[4173622]: [12:29:27,685] [DEBUG] [wallbox] UDP-Antwort geparst für "report 3" - Daten: {"ID":"3","U1":0,"U2":0,"U3":0,"I1":0,"I2":0,"I3":0,"P":0,"PF":0,"E pres":53026,"E total":298144081,"Serial":"16314582","Sec":580575}
+Nov 22 12:29:27 hmland node[4173622]: [12:29:27,689] [DEBUG] [system] [SSE] Status an 1 Clients gesendet
+Nov 22 12:29:32 hmland node[4173622]: [12:29:32,790] [DEBUG] [system] [UDP-Channel] Läuft bereits
+Nov 22 12:29:32 hmland node[4173622]: [12:29:32,797] [DEBUG] [wallbox] Sende UDP-Befehl an 192.168.40.16 - Befehl: report 1
+Nov 22 12:29:32 hmland node[4173622]: [12:29:32,836] [DEBUG] [wallbox] UDP-Antwort geparst für "report 1" - Daten: {"ID":"1","Product":"KC-P20-EC240130-000            ","Serial":"16314582","Firmware":"KEBA P20 v 2.5a3 (160613-061001)","Sec":580580}
+Nov 22 12:29:32 hmland node[4173622]: [12:29:32,839] [DEBUG] [system] [UDP-Channel] Läuft bereits
+Nov 22 12:29:32 hmland node[4173622]: [12:29:32,842] [DEBUG] [wallbox] Sende UDP-Befehl an 192.168.40.16 - Befehl: report 2
+Nov 22 12:29:33 hmland node[4173622]: [12:29:33,886] [DEBUG] [wallbox] UDP-Antwort geparst für "report 2" - Daten: {"ID":"2","State":5,"Error1":0,"Error2":0,"Plug":7,"Enable sys":0,"Enable user":0,"Max curr":0,"Max curr %":1000,"Curr HW":32000,"Curr user":6000,"Curr FS":0,"Tmo FS":0,"Output":0,"Input":0,"Serial":"
+Nov 22 12:29:33 hmland node[4173622]: [12:29:33,889] [DEBUG] [system] [Wallbox-Broadcast-Listener] Initial-Sync: Input=0 (von 192.168.40.16)
+Nov 22 12:29:33 hmland node[4173622]: [12:29:33,894] [DEBUG] [system] [UDP-Channel] Läuft bereits
+Nov 22 12:29:33 hmland node[4173622]: [12:29:33,897] [DEBUG] [wallbox] Sende UDP-Befehl an 192.168.40.16 - Befehl: report 3
+Nov 22 12:29:34 hmland node[4173622]: [12:29:34,042] [INFO] [system] [SSE] Client getrennt: 20eb0al (0 übrig)
+Nov 22 12:29:34 hmland node[4173622]: [12:29:34,744] [DEBUG] [strategy] Fallback-Timer: Health-Check Charging Strategy
+Nov 22 12:29:34 hmland node[4173622]: [12:29:34,746] [DEBUG] [system] [ChargingStrategyController] Wallbox bereits gestoppt und Strategie auf "off" - überspringe
+Nov 22 12:29:34 hmland node[4173622]: [12:29:34,750] [DEBUG] [system] [UDP-Channel] Läuft bereits
+Nov 22 12:29:34 hmland node[4173622]: [12:29:34,758] [DEBUG] [fhem] Fallback-Timer: Health-Check FHEM-Sync
+Nov 22 12:29:34 hmland node[4173622]: [12:29:34,759] [DEBUG] [fhem] Sende cached E3DC-Daten an FHEM - Host: 192.168.40.11:7072, PV: 2784W, Haus: 2872W, SOC: 68%
+Nov 22 12:29:34 hmland node[4173622]: [12:29:34,936] [DEBUG] [wallbox] UDP-Antwort geparst für "report 3" - Daten: {"ID":"3","U1":0,"U2":0,"U3":0,"I1":0,"I2":0,"I3":0,"P":0,"PF":0,"E pres":53026,"E total":298144081,"Serial":"16314582","Sec":580582}
+Nov 22 12:29:34 hmland node[4173622]: [12:29:34,979] [DEBUG] [fhem] E3DC-Daten erfolgreich an FHEM gesendet - PV: 2784W, Haus: 2872W, SOC: 68%, Netz: -2W, Speicher: -90W
+Nov 22 12:29:35 hmland node[4173622]: [12:29:35,038] [DEBUG] [wallbox] Sende UDP-Befehl an 192.168.40.16 - Befehl: report 3
+Nov 22 12:29:35 hmland node[4173622]: [12:29:35,986] [DEBUG] [wallbox] UDP-Antwort geparst für "report 3" - Daten: {"ID":"3","U1":0,"U2":0,"U3":0,"I1":0,"I2":0,"I3":0,"P":0,"PF":0,"E pres":53026,"E total":298144081,"Serial":"16314582","Sec":580583}
+Nov 22 12:29:36 hmland node[4173622]: [12:29:36,072] [DEBUG] [system] E3DC EMS-Status RAW: 0x0004 = 0b0000000000000100
+Nov 22 12:29:36 hmland node[4173622]: [12:29:36,074] [DEBUG] [system] E3DC Register gelesen: PV=2737W, Batterie=-126W (SOC=68%), Haus=2875W, Netz=12W, Autarkie=99%, Eigenverbrauch=99%, Wallbox=0W
+Nov 22 12:29:36 hmland node[4173622]: [12:29:36,076] [DEBUG] [system] E3DC EMS-Status (0x0004): emergencyPowerReady
+Nov 22 12:29:36 hmland node[4173622]: [12:29:36,077] [DEBUG] [system] E3DC Emergency-Power-Status (2): nicht aktiv
+Nov 22 12:29:36 hmland node[4173622]: [12:29:36,079] [DEBUG] [e3dc-hub] Broadcasting an 2 Listener - PV=2737W, SOC=68%
+Nov 22 12:29:36 hmland node[4173622]: [12:29:36,080] [DEBUG] [e3dc-poller] E3DC-Daten aktualisiert: PV=2737W, Batterie=-126W (SOC=68%), Haus=2875W, Netz=12W
+Nov 22 12:29:36 hmland node[4173622]: [12:29:36,083] [DEBUG] [fhem] Event empfangen: Neue E3DC-Daten verfügbar - PV=2737W, SOC=68%
+Nov 22 12:29:36 hmland node[4173622]: [12:29:36,085] [DEBUG] [fhem] Sende cached E3DC-Daten an FHEM - Host: 192.168.40.11:7072, PV: 2737W, Haus: 2875W, SOC: 68%
+Nov 22 12:29:36 hmland node[4173622]: [12:29:36,088] [DEBUG] [strategy] Event empfangen: Neue E3DC-Daten verfügbar - PV=2737W, SOC=68%
+Nov 22 12:29:36 hmland node[4173622]: [12:29:36,090] [DEBUG] [system] [ChargingStrategyController] Wallbox bereits gestoppt und Strategie auf "off" - überspringe
+Nov 22 12:29:36 hmland node[4173622]: [12:29:36,302] [DEBUG] [fhem] E3DC-Daten erfolgreich an FHEM gesendet - PV: 2737W, Haus: 2875W, SOC: 68%, Netz: 12W, Speicher: -126W
+Nov 22 12:29:36 hmland node[4173622]: [12:29:36,908] [INFO] [system] Log-Level auf "info" gesetzt
+Nov 22 12:29:43 hmland node[4173622]: [12:29:43,175] [INFO] [system] [SSE] Client verbunden: 110swcf (1 gesamt)
+Nov 22 12:29:55 hmland node[4173622]: [12:29:55,881] [INFO] [wallbox] Ladestrategie aktiviert: max_without_battery
+Nov 22 12:29:55 hmland node[4173622]: [12:29:55,891] [INFO] [system] Strategie-Wechsel: Max Power ohne Batterie → Battery Lock aktivieren
+Nov 22 12:29:55 hmland node[4173622]: [12:29:55,899] [INFO] [system] E3DC: Modbus-Pause BEGINNT (10s vor e3dcset-Befehl)
+Nov 22 12:29:55 hmland node[4173622]: [12:29:55,903] [INFO] [e3dc-poller] E3DC-Background-Poller gestoppt
+Nov 22 12:30:05 hmland node[4173622]: [12:30:05,909] [INFO] [system] E3DC: Modbus-Pause ENDET (10s vor e3dcset-Befehl)
+Nov 22 12:30:05 hmland node[4173622]: [12:30:05,911] [INFO] [system] E3DC: Entladesperre aktivieren - Befehl: /opt/keba-wallbox/e3dcset -p /opt/keba-wallbox/e3dcset.config -t /opt/keba-wallbox/e3dcset.tags -d 1
+Nov 22 12:30:08 hmland node[4173622]: [12:30:08,000] [INFO] [system] E3DC: Entladesperre aktivieren - Ausgabe - Setze EntladeLeistung auf 1W
+Nov 22 12:30:08 hmland node[4173622]: [12:30:08,004] [INFO] [system] E3DC: Entladesperre aktivieren erfolgreich ausgeführt
+Nov 22 12:30:08 hmland node[4173622]: [12:30:08,007] [INFO] [system] E3DC: Modbus-Pause BEGINNT (10s nach e3dcset-Befehl)
+Nov 22 12:30:11 hmland node[4173622]: [12:30:11,197] [INFO] [system] Ladung gestartet mit 32A @ 1P (Strategie: max_without_battery)
+Nov 22 12:30:12 hmland node[4173622]: [12:30:12,205] [INFO] [system] [Wallbox-Broadcast-Listener] State geändert: 5 → 2 (ready for charging) (von 192.168.40.16)
+Nov 22 12:30:12 hmland node[4173622]: [12:30:12,516] [INFO] [system] [Wallbox-Broadcast-Listener] State geändert: 2 → 3 (charging) (von 192.168.40.16)
+Nov 22 12:30:18 hmland node[4173622]: [12:30:18,011] [INFO] [system] E3DC: Modbus-Pause ENDET (10s nach e3dcset-Befehl)
+Nov 22 12:30:18 hmland node[4173622]: [12:30:18,016] [INFO] [e3dc-poller] E3DC-Background-Poller wird gestartet - Update-Intervall: 10 Sekunden
+Nov 22 12:30:18 hmland node[4173622]: [12:30:18,019] [INFO] [system] E3DC: Poller nach e3dcset-Befehl wieder gestartet
+Nov 22 12:30:20 hmland node[4173622]: [12:30:20,649] [INFO] [wallbox] Laden erfolgreich gestartet
+Nov 22 12:30:33 hmland node[4173622]: [12:30:33,051] [INFO] [wallbox] Ladestrategie deaktiviert (auf "off" gesetzt)
+Nov 22 12:30:33 hmland node[4173622]: [12:30:33,058] [INFO] [system] Strategie-Wechsel: off → Battery Lock deaktivieren
+Nov 22 12:30:33 hmland node[4173622]: [12:30:33,063] [INFO] [system] E3DC: Modbus-Pause BEGINNT (10s vor e3dcset-Befehl)
+Nov 22 12:30:34 hmland node[4173622]: [12:30:34,745] [INFO] [system] [ChargingStrategyController] Strategie auf "off" → Wallbox wird gestoppt
+Nov 22 12:30:37 hmland node[4173622]: [12:30:37,454] [INFO] [system] Ladung gestoppt
+Nov 22 12:30:37 hmland node[4173622]: [12:30:37,484] [INFO] [system] [ChargingStrategyController] Wallbox gestoppt, Strategie auf "off" gesetzt
+Nov 22 12:30:37 hmland node[4173622]: [12:30:37,516] [INFO] [system] [Wallbox-Broadcast-Listener] State geändert: 3 → 5 (authorization rejected) (von 192.168.40.16)
+Nov 22 12:30:43 hmland node[4173622]: [12:30:43,069] [INFO] [system] E3DC: Modbus-Pause ENDET (10s vor e3dcset-Befehl)
+Nov 22 12:30:43 hmland node[4173622]: [12:30:43,072] [INFO] [system] E3DC: Entladesperre deaktivieren - Befehl: /opt/keba-wallbox/e3dcset -p /opt/keba-wallbox/e3dcset.config -t /opt/keba-wallbox/e3dcset.tags -a
+Nov 22 12:30:45 hmland node[4173622]: [12:30:45,158] [INFO] [system] E3DC: Entladesperre deaktivieren - Ausgabe - Setze Lade-/EntladeLeistung auf Automatik
+Nov 22 12:30:45 hmland node[4173622]: [12:30:45,161] [INFO] [system] E3DC: Entladesperre deaktivieren erfolgreich ausgeführt
+Nov 22 12:30:45 hmland node[4173622]: [12:30:45,163] [INFO] [system] E3DC: Modbus-Pause BEGINNT (10s nach e3dcset-Befehl)
+Nov 22 12:30:55 hmland node[4173622]: [12:30:55,167] [INFO] [system] E3DC: Modbus-Pause ENDET (10s nach e3dcset-Befehl)
+Nov 22 12:30:55 hmland node[4173622]: [12:30:55,169] [INFO] [e3dc-poller] E3DC-Background-Poller wird gestartet - Update-Intervall: 10 Sekunden
+Nov 22 12:30:55 hmland node[4173622]: [12:30:55,172] [INFO] [system] E3DC: Poller nach e3dcset-Befehl wieder gestartet
+Nov 22 12:30:55 hmland node[4173622]: [12:30:55,202] [INFO] [wallbox] Laden erfolgreich gestoppt
+Nov 22 12:30:55 hmland node[4173622]: [12:30:55,959] [INFO] [system] [SSE] Client getrennt: 110swcf (0 übrig)
+Nov 22 12:31:04 hmland node[4173622]: [12:31:04,113] [INFO] [system] [SSE] Client verbunden: sz2kxj1 (1 gesamt)
+Nov 22 12:31:10 hmland node[4173622]: [12:31:10,135] [INFO] [system] [SSE] Client getrennt: sz2kxj1 (0 übrig)
+Nov 22 12:31:17 hmland node[4173622]: [12:31:17,914] [INFO] [system] [SSE] Client verbunden: 0zbl3fi (1 gesamt)
+Nov 22 12:31:25 hmland node[4173622]: [12:31:25,424] [INFO] [system] [SSE] Client getrennt: 0zbl3fi (0 übrig)
+Nov 22 12:31:27 hmland node[4173622]: [12:31:27,626] [INFO] [system] [SSE] Client verbunden: efigfd1 (1 gesamt)
+Nov 22 12:31:34 hmland node[4173622]: [12:31:34,012] [INFO] [system] [SSE] Client getrennt: efigfd1 (0 übrig)
+Nov 22 12:32:28 hmland node[4173622]: [12:32:28,490] [INFO] [system] [SSE] Client verbunden: i219zy4 (1 gesamt)
+Nov 22 12:32:38 hmland node[4173622]: [12:32:38,738] [INFO] [system] [Wallbox-Broadcast-Listener] Plug-Status geändert: 7 → 3 (von 192.168.40.16)
+Nov 22 12:32:59 hmland node[4173622]: [12:32:59,690] [INFO] [system] [Wallbox-Broadcast-Listener] Plug-Status geändert: 3 → 7 (von 192.168.40.16)
+Nov 22 12:33:40 hmland node[4173622]: [12:33:40,286] [INFO] [system] [SSE] Client getrennt: i219zy4 (0 übrig)
+Nov 22 12:34:00 hmland node[4173622]: [12:34:00,401] [INFO] [system] [SSE] Client verbunden: 69htcp5 (1 gesamt)
+Nov 22 12:34:14 hmland node[4173622]: [12:34:14,771] [INFO] [system] [Wallbox-Broadcast-Listener] Input-Status geändert: 0 → 1 (von 192.168.40.16)
+Nov 22 12:34:14 hmland node[4173622]: [12:34:14,776] [INFO] [system] [Wallbox-Broadcast-Listener] Aktiviere Ladestrategie: max_without_battery
+Nov 22 12:34:14 hmland node[4173622]: [12:34:14,779] [INFO] [system] Strategie-Wechsel: Max Power ohne Batterie → Battery Lock aktivieren
+Nov 22 12:34:14 hmland node[4173622]: [12:34:14,783] [INFO] [system] E3DC: Modbus-Pause BEGINNT (10s vor e3dcset-Befehl)
+Nov 22 12:34:24 hmland node[4173622]: [12:34:24,792] [INFO] [system] E3DC: Modbus-Pause ENDET (10s vor e3dcset-Befehl)
+Nov 22 12:34:24 hmland node[4173622]: [12:34:24,796] [INFO] [system] E3DC: Entladesperre aktivieren - Befehl: /opt/keba-wallbox/e3dcset -p /opt/keba-wallbox/e3dcset.config -t /opt/keba-wallbox/e3dcset.tags -d 1
+Nov 22 12:34:26 hmland node[4173622]: [12:34:26,873] [INFO] [system] E3DC: Entladesperre aktivieren - Ausgabe - Setze EntladeLeistung auf 1W
+Nov 22 12:34:26 hmland node[4173622]: [12:34:26,877] [INFO] [system] E3DC: Entladesperre aktivieren erfolgreich ausgeführt
+Nov 22 12:34:26 hmland node[4173622]: [12:34:26,879] [INFO] [system] E3DC: Modbus-Pause BEGINNT (10s nach e3dcset-Befehl)
+Nov 22 12:34:36 hmland node[4173622]: [12:34:36,883] [INFO] [system] E3DC: Modbus-Pause ENDET (10s nach e3dcset-Befehl)
+Nov 22 12:34:36 hmland node[4173622]: [12:34:36,886] [INFO] [e3dc-poller] E3DC-Background-Poller wird gestartet - Update-Intervall: 10 Sekunden
+Nov 22 12:34:36 hmland node[4173622]: [12:34:36,889] [INFO] [system] E3DC: Poller nach e3dcset-Befehl wieder gestartet
+Nov 22 12:34:36 hmland node[4173622]: [12:34:36,919] [INFO] [system] [Wallbox-Broadcast-Listener] Strategie persistent gesetzt: max_without_battery
+Nov 22 12:34:36 hmland node[4173622]: [12:34:36,935] [INFO] [system] [Wallbox-Broadcast-Listener] Settings persistent gesetzt: max_without_battery
+Nov 22 12:34:45 hmland node[4173622]: [12:34:45,421] [INFO] [system] Ladung gestartet mit 32A @ 1P (Strategie: max_without_battery)
+Nov 22 12:34:45 hmland node[4173622]: [12:34:45,929] [INFO] [system] [Wallbox-Broadcast-Listener] State geändert: 5 → 2 (ready for charging) (von 192.168.40.16)
+Nov 22 12:34:46 hmland node[4173622]: [12:34:46,141] [INFO] [system] [Wallbox-Broadcast-Listener] State geändert: 2 → 3 (charging) (von 192.168.40.16)
+Nov 22 12:34:49 hmland node[4173622]: [12:34:49,621] [INFO] [system] [RECONCILE] Context sagt isActive=true, aber Wallbox lädt nicht (State=3, Power=949mW) → setze isActive=false
+Nov 22 12:34:59 hmland node[4173622]: [12:34:59,075] [INFO] [system] Ladung gestartet mit 32A @ 1P (Strategie: max_without_battery)
+Nov 22 12:35:01 hmland node[4173622]: [12:35:01,174] [INFO] [system] [RECONCILE] Phasen-Korrektur: 3P → 1P (gemessen aus Strömen)
+Nov 22 12:35:19 hmland node[4173622]: [12:35:19,627] [INFO] [system] [Wallbox-Broadcast-Listener] Input-Status geändert: 1 → 0 (von 192.168.40.16)
+Nov 22 12:35:19 hmland node[4173622]: [12:35:19,630] [INFO] [system] [Wallbox-Broadcast-Listener] Deaktiviere Ladestrategie: Aus
+Nov 22 12:35:19 hmland node[4173622]: [12:35:19,633] [INFO] [system] [ChargingStrategyController] Strategie auf "off" → Wallbox wird gestoppt
+Nov 22 12:35:19 hmland node[4173622]: [12:35:19,635] [INFO] [system] Strategie-Wechsel: off → Battery Lock deaktivieren
+Nov 22 12:35:19 hmland node[4173622]: [12:35:19,639] [INFO] [system] E3DC: Modbus-Pause BEGINNT (10s vor e3dcset-Befehl)
+Nov 22 12:35:29 hmland node[4173622]: [12:35:29,642] [INFO] [system] E3DC: Modbus-Pause ENDET (10s vor e3dcset-Befehl)
+Nov 22 12:35:29 hmland node[4173622]: [12:35:29,645] [INFO] [system] E3DC: Entladesperre deaktivieren - Befehl: /opt/keba-wallbox/e3dcset -p /opt/keba-wallbox/e3dcset.config -t /opt/keba-wallbox/e3dcset.tags -a
+Nov 22 12:35:31 hmland node[4173622]: [12:35:31,709] [INFO] [system] E3DC: Entladesperre deaktivieren - Ausgabe - Setze Lade-/EntladeLeistung auf Automatik
+Nov 22 12:35:31 hmland node[4173622]: [12:35:31,712] [INFO] [system] E3DC: Entladesperre deaktivieren erfolgreich ausgeführt
+Nov 22 12:35:31 hmland node[4173622]: [12:35:31,715] [INFO] [system] E3DC: Modbus-Pause BEGINNT (10s nach e3dcset-Befehl)
+Nov 22 12:35:41 hmland node[4173622]: [12:35:41,718] [INFO] [system] E3DC: Modbus-Pause ENDET (10s nach e3dcset-Befehl)
+Nov 22 12:35:41 hmland node[4173622]: [12:35:41,721] [INFO] [e3dc-poller] E3DC-Background-Poller wird gestartet - Update-Intervall: 10 Sekunden
+Nov 22 12:35:41 hmland node[4173622]: [12:35:41,724] [INFO] [system] E3DC: Poller nach e3dcset-Befehl wieder gestartet
+Nov 22 12:35:44 hmland node[4173622]: [12:35:44,226] [INFO] [system] Ladung gestoppt
+Nov 22 12:35:44 hmland node[4173622]: [12:35:44,240] [INFO] [system] [ChargingStrategyController] Wallbox gestoppt, Strategie auf "off" gesetzt
+Nov 22 12:35:44 hmland node[4173622]: [12:35:44,244] [INFO] [system] [Wallbox-Broadcast-Listener] State geändert: 3 → 5 (authorization rejected) (von 192.168.40.16)
+Nov 22 12:35:48 hmland node[4173622]: [12:35:48,360] [INFO] [system] [SSE] Client getrennt: 69htcp5 (0 übrig)
+Nov 22 12:36:03 hmland node[4173622]: [12:36:03,455] [INFO] [system] E3DC-Konfiguration wird gespeichert
+Nov 22 12:36:03 hmland node[4173622]: [12:36:03,457] [INFO] [system] E3DC-Konfiguration erfolgreich gespeichert
+Nov 22 12:36:05 hmland node[4173622]: [12:36:05,953] [INFO] [system] [SSE] Client verbunden: avdbjbv (1 gesamt)
+Nov 22 12:36:08 hmland node[4173622]: [12:36:08,957] [INFO] [system] [Wallbox-Broadcast-Listener] Input-Status geändert: 0 → 1 (von 192.168.40.16)
+Nov 22 12:36:08 hmland node[4173622]: [12:36:08,960] [INFO] [system] [Wallbox-Broadcast-Listener] Aktiviere Ladestrategie: max_without_battery
+Nov 22 12:36:08 hmland node[4173622]: [12:36:08,962] [INFO] [system] Strategie-Wechsel: Max Power ohne Batterie → Battery Lock aktivieren
+Nov 22 12:36:08 hmland node[4173622]: [12:36:08,967] [INFO] [system] E3DC: Modbus-Pause BEGINNT (3s vor e3dcset-Befehl)
+Nov 22 12:36:11 hmland node[4173622]: [12:36:11,971] [INFO] [system] E3DC: Modbus-Pause ENDET (3s vor e3dcset-Befehl)
+Nov 22 12:36:11 hmland node[4173622]: [12:36:11,974] [INFO] [system] E3DC: Entladesperre aktivieren - Befehl: /opt/keba-wallbox/e3dcset -p /opt/keba-wallbox/e3dcset.config -t /opt/keba-wallbox/e3dcset.tags -d 1
+Nov 22 12:36:14 hmland node[4173622]: [12:36:14,062] [INFO] [system] E3DC: Entladesperre aktivieren - Ausgabe - Setze EntladeLeistung auf 1W
+Nov 22 12:36:14 hmland node[4173622]: [12:36:14,064] [INFO] [system] E3DC: Entladesperre aktivieren erfolgreich ausgeführt
+Nov 22 12:36:14 hmland node[4173622]: [12:36:14,065] [INFO] [system] E3DC: Modbus-Pause BEGINNT (3s nach e3dcset-Befehl)
+Nov 22 12:36:17 hmland node[4173622]: [12:36:17,068] [INFO] [system] E3DC: Modbus-Pause ENDET (3s nach e3dcset-Befehl)
+Nov 22 12:36:17 hmland node[4173622]: [12:36:17,069] [INFO] [e3dc-poller] E3DC-Background-Poller wird gestartet - Update-Intervall: 10 Sekunden
+Nov 22 12:36:17 hmland node[4173622]: [12:36:17,071] [INFO] [system] E3DC: Poller nach e3dcset-Befehl wieder gestartet
+Nov 22 12:36:17 hmland node[4173622]: [12:36:17,098] [INFO] [system] [Wallbox-Broadcast-Listener] Strategie persistent gesetzt: max_without_battery
+Nov 22 12:36:17 hmland node[4173622]: [12:36:17,102] [INFO] [system] [Wallbox-Broadcast-Listener] Settings persistent gesetzt: max_without_battery
+Nov 22 12:36:27 hmland node[4173622]: [12:36:27,596] [INFO] [system] [Wallbox-Broadcast-Listener] State geändert: 5 → 2 (ready for charging) (von 192.168.40.16)
+Nov 22 12:36:27 hmland node[4173622]: [12:36:27,807] [INFO] [system] [Wallbox-Broadcast-Listener] State geändert: 2 → 3 (charging) (von 192.168.40.16)
+Nov 22 12:36:29 hmland node[4173622]: [12:36:29,737] [INFO] [system] Ladung gestartet mit 32A @ 1P (Strategie: max_without_battery)
+Nov 22 12:36:41 hmland node[4173622]: [12:36:41,289] [INFO] [system] Ladung gestartet mit 32A @ 1P (Strategie: max_without_battery)
+Nov 22 12:36:55 hmland node[4173622]: [12:36:55,184] [INFO] [system] [Wallbox-Broadcast-Listener] Input-Status geändert: 1 → 0 (von 192.168.40.16)
+Nov 22 12:36:55 hmland node[4173622]: [12:36:55,186] [INFO] [system] [Wallbox-Broadcast-Listener] Deaktiviere Ladestrategie: Aus
+Nov 22 12:36:55 hmland node[4173622]: [12:36:55,189] [INFO] [system] [ChargingStrategyController] Strategie auf "off" → Wallbox wird gestoppt
+Nov 22 12:36:55 hmland node[4173622]: [12:36:55,191] [INFO] [system] Strategie-Wechsel: off → Battery Lock deaktivieren
+Nov 22 12:36:55 hmland node[4173622]: [12:36:55,195] [INFO] [system] E3DC: Modbus-Pause BEGINNT (3s vor e3dcset-Befehl)
+Nov 22 12:36:58 hmland node[4173622]: [12:36:58,198] [INFO] [system] E3DC: Modbus-Pause ENDET (3s vor e3dcset-Befehl)
+Nov 22 12:36:58 hmland node[4173622]: [12:36:58,201] [INFO] [system] E3DC: Entladesperre deaktivieren - Befehl: /opt/keba-wallbox/e3dcset -p /opt/keba-wallbox/e3dcset.config -t /opt/keba-wallbox/e3dcset.tags -a
+Nov 22 12:37:00 hmland node[4173622]: [12:37:00,258] [INFO] [system] E3DC: Entladesperre deaktivieren - Ausgabe - Setze Lade-/EntladeLeistung auf Automatik
+Nov 22 12:37:00 hmland node[4173622]: [12:37:00,260] [INFO] [system] E3DC: Entladesperre deaktivieren erfolgreich ausgeführt
+Nov 22 12:37:00 hmland node[4173622]: [12:37:00,262] [INFO] [system] E3DC: Modbus-Pause BEGINNT (3s nach e3dcset-Befehl)
+Nov 22 12:37:03 hmland node[4173622]: [12:37:03,265] [INFO] [system] E3DC: Modbus-Pause ENDET (3s nach e3dcset-Befehl)
+Nov 22 12:37:03 hmland node[4173622]: [12:37:03,267] [INFO] [e3dc-poller] E3DC-Background-Poller wird gestartet - Update-Intervall: 10 Sekunden
+Nov 22 12:37:03 hmland node[4173622]: [12:37:03,269] [INFO] [system] E3DC: Poller nach e3dcset-Befehl wieder gestartet
+Nov 22 12:37:07 hmland node[4173622]: [12:37:07,540] [INFO] [system] Ladung gestoppt
+Nov 22 12:37:07 hmland node[4173622]: [12:37:07,547] [INFO] [system] [ChargingStrategyController] Wallbox gestoppt, Strategie auf "off" gesetzt
+Nov 22 12:37:07 hmland node[4173622]: [12:37:07,607] [INFO] [system] [Wallbox-Broadcast-Listener] State geändert: 3 → 5 (authorization rejected) (von 192.168.40.16)
+Nov 22 12:37:27 hmland node[4173622]: [12:37:27,244] [INFO] [system] [SSE] Client getrennt: avdbjbv (0 übrig)

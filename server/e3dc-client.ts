@@ -9,6 +9,29 @@ import path from 'path';
 
 const execAsync = promisify(exec);
 
+/**
+ * Prüft ob für einen e3dcset-Befehl eine Modbus-Pause nötig ist.
+ * 
+ * Modbus-Pause ist nur erforderlich bei Grid Charging Enable (-e > 0),
+ * da dies den Emergency Power Modus aktiviert und Konflikte verursachen kann.
+ * 
+ * @param command - Der e3dcset Befehl (mit oder ohne "e3dcset" Prefix)
+ * @returns true wenn Modbus-Pause angewendet werden soll
+ */
+function shouldApplyModbusPause(command: string): boolean {
+  // Suche nach -e Parameter mit Wert (mit oder ohne Leerzeichen)
+  // Unterstützt beide Formate: "-e 6000" und "-e6000"
+  const match = command.match(/-e\s*(\d+)/);
+  if (!match) {
+    return false; // Kein -e Parameter → keine Pause nötig
+  }
+  
+  const eValue = parseInt(match[1], 10);
+  // Nur bei Grid Charging ENABLE (-e > 0) Pause anwenden
+  // Bei -e 0 (Disable) ist keine Pause nötig
+  return eValue > 0;
+}
+
 class E3dcClient {
   private config: E3dcConfig | null = null;
   private lastCommandTime: number = 0;
@@ -92,6 +115,9 @@ class E3dcClient {
   /**
    * Führt Mock-E3DC-Befehl aus (Demo-Modus)
    * Ruft e3dcset-mock.ts auf statt echtem CLI-Tool
+   * 
+   * WICHTIG: Diese Methode führt KEINE Modbus-Pause durch!
+   * Die Pause wird von executeCommand() durchgeführt, welches diese Methode aufruft.
    */
   private async executeMockCommand(mockCommand: string, commandName: string): Promise<void> {
     const mockScriptPath = path.join(process.cwd(), 'server', 'e3dcset-mock.ts');
@@ -124,23 +150,20 @@ class E3dcClient {
       return;
     }
 
-    // Modbus-Pause VOR e3dcset-Befehl (um Konflikte zu vermeiden)
-    // Wird sowohl im Demo- als auch im Production-Modus angewendet
+    // Prüfe ob Modbus-Pause erforderlich (nur bei Grid Charging Enable mit -e > 0)
+    const needsModbusPause = shouldApplyModbusPause(command);
     const modbusPauseSeconds = this.config?.modbusPauseSeconds ?? 3;
     const e3dcModbusService = getE3dcModbusService();
     
-    if (modbusPauseSeconds > 0) {
-      log('info', 'system', `E3DC: Modbus-Pause BEGINNT (${modbusPauseSeconds}s vor e3dcset-Befehl)`);
-      
-      // Stoppe E3DC Poller (verhindert Auto-Reconnect)
+    // Modbus-Pause VOR e3dcset-Befehl (nur wenn nötig)
+    if (needsModbusPause && modbusPauseSeconds > 0) {
+      log('info', 'system', `E3DC: Modbus-Pause BEGINNT (${modbusPauseSeconds}s - Grid Charging Enable erkannt)`);
       await stopE3dcPoller();
-      
-      // Trenne Modbus-Verbindung
       await e3dcModbusService.disconnect();
-      
-      // Warte Pause-Zeit ab
       await new Promise(resolve => setTimeout(resolve, modbusPauseSeconds * 1000));
-      log('info', 'system', `E3DC: Modbus-Pause ENDET (${modbusPauseSeconds}s vor e3dcset-Befehl)`);
+      log('info', 'system', `E3DC: Modbus-Pause ENDET (${modbusPauseSeconds}s)`);
+    } else {
+      log('debug', 'system', `E3DC: Keine Modbus-Pause nötig für: ${command}`);
     }
 
     // Im Demo-Modus: Mock-Script verwenden statt echtes CLI
@@ -153,13 +176,11 @@ class E3dcClient {
       try {
         await this.executeMockCommand(mockCommand, commandName);
       } finally {
-        // Modbus-Pause NACH e3dcset-Befehl (um Konflikte zu vermeiden)
-        if (modbusPauseSeconds > 0) {
+        // Modbus-Pause NACH e3dcset-Befehl (nur wenn nötig)
+        if (needsModbusPause && modbusPauseSeconds > 0) {
           log('info', 'system', `E3DC: Modbus-Pause BEGINNT (${modbusPauseSeconds}s nach e3dcset-Befehl)`);
           await new Promise(resolve => setTimeout(resolve, modbusPauseSeconds * 1000));
           log('info', 'system', `E3DC: Modbus-Pause ENDET (${modbusPauseSeconds}s nach e3dcset-Befehl)`);
-          
-          // Starte E3DC Poller wieder (stellt automatisch Modbus-Verbindung her)
           startE3dcPoller();
           log('info', 'system', 'E3DC: Poller nach e3dcset-Befehl wieder gestartet');
         }
@@ -211,13 +232,11 @@ class E3dcClient {
       log('error', 'system', `E3DC: ${commandName} fehlgeschlagen`, `Command failed: ${fullCommand} ${errorMessage}`);
       throw new Error(`Failed to execute ${commandName}`);
     } finally {
-      // Modbus-Pause NACH e3dcset-Befehl (um Konflikte zu vermeiden)
-      if (modbusPauseSeconds > 0) {
+      // Modbus-Pause NACH e3dcset-Befehl (nur wenn nötig)
+      if (needsModbusPause && modbusPauseSeconds > 0) {
         log('info', 'system', `E3DC: Modbus-Pause BEGINNT (${modbusPauseSeconds}s nach e3dcset-Befehl)`);
         await new Promise(resolve => setTimeout(resolve, modbusPauseSeconds * 1000));
         log('info', 'system', `E3DC: Modbus-Pause ENDET (${modbusPauseSeconds}s nach e3dcset-Befehl)`);
-        
-        // Starte E3DC Poller wieder (stellt automatisch Modbus-Verbindung her)
         startE3dcPoller();
         log('info', 'system', 'E3DC: Poller nach e3dcset-Befehl wieder gestartet');
       }
