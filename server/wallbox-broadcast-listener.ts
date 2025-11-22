@@ -15,7 +15,7 @@ import { log } from "./logger";
 import { storage } from "./storage";
 import { wallboxUdpChannel } from "./wallbox-udp-channel";
 import { ChargingStrategyController } from "./charging-strategy-controller";
-import { getProwlNotifier } from "./prowl-notifier";
+import { getProwlNotifier, triggerProwlEvent } from "./prowl-notifier";
 import { broadcastWallboxStatus } from "./wallbox-sse";
 
 let lastInputStatus: number | null = null;
@@ -213,7 +213,6 @@ const handleBroadcast = async (data: any, rinfo: any) => {
 
     // Reagiere auf Input-Änderung
     if (inputStatus === 1) {
-      // Hole konfigurierte Strategie aus den Einstellungen
       const settings = storage.getSettings();
       targetStrategy =
         settings?.chargingStrategy?.inputX1Strategy ?? "max_without_battery";
@@ -224,8 +223,81 @@ const handleBroadcast = async (data: any, rinfo: any) => {
         `[Wallbox-Broadcast-Listener] Aktiviere Ladestrategie: ${targetStrategy}`,
       );
 
-      // WICHTIG: Battery Lock aktivieren (für E3DC S10) wenn Strategie max_without_battery
-      if (strategyController) {
+      // X1-OPTIMIERUNG: NUR für max_without_battery
+      // Andere Strategien (surplus_*) brauchen E3DC-Daten → normale Event-Loop verwenden
+      if (targetStrategy === "max_without_battery" && strategyController && settings?.wallboxIp) {
+        // OPTIMIERTER PFAD: Schnelle UI-Reaktion mit Battery Lock Sicherheit
+        // 1. Wallbox sofort starten
+        // 2. SSE sofort senden (UI bekommt Update in ~2-3s)
+        // 3. Battery Lock aktivieren (KRITISCH: await für Sicherheit!)
+        // 4. Bei Fehler: Wallbox stoppen + Strategie NICHT setzen
+        
+        const x1StartTime = Date.now();
+        log('debug', 'system', '[X1-Optimierung] Input 0→1: START (max_without_battery)');
+        
+        try {
+          // SCHRITT 1: Wallbox SOFORT starten (ohne auf Battery Lock zu warten)
+          log('debug', 'system', '[X1-Optimierung] Schritt 1/3: Wallbox starten');
+          await strategyController.activateMaxPowerImmediately(settings.wallboxIp);
+          
+          const wallboxDone = Date.now() - x1StartTime;
+          log('debug', 'system', `[X1-Optimierung] Schritt 1/3 FERTIG - Wallbox gestartet in ${wallboxDone}ms`);
+          
+          // SCHRITT 2: SSE SOFORT senden (UI bekommt Update - optimiert!)
+          log('debug', 'system', '[X1-Optimierung] Schritt 2/3: SSE-Update senden');
+          await fetchAndBroadcastStatus("X1-Aktivierung");
+          
+          const sseDone = Date.now() - x1StartTime;
+          log('debug', 'system', `[X1-Optimierung] Schritt 2/3 FERTIG - SSE gesendet in ${sseDone}ms`);
+          
+          // SCHRITT 3: Battery Lock aktivieren (KRITISCH: await für Sicherheit!)
+          // UI hat bereits Update, aber wir MÜSSEN warten um Batterie zu schützen
+          log('debug', 'system', '[X1-Optimierung] Schritt 3/3: Battery Lock aktivieren (KRITISCH)');
+          await strategyController.handleStrategyChange(targetStrategy);
+          
+          const batteryDone = Date.now() - x1StartTime;
+          log('debug', 'system', `[X1-Optimierung] Schritt 3/3 FERTIG - Battery Lock aktiviert in ${batteryDone}ms`);
+          log('info', 'system', `[X1-Optimierung] Input 0→1 FERTIG - UI-Update in ${sseDone}ms, Total: ${batteryDone}ms`);
+          
+          // Prowl-Notification NACHDEM alles erfolgreich war
+          const finalContext = storage.getChargingContext();
+          if (finalContext.isActive) {
+            triggerProwlEvent(settings, "chargingStarted", (notifier) =>
+              notifier.sendChargingStarted(finalContext.currentAmpere, 1, finalContext.strategy)
+            );
+          }
+        } catch (error) {
+          log(
+            "error",
+            "system",
+            "[X1-Optimierung] FEHLER - Rollback wird ausgeführt:",
+            error instanceof Error ? error.message : String(error),
+          );
+          
+          // ROLLBACK: Wallbox stoppen weil Battery Lock fehlgeschlagen
+          try {
+            await strategyController.stopChargingOnly(settings.wallboxIp, "Battery Lock Fehler - Sicherheits-Rollback");
+            log('error', 'system', '[X1-Optimierung] Rollback erfolgreich - Wallbox gestoppt');
+            
+            // Prowl-Notification: Kritischer Fehler
+            triggerProwlEvent(settings, "errorOccurred", (notifier) =>
+              notifier.sendError("X1 Aktivierung fehlgeschlagen: Battery Lock konnte nicht aktiviert werden. Wallbox wurde gestoppt.")
+            );
+          } catch (rollbackError) {
+            log(
+              'error',
+              'system',
+              '[X1-Optimierung] KRITISCH: Rollback fehlgeschlagen!',
+              rollbackError instanceof Error ? rollbackError.message : String(rollbackError)
+            );
+          }
+          
+          // WICHTIG: targetStrategy auf null setzen → finally-Block setzt KEINE Strategie
+          targetStrategy = null;
+        }
+      } else if (strategyController) {
+        // NORMALER PFAD: Für surplus-Strategien (brauchen E3DC-Daten)
+        // Battery Lock aktivieren, dann wartet Event-Loop auf E3DC-Daten
         try {
           await strategyController.handleStrategyChange(targetStrategy);
         } catch (error) {
@@ -245,6 +317,14 @@ const handleBroadcast = async (data: any, rinfo: any) => {
         );
       }
     } else if (inputStatus === 0) {
+      // X1-OPTIMIERUNG: Sofortige UI-Reaktion durch parallele Ausführung
+      // 1. Wallbox sofort stoppen
+      // 2. SSE sofort senden
+      // 3. Battery Lock asynchron im Hintergrund deaktivieren
+      
+      const x1StopTime = Date.now();
+      log('debug', 'system', '[X1-Optimierung] Input 1→0: START');
+      
       targetStrategy = "off";
       log(
         "info",
@@ -252,18 +332,47 @@ const handleBroadcast = async (data: any, rinfo: any) => {
         "[Wallbox-Broadcast-Listener] Deaktiviere Ladestrategie: Aus",
       );
 
-      // Verwende den ChargingStrategyController für zentralisierte Stopp-Logik
       const settings = storage.getSettings();
       if (settings?.wallboxIp && strategyController) {
         try {
-          await strategyController.stopChargingForStrategyOff(
-            settings.wallboxIp,
-          );
+          // SCHRITT 1: Wallbox SOFORT stoppen (ohne auf Battery Lock zu warten)
+          log('debug', 'system', '[X1-Optimierung] Schritt 1/3: Wallbox stoppen');
+          await strategyController.stopChargingOnly(settings.wallboxIp, "Input X1 deaktiviert");
+          
+          const wallboxDone = Date.now() - x1StopTime;
+          log('debug', 'system', `[X1-Optimierung] Schritt 1/3 FERTIG - Wallbox gestoppt in ${wallboxDone}ms`);
+          
+          // SCHRITT 2: SSE SOFORT senden (UI bekommt Update)
+          log('debug', 'system', '[X1-Optimierung] Schritt 2/3: SSE-Update senden');
+          await fetchAndBroadcastStatus("X1-Deaktivierung");
+          
+          const sseDone = Date.now() - x1StopTime;
+          log('debug', 'system', `[X1-Optimierung] Schritt 2/3 FERTIG - SSE gesendet in ${sseDone}ms`);
+          
+          // SCHRITT 3: Battery Lock ASYNCHRON im Hintergrund deaktivieren
+          // Fire-and-forget: UI wartet nicht darauf
+          log('debug', 'system', '[X1-Optimierung] Schritt 3/3: Battery Lock (async im Hintergrund)');
+          void strategyController.handleStrategyChange("off")
+            .then(() => {
+              const batteryDone = Date.now() - x1StopTime;
+              log('debug', 'system', `[X1-Optimierung] Schritt 3/3 FERTIG - Battery Lock deaktiviert in ${batteryDone}ms`);
+            })
+            .catch((error) => {
+              log(
+                "error",
+                "system",
+                "[X1-Optimierung] Battery Lock Deaktivierung fehlgeschlagen:",
+                error instanceof Error ? error.message : String(error),
+              );
+            });
+          
+          const totalTime = Date.now() - x1StopTime;
+          log('info', 'system', `[X1-Optimierung] Input 1→0 FERTIG - UI-Update in ${totalTime}ms (Battery Lock läuft im Hintergrund)`);
         } catch (error) {
           log(
             "error",
             "system",
-            "[Wallbox-Broadcast-Listener] Wallbox stoppen fehlgeschlagen:",
+            "[X1-Optimierung] Wallbox stoppen fehlgeschlagen:",
             error instanceof Error ? error.message : String(error),
           );
           // Fortfahren - Strategie wird trotzdem auf "off" gesetzt (finally-Block)
@@ -272,7 +381,7 @@ const handleBroadcast = async (data: any, rinfo: any) => {
         log(
           "warning",
           "system",
-          "[Wallbox-Broadcast-Listener] ChargingStrategyController nicht verfügbar - Wallbox nicht gestoppt",
+          "[Wallbox-Broadcast-Listener] ChargingStrategyController oder Wallbox-IP nicht verfügbar - Wallbox nicht gestoppt",
         );
       }
     }

@@ -27,16 +27,103 @@ export class ChargingStrategyController {
   }
 
   /**
+   * Stoppt NUR die Wallbox ohne Battery Lock zu ändern.
+   * Wird verwendet für sofortige UI-Reaktion beim X1-Wechsel.
+   * 
+   * @param wallboxIp IP-Adresse der Wallbox
+   * @param reason Optional: Grund für den Stopp (für Logging)
+   */
+  async stopChargingOnly(wallboxIp: string, reason?: string): Promise<void> {
+    const startTime = Date.now();
+    log('debug', 'system', `[X1-Optimierung] Wallbox-Stopp START - ${reason || 'kein Grund angegeben'}`);
+    
+    await this.stopCharging(wallboxIp, reason);
+    
+    const duration = Date.now() - startTime;
+    log('debug', 'system', `[X1-Optimierung] Wallbox-Stopp ENDE - Dauer: ${duration}ms`);
+  }
+
+  /**
+   * Aktiviert "Max Power without Battery" Strategie SOFORT.
+   * Startet Wallbox mit 32A @ 1P ohne auf E3DC-Daten zu warten.
+   * 
+   * WICHTIG: Setzt NUR den Wallbox-Status (isActive, currentAmpere).
+   * Die Strategie wird vom Aufrufer gesetzt (wallbox-broadcast-listener finally-Block).
+   * 
+   * Optimiert für schnelle UI-Reaktion beim X1-Wechsel:
+   * 1. Wallbox sofort starten (32A @ 1P)
+   * 2. Context updaten (OHNE strategy - wird vom Aufrufer gesetzt)
+   * 3. Battery Lock wird separat im Hintergrund aktiviert (vom Aufrufer)
+   */
+  async activateMaxPowerImmediately(wallboxIp: string): Promise<void> {
+    const startTime = Date.now();
+    log('debug', 'system', '[X1-Optimierung] Max Power Aktivierung START');
+    
+    const settings = storage.getSettings();
+    const context = storage.getChargingContext();
+    
+    // Guard: Prüfe ob bereits aktiv MIT max_without_battery
+    // Verhindert redundante Aktivierungen bei wiederholten X1-Toggles
+    if (context.isActive && context.strategy === "max_without_battery") {
+      log('debug', 'system', '[X1-Optimierung] Strategie bereits aktiv - überspringe');
+      return;
+    }
+    
+    try {
+      // Für max_without_battery: Verwende physicalPhaseSwitch aus Settings
+      // Default 1P weil User's Setup: KEBA manueller Phasenschalter auf 1P fixiert
+      // Begründung: Minimale Startleistung ~1380W (1P) vs ~4140W (3P)
+      // User's PV: ~3kW → Surplus-Laden nur mit 1P praktikabel
+      const config = settings?.chargingStrategy;
+      const phases = config?.physicalPhaseSwitch ?? 1;  // Default 1P für User's Setup
+      const maxCurrent = phases === 1 ? MAX_CURRENT_1P_AMPERE : MAX_CURRENT_3P_AMPERE;
+      const targetAmpere = maxCurrent; // 32A @ 1P oder 16A @ 3P
+      const targetCurrentMa = targetAmpere * 1000;
+      
+      log('debug', 'system', `[X1-Optimierung] Konfiguration: ${targetAmpere}A @ ${phases}P (physicalPhaseSwitch=${config?.physicalPhaseSwitch ?? 'default'})`);
+      
+      // 1. Wallbox SOFORT starten
+      await this.sendUdpCommand(wallboxIp, "ena 1");
+      await this.sendUdpCommand(wallboxIp, `curr ${targetCurrentMa}`);
+      
+      // 2. Context aktualisieren - OHNE strategy!
+      // Strategie wird vom wallbox-broadcast-listener finally-Block gesetzt
+      // Dies verhindert Race Conditions zwischen Context-Update und Strategie-Persistierung
+      const now = new Date();
+      storage.updateChargingContext({
+        isActive: true,
+        currentAmpere: targetAmpere,
+        targetAmpere: targetAmpere,
+        lastAdjustment: now.toISOString(),
+        lastStartedAt: now.toISOString(),
+        belowThresholdSince: undefined,
+      });
+      
+      const duration = Date.now() - startTime;
+      log('info', 'system', `Ladung gestartet mit ${targetAmpere}A @ ${phases}P - X1-Optimiert in ${duration}ms`);
+      log('debug', 'system', `[X1-Optimierung] Max Power Aktivierung ENDE - Dauer: ${duration}ms`);
+      
+      // WICHTIG: Prowl-Notification wird vom Aufrufer gesendet (nach Strategie-Persistierung)
+    } catch (error) {
+      log('error', 'system', 
+        '[X1-Optimierung] Fehler beim Starten der Ladung:',
+        error instanceof Error ? error.message : String(error)
+      );
+      throw error;
+    }
+  }
+
+  /**
    * Stoppt die Wallbox-Ladung wenn die Strategie auf "off" gesetzt wird.
    * 
-   * Diese Methode:
-   * 1. Deaktiviert Battery Lock (via handleStrategyChange)
-   * 2. Stoppt die Wallbox (via "ena 0")
+   * OPTIMIERT für X1-Wechsel:
+   * 1. Stoppt ZUERST die Wallbox (sofortige Reaktion)
+   * 2. Deaktiviert dann Battery Lock (kann parallel laufen)
    * 3. Aktualisiert Context und Settings
    * 
    * Wird aufgerufen von:
    * - Scheduler bei activeStrategy === "off"
-   * - Broadcast-Listener bei Input 0
+   * - Broadcast-Listener bei Input 0 (NICHT MEHR - verwendet nun stopChargingOnly)
    */
   async stopChargingForStrategyOff(wallboxIp: string): Promise<void> {
     const context = storage.getChargingContext();
@@ -55,11 +142,11 @@ export class ChargingStrategyController {
     
     log('info', 'system', '[ChargingStrategyController] Strategie auf "off" → Wallbox wird gestoppt');
     
-    // 1. Battery Lock deaktivieren (falls E3DC aktiviert)
-    await this.handleStrategyChange("off");
-    
-    // 2. Wallbox stoppen (stopCharging ist idempotent, stoppt nur wenn isActive)
+    // 1. Wallbox ZUERST stoppen (stopCharging ist idempotent, stoppt nur wenn isActive)
     await this.stopCharging(wallboxIp, "Ladung gestoppt");
+    
+    // 2. Battery Lock deaktivieren (falls E3DC aktiviert)
+    await this.handleStrategyChange("off");
     
     // 3. Nur Strategie auf "off" setzen (stopCharging hat bereits isActive=false gesetzt)
     storage.updateChargingContext({ strategy: "off" });
