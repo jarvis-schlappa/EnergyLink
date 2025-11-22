@@ -5,8 +5,8 @@
   "targetAmpere": 32,
   "currentPhases": 1,
   "adjustmentCount": 0,
-  "lastAdjustment": "2025-11-22T14:20:27.558Z",
+  "lastAdjustment": "2025-11-22T14:37:31.000Z",
   "lastAdjustmentTimes": [],
-  "calculatedSurplus": 1874,
-  "lastStartedAt": "2025-11-22T14:20:27.558Z"
+  "calculatedSurplus": 1625,
+  "lastStartedAt": "2025-11-22T14:37:31.000Z"
 }

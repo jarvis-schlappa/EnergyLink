@@ -60,6 +60,7 @@ export default function StatusPage() {
   const [relativeUpdateTime, setRelativeUpdateTime] = useState<string>("");
   const [liveCountdown, setLiveCountdown] = useState<number | null>(null);
   const [liveStopCountdown, setLiveStopCountdown] = useState<number | null>(null);
+  const [isButtonLocked, setIsButtonLocked] = useState(false);
 
   const { status: sseStatus, isConnected: sseConnected } = useWallboxSSE({
     onStatusUpdate: (newStatus) => {
@@ -263,6 +264,10 @@ export default function StatusPage() {
   });
 
   const handleToggleCharging = () => {
+    // Sofort visuell sperren für Mindestanzeigedauer
+    setIsButtonLocked(true);
+    setTimeout(() => setIsButtonLocked(false), 800);
+    
     const isCharging = status?.state === 3;
     if (isCharging) {
       // Stoppen: Backend setzt Strategie automatisch auf "off"
@@ -736,9 +741,9 @@ export default function StatusPage() {
               variant={isCharging ? "destructive" : "default"}
               className="w-full h-12 text-base font-medium"
               data-testid="button-toggle-charging"
-              disabled={isLoading || startChargingMutation.isPending || stopChargingMutation.isPending}
+              disabled={isLoading || isButtonLocked || startChargingMutation.isPending || stopChargingMutation.isPending}
             >
-              {startChargingMutation.isPending || stopChargingMutation.isPending
+              {isButtonLocked || startChargingMutation.isPending || stopChargingMutation.isPending
                 ? "Wird verarbeitet..."
                 : isCharging
                 ? controlState?.nightCharging
