@@ -1,10 +1,12 @@
 {
-  "strategy": "off",
-  "isActive": false,
-  "currentAmpere": 0,
-  "targetAmpere": 0,
+  "strategy": "max_without_battery",
+  "isActive": true,
+  "currentAmpere": 32,
+  "targetAmpere": 32,
   "currentPhases": 1,
   "adjustmentCount": 0,
+  "lastAdjustment": "2025-11-22T14:20:27.558Z",
   "lastAdjustmentTimes": [],
-  "calculatedSurplus": 2458
+  "calculatedSurplus": 1874,
+  "lastStartedAt": "2025-11-22T14:20:27.558Z"
 }

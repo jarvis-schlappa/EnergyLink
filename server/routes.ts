@@ -351,23 +351,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
             if (!strategyController) {
               strategyController = new ChargingStrategyController(sendUdpCommand);
             }
-            await strategyController.handleStrategyChange(strategyToActivate);
-          }
-
-          const response = await sendUdpCommand(settings.wallboxIp, "ena 1");
-
-          if (
-            !response ||
-            (!response["TCH-OK"] && !JSON.stringify(response).includes("TCH-OK"))
-          ) {
-            log(
-              "error",
-              "wallbox",
-              `Laden starten fehlgeschlagen - keine Bestätigung`,
-              `Antwort: ${JSON.stringify(response)}`,
-            );
+            
+            if (strategyToActivate === "max_without_battery") {
+              // X1-Optimierung: Schneller Pfad (Wallbox → SSE → Battery Lock async)
+              await strategyController.activateMaxPowerImmediately(settings.wallboxIp);
+              log("info", "wallbox", `Laden erfolgreich gestartet`);
+            } else {
+              // Normale Strategien: Event-driven Flow
+              await strategyController.handleStrategyChange(strategyToActivate);
+              
+              const response = await sendUdpCommand(settings.wallboxIp, "ena 1");
+              if (
+                !response ||
+                (!response["TCH-OK"] && !JSON.stringify(response).includes("TCH-OK"))
+              ) {
+                log(
+                  "error",
+                  "wallbox",
+                  `Laden starten fehlgeschlagen - keine Bestätigung`,
+                  `Antwort: ${JSON.stringify(response)}`,
+                );
+              } else {
+                log("info", "wallbox", `Laden erfolgreich gestartet`);
+              }
+            }
           } else {
-            log("info", "wallbox", `Laden erfolgreich gestartet`);
+            // Keine Strategie → nur Wallbox starten
+            const response = await sendUdpCommand(settings.wallboxIp, "ena 1");
+
+            if (
+              !response ||
+              (!response["TCH-OK"] && !JSON.stringify(response).includes("TCH-OK"))
+            ) {
+              log(
+                "error",
+                "wallbox",
+                `Laden starten fehlgeschlagen - keine Bestätigung`,
+                `Antwort: ${JSON.stringify(response)}`,
+              );
+            } else {
+              log("info", "wallbox", `Laden erfolgreich gestartet`);
+            }
           }
         } catch (bgError) {
           log(
@@ -1080,32 +1104,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
         chargingStrategy: updatedConfig,
       });
 
-      // WICHTIG: Battery Lock aktivieren/deaktivieren basierend auf Strategie
+      // WICHTIG: Nutze X1-Fast-Path für max_without_battery
       if (strategyController) {
         try {
-          await strategyController.handleStrategyChange(strategy);
+          if (strategy === "max_without_battery") {
+            // X1-Optimierung: Schneller Pfad (Wallbox → SSE → Battery Lock async)
+            const wallboxIp = settings.wallboxIp || "192.168.40.16";
+            await strategyController.activateMaxPowerImmediately(wallboxIp);
+          } else {
+            // Normale Strategien: Event-driven Flow
+            await strategyController.handleStrategyChange(strategy);
+            
+            // Sofortiger Check nach Strategiewechsel (vermeidet 0-15s Verzögerung)
+            try {
+              const wallboxIp = settings.wallboxIp || "192.168.40.16";
+              await strategyController.triggerImmediateCheck(wallboxIp);
+            } catch (error) {
+              log(
+                "debug",
+                "system",
+                "Sofortiger Check fehlgeschlagen (Scheduler übernimmt)",
+                error instanceof Error ? error.message : String(error),
+              );
+              // Nicht kritisch - Scheduler wird Check nachholen
+            }
+          }
         } catch (error) {
           log(
             "warning",
             "system",
-            "Battery Lock konnte nicht gesetzt werden",
+            "Strategie-Aktivierung fehlgeschlagen",
             error instanceof Error ? error.message : String(error),
           );
           // Nicht kritisch - Strategie wurde trotzdem gespeichert
-        }
-
-        // Option 1: Sofortiger Check nach Strategiewechsel (vermeidet 0-15s Verzögerung)
-        try {
-          const wallboxIp = settings.wallboxIp || "192.168.40.16";
-          await strategyController.triggerImmediateCheck(wallboxIp);
-        } catch (error) {
-          log(
-            "debug",
-            "system",
-            "Sofortiger Check fehlgeschlagen (Scheduler übernimmt)",
-            error instanceof Error ? error.message : String(error),
-          );
-          // Nicht kritisch - Scheduler wird Check nachholen
         }
       }
 
