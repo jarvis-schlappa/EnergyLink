@@ -19,7 +19,8 @@
     "gridChargeEnableCommand": "-c 2500 -e 6000",
     "gridChargeDisableCommand": "-e 0",
     "gridChargeDuringNightCharging": true,
-    "modbusPauseSeconds": 10
+    "modbusPauseSeconds": 10,
+    "pollingIntervalSeconds": 10
   },
   "chargingStrategy": {
     "activeStrategy": "off",

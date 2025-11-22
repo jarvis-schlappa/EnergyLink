@@ -13,6 +13,7 @@ import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { WallboxStatus, ControlState, Settings, PlugStatusTracking, ChargingContext, ChargingStrategy, BuildInfo } from "@shared/schema";
 import { buildInfoSchema } from "@shared/schema";
+import { useWallboxSSE } from "@/hooks/use-wallbox-sse";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -60,10 +61,20 @@ export default function StatusPage() {
   const [liveCountdown, setLiveCountdown] = useState<number | null>(null);
   const [liveStopCountdown, setLiveStopCountdown] = useState<number | null>(null);
 
+  const { status: sseStatus, isConnected: sseConnected } = useWallboxSSE({
+    onStatusUpdate: (newStatus) => {
+      queryClient.setQueryData(["/api/wallbox/status"], newStatus);
+    }
+  });
+
+  // Polling für regelmäßige Updates (5s) + SSE für Echtzeit-Events
   const { data: status, isLoading, error } = useQuery<WallboxStatus>({
     queryKey: ["/api/wallbox/status"],
-    refetchInterval: 5000,
+    refetchInterval: 5000, // Polling bleibt aktiv (SSE ist nur für Events)
   });
+
+  // Nutze SSE-Status wenn verfügbar, sonst Polling-Status
+  const displayStatus = sseStatus || status;
 
   const { data: controlState } = useQuery<ControlState>({
     queryKey: ["/api/controls"],
@@ -101,16 +112,16 @@ export default function StatusPage() {
   });
 
   useEffect(() => {
-    if (status) {
+    if (displayStatus) {
       errorCountRef.current = 0;
       setShowError(false);
-      if (status.maxCurr > 0) {
-        const maxAllowed = status.phases === 3 ? 16 : 32;
-        const newCurrent = Math.min(Math.round(status.maxCurr), maxAllowed);
+      if (displayStatus?.maxCurr > 0) {
+        const maxAllowed = displayStatus?.phases === 3 ? 16 : 32;
+        const newCurrent = Math.min(Math.round(displayStatus?.maxCurr), maxAllowed);
         setCurrentAmpere(newCurrent);
       }
       // Wenn Ladeleistung empfangen wird, "Warte auf Bestätigung" beenden
-      if (status.power > 0 && waitingForConfirmation) {
+      if (displayStatus?.power > 0 && waitingForConfirmation) {
         setWaitingForConfirmation(false);
       }
     } else if (error) {
@@ -127,7 +138,7 @@ export default function StatusPage() {
     if (previousNightChargingRef.current !== undefined) {
       if (controlState && status && controlState.nightCharging && !previousNightChargingRef.current) {
         // Zeitgesteuerte Ladung wurde gerade aktiviert (Wechsel von false auf true)
-        const maxAllowed = status.phases === 3 ? 16 : 32;
+        const maxAllowed = displayStatus?.phases === 3 ? 16 : 32;
         setCurrentAmpere(maxAllowed);
         // Sende Befehl an Wallbox
         setCurrentMutation.mutate(maxAllowed);
@@ -216,8 +227,8 @@ export default function StatusPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/wallbox/status"] });
     },
     onError: () => {
-      if (status?.maxCurr) {
-        setCurrentAmpere(Math.round(status.maxCurr));
+      if (displayStatus?.maxCurr) {
+        setCurrentAmpere(Math.round(displayStatus.maxCurr));
       }
       toast({
         title: "Fehler",
@@ -388,13 +399,13 @@ export default function StatusPage() {
   const getPhaseInfo = () => {
     if (!status || !isCharging) return undefined;
     
-    const phases = status.phases || 0;
+    const phases = displayStatus?.phases || 0;
     if (phases === 0) return undefined;
 
     const activePhases = [
-      (status.i1 || 0) >= 1,
-      (status.i2 || 0) >= 1,
-      (status.i3 || 0) >= 1,
+      (displayStatus?.i1 || 0) >= 1,
+      (displayStatus?.i2 || 0) >= 1,
+      (displayStatus?.i3 || 0) >= 1,
     ].filter(Boolean).length;
 
     if (phases === 3 && activePhases === 2) {
@@ -524,7 +535,7 @@ export default function StatusPage() {
     }
 
     const updateRelativeTime = () => {
-      setRelativeUpdateTime(formatRelativeTime(status.lastUpdated!));
+      setRelativeUpdateTime(formatRelativeTime(displayStatus?.lastUpdated!));
     };
 
     updateRelativeTime();
@@ -736,9 +747,9 @@ export default function StatusPage() {
                 : `Starte ${getStrategyLabel(settings?.chargingStrategy?.inputX1Strategy || "max_without_battery")}`}
             </Button>
 
-            {status?.lastUpdated && relativeUpdateTime && (
+            {displayStatus?.lastUpdated && relativeUpdateTime && (
               <div className="text-xs text-left text-muted-foreground" data-testid="text-last-update">
-                Letztes Update: {format(new Date(status.lastUpdated), 'HH:mm:ss', { locale: de })} ({relativeUpdateTime})
+                Letztes Update: {format(new Date(displayStatus.lastUpdated), 'HH:mm:ss', { locale: de })} ({relativeUpdateTime})
               </div>
             )}
           </div>

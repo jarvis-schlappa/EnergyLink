@@ -16,6 +16,7 @@ import { storage } from "./storage";
 import { wallboxUdpChannel } from "./wallbox-udp-channel";
 import { ChargingStrategyController } from "./charging-strategy-controller";
 import { getProwlNotifier } from "./prowl-notifier";
+import { broadcastWallboxStatus } from "./wallbox-sse";
 
 let lastInputStatus: number | null = null;
 let lastPlugStatus: number | null = null;
@@ -133,6 +134,9 @@ const handleBroadcast = async (data: any, rinfo: any) => {
         } catch (error) {
           log("debug", "system", "Prowl-Notifier nicht initialisiert - überspringe Benachrichtigung");
         }
+        
+        // WebSocket-Broadcast: Hol aktuellen Status und push zu Clients
+        void fetchAndBroadcastStatus("Plug-Änderung");
       }
 
       // Update In-Memory-Tracker für nächsten Broadcast
@@ -161,6 +165,9 @@ const handleBroadcast = async (data: any, rinfo: any) => {
           "system",
           `[Wallbox-Broadcast-Listener] State geändert: ${lastState} → ${state} (${stateNames[state] || "unknown"}) (von ${rinfo.address})`,
         );
+        
+        // WebSocket-Broadcast: Hol aktuellen Status und push zu Clients
+        void fetchAndBroadcastStatus("State-Änderung");
       }
 
       lastState = state;
@@ -323,6 +330,56 @@ const handleBroadcast = async (data: any, rinfo: any) => {
     }
   }
 };
+
+/**
+ * Holt aktuellen Wallbox-Status und broadcastet ihn an WebSocket-Clients
+ * Wird bei Plug- und State-Änderungen aufgerufen
+ */
+async function fetchAndBroadcastStatus(reason: string): Promise<void> {
+  try {
+    const settings = storage.getSettings();
+    if (!settings?.wallboxIp || !sendUdpCommand) {
+      return;
+    }
+
+    // Hole vollständigen Status (wie in /api/wallbox/status)
+    const report1 = await sendUdpCommand(settings.wallboxIp, "report 1");
+    const report2 = await sendUdpCommand(settings.wallboxIp, "report 2");
+    const report3 = await sendUdpCommand(settings.wallboxIp, "report 3");
+
+    // Phasenzahl aus Strömen ableiten
+    const i1 = report3?.["I1"] || 0;
+    const i2 = report3?.["I2"] || 0;
+    const i3 = report3?.["I3"] || 0;
+    const CURRENT_THRESHOLD = 100; // mA
+    let activePhaseCount = 0;
+    if (i1 > CURRENT_THRESHOLD) activePhaseCount++;
+    if (i2 > CURRENT_THRESHOLD) activePhaseCount++;
+    if (i3 > CURRENT_THRESHOLD) activePhaseCount++;
+
+    const status = {
+      state: report2?.State || 0,
+      plug: report2?.Plug || 0,
+      input: report2?.Input,
+      enableSys: report2["Enable sys"] || 0,
+      maxCurr: (report2["Max curr"] || 0) / 1000,
+      ePres: (report3["E pres"] || 0) / 10,
+      eTotal: (report3["E total"] || 0) / 10,
+      power: (report3?.P || 0) / 1000000,
+      phases: activePhaseCount,
+      i1: i1 / 1000,
+      i2: i2 / 1000,
+      i3: i3 / 1000,
+      lastUpdated: new Date().toISOString(),
+    };
+
+    // Broadcast zu allen WebSocket-Clients
+    broadcastWallboxStatus(status);
+    log("debug", "system", `[WebSocket] Broadcast gesendet (${reason})`);
+  } catch (error) {
+    log("debug", "system", "[WebSocket] Fehler beim Status-Abruf für Broadcast:", error instanceof Error ? error.message : String(error));
+  }
+}
 
 export async function startBroadcastListener(
   udpCommandSender: (ip: string, command: string) => Promise<any>,

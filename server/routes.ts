@@ -11,6 +11,7 @@ import {
   e3dcLiveDataSchema,
   chargingStrategyConfigSchema,
   chargingStrategySchema,
+  type ChargingStrategy,
 } from "@shared/schema";
 import { e3dcClient } from "./e3dc-client";
 import { getE3dcModbusService } from "./e3dc-modbus";
@@ -23,6 +24,7 @@ import { getBuildInfo } from "./build-info";
 import { syncE3dcToFhem, startFhemSyncScheduler, stopFhemSyncScheduler } from "./fhem-e3dc-sync";
 import { startE3dcPoller, stopE3dcPoller } from "./e3dc-poller";
 import { initializeProwlNotifier, triggerProwlEvent, extractTargetWh, getProwlNotifier } from "./prowl-notifier";
+import { initSSEClient, broadcastWallboxStatus } from "./wallbox-sse";
 
 // Module-scope Scheduler Handles (überleben Hot-Reload)
 let chargingStrategyInterval: NodeJS.Timeout | null = null;
@@ -212,6 +214,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // SSE-Endpoint für Echtzeit-Status-Updates
+  app.get("/api/wallbox/stream", (req, res) => {
+    initSSEClient(res);
+  });
+
   app.get("/api/wallbox/status", async (req, res) => {
     try {
       const settings = storage.getSettings();
@@ -279,6 +286,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
+      // Broadcast to all WebSocket clients
+      broadcastWallboxStatus(status);
+
       res.json(status);
     } catch (error) {
       log(
@@ -291,7 +301,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/wallbox/start", async (req, res) => {
+  app.post("/api/wallbox/start", (req, res) => {
     try {
       const settings = storage.getSettings();
 
@@ -301,11 +311,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Optional: Aktiviere Ladestrategie (Standard: inputX1Strategy)
       const { strategy } = req.body;
+      let strategyToActivate: ChargingStrategy | undefined;
+      
       if (strategy !== undefined) {
         const strategyValidation = chargingStrategySchema.safeParse(strategy);
         if (!strategyValidation.success) {
           return res.status(400).json({ error: "Invalid charging strategy" });
         }
+        strategyToActivate = strategyValidation.data;
 
         const updatedSettings = {
           ...settings,
@@ -319,45 +332,52 @@ export async function registerRoutes(app: Express): Promise<Server> {
             minCurrentChangeAmpere: settings.chargingStrategy?.minCurrentChangeAmpere ?? 1,
             minChangeIntervalSeconds: settings.chargingStrategy?.minChangeIntervalSeconds ?? 60,
             inputX1Strategy: settings.chargingStrategy?.inputX1Strategy ?? "max_without_battery",
-            activeStrategy: strategyValidation.data,
+            activeStrategy: strategyToActivate,
           },
         };
 
         storage.saveSettings(updatedSettings);
-        log("info", "wallbox", `Ladestrategie aktiviert: ${strategyValidation.data}`);
-        
-        // WICHTIG: Battery Lock aktivieren/deaktivieren basierend auf Strategie
-        // Initialisiere Controller wenn noch nicht vorhanden (Shared instance)
-        if (!strategyController) {
-          strategyController = new ChargingStrategyController(sendUdpCommand);
-        }
-        await strategyController.handleStrategyChange(strategyValidation.data);
+        log("info", "wallbox", `Ladestrategie aktiviert: ${strategyToActivate}`);
       }
 
-      const response = await sendUdpCommand(settings.wallboxIp, "ena 1");
-
-      if (
-        !response ||
-        (!response["TCH-OK"] && !JSON.stringify(response).includes("TCH-OK"))
-      ) {
-        log(
-          "error",
-          "wallbox",
-          `Laden starten fehlgeschlagen - keine Bestätigung`,
-          `Antwort: ${JSON.stringify(response)}`,
-        );
-        return res
-          .status(500)
-          .json({ error: "Wallbox did not acknowledge start command" });
-      }
-
-      log("info", "wallbox", `Laden erfolgreich gestartet`);
-      
-      // HINWEIS: Prowl-Benachrichtigung wird vom ChargingStrategyController gesendet
-      // Der Controller wird sofort nach dem Start durch den Scheduler getriggert
-      // und sendet die Benachrichtigung mit korrekten Parametern (Ampere, Phasen, Strategie)
-      
+      // Sofort antworten für schnelle UI-Reaktion
       res.json({ success: true });
+      
+      // Background: Async-Operationen im Hintergrund ausführen (nicht warten)
+      (async () => {
+        try {
+          // WICHTIG: Battery Lock aktivieren/deaktivieren basierend auf Strategie
+          if (strategyToActivate) {
+            if (!strategyController) {
+              strategyController = new ChargingStrategyController(sendUdpCommand);
+            }
+            await strategyController.handleStrategyChange(strategyToActivate);
+          }
+
+          const response = await sendUdpCommand(settings.wallboxIp, "ena 1");
+
+          if (
+            !response ||
+            (!response["TCH-OK"] && !JSON.stringify(response).includes("TCH-OK"))
+          ) {
+            log(
+              "error",
+              "wallbox",
+              `Laden starten fehlgeschlagen - keine Bestätigung`,
+              `Antwort: ${JSON.stringify(response)}`,
+            );
+          } else {
+            log("info", "wallbox", `Laden erfolgreich gestartet`);
+          }
+        } catch (bgError) {
+          log(
+            "error",
+            "wallbox",
+            "Background: Failed to start charging",
+            bgError instanceof Error ? bgError.message : String(bgError),
+          );
+        }
+      })();
     } catch (error) {
       log(
         "error",
@@ -369,7 +389,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/wallbox/stop", async (req, res) => {
+  app.post("/api/wallbox/stop", (req, res) => {
     try {
       const settings = storage.getSettings();
 
@@ -397,33 +417,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
       storage.saveSettings(updatedSettings);
       log("info", "wallbox", `Ladestrategie deaktiviert (auf "off" gesetzt)`);
       
-      // WICHTIG: Battery Lock deaktivieren
-      // Initialisiere Controller wenn noch nicht vorhanden (Shared instance)
-      if (!strategyController) {
-        strategyController = new ChargingStrategyController(sendUdpCommand);
-      }
-      await strategyController.handleStrategyChange("off");
-
-      const response = await sendUdpCommand(settings.wallboxIp, "ena 0");
-
-      if (
-        !response ||
-        (!response["TCH-OK"] && !JSON.stringify(response).includes("TCH-OK"))
-      ) {
-        log(
-          "error",
-          "wallbox",
-          `Laden stoppen fehlgeschlagen - keine Bestätigung`,
-          `Antwort: ${JSON.stringify(response)}`,
-        );
-        return res
-          .status(500)
-          .json({ error: "Wallbox did not acknowledge stop command" });
-      }
-
-      log("info", "wallbox", `Laden erfolgreich gestoppt`);
-      // Prowl-Benachrichtigung erfolgt durch ChargingStrategyController
+      // Sofort antworten für schnelle UI-Reaktion
       res.json({ success: true });
+      
+      // Background: Async-Operationen im Hintergrund ausführen (nicht warten)
+      (async () => {
+        try {
+          // WICHTIG: Battery Lock deaktivieren
+          if (!strategyController) {
+            strategyController = new ChargingStrategyController(sendUdpCommand);
+          }
+          await strategyController.handleStrategyChange("off");
+
+          const response = await sendUdpCommand(settings.wallboxIp, "ena 0");
+
+          if (
+            !response ||
+            (!response["TCH-OK"] && !JSON.stringify(response).includes("TCH-OK"))
+          ) {
+            log(
+              "error",
+              "wallbox",
+              `Laden stoppen fehlgeschlagen - keine Bestätigung`,
+              `Antwort: ${JSON.stringify(response)}`,
+            );
+          } else {
+            log("info", "wallbox", `Laden erfolgreich gestoppt`);
+          }
+        } catch (bgError) {
+          log(
+            "error",
+            "wallbox",
+            "Background: Failed to stop charging",
+            bgError instanceof Error ? bgError.message : String(bgError),
+          );
+        }
+      })();
     } catch (error) {
       log(
         "error",
@@ -1852,6 +1881,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   }
 
   const httpServer = createServer(app);
+
+  // SSE-Server für Echtzeit-Wallbox-Updates ist bereits via /api/wallbox/stream konfiguriert
+  log("info", "system", "SSE-Server für Wallbox-Status-Updates bereit");
 
   return httpServer;
 }
