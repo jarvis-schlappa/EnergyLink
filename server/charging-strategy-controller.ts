@@ -471,8 +471,20 @@ export class ChargingStrategyController {
     });
     
     if (waitingDuration >= config.startDelaySeconds) {
+      // WICHTIG: Auch bei Surplus-Strategien prüfen, ob Auto angeschlossen ist!
+      if (this.lastPlugStatus !== 7) {
+        log("info", "system", 
+          `Start-Bedingung erfüllt: Überschuss ${surplus}W > ${config.minStartPowerWatt}W für ${waitingDuration}s, aber kein Auto angeschlossen (Plug=${this.lastPlugStatus}) - Stopp-Timer wird zurückgesetzt`
+        );
+        storage.updateChargingContext({
+          startDelayTrackerSince: undefined,
+          remainingStartDelay: undefined,
+        });
+        return false;
+      }
+
       log("info", "system", 
-        `Start-Bedingung erfüllt: Überschuss ${surplus}W > ${config.minStartPowerWatt}W für ${waitingDuration}s`
+        `Start-Bedingung erfüllt: Überschuss ${surplus}W > ${config.minStartPowerWatt}W für ${waitingDuration}s, Auto angeschlossen (Plug=7)`
       );
       storage.updateChargingContext({
         startDelayTrackerSince: undefined,

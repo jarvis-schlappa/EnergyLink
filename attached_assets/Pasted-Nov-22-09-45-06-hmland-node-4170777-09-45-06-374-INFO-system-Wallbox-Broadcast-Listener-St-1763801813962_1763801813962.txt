@@ -1,0 +1,26 @@
+Nov 22 09:45:06 hmland node[4170777]: [09:45:06,374] [INFO] [system] [Wallbox-Broadcast-Listener] State geändert: 2 → 3 (charging) (von 192.168.40.16)
+Nov 22 09:45:08 hmland node[4170777]: [09:45:08,651] [INFO] [system] [RECONCILE] Context sagt isActive=false, aber Wallbox lädt (State=3, Power=87465mW) → setze isActive=true
+Nov 22 09:45:39 hmland node[4170777]: [09:45:39,103] [INFO] [system] Ladestrom angepasst: 1A → 7A @ 1P
+Nov 22 09:45:45 hmland node[4170777]: [09:45:45,408] [INFO] [system] [surplus_vehicle_prio] Überschuss unter Schwellwert: 899W < 1000W - Stopp-Timer gestartet
+Nov 22 09:45:48 hmland node[4170777]: [09:45:48,552] [INFO] [system] [surplus_vehicle_prio] Überschuss wieder ausreichend: 1036W >= 1000W - Stopp-Timer zurückgesetzt
+Nov 22 09:46:23 hmland node[4170777]: [09:46:23,202] [INFO] [system] Ladestrom angepasst: 7A → 10A @ 1P
+Nov 22 09:46:57 hmland node[4170777]: [09:46:57,509] [INFO] [system] Ladestrom angepasst: 10A → 8A @ 1P
+Nov 22 09:47:27 hmland node[4170777]: [09:47:27,947] [INFO] [system] [Wallbox-Broadcast-Listener] Plug-Status geändert: 7 → 3 (von 192.168.40.16)
+Nov 22 09:47:30 hmland node[4170777]: [09:47:30,710] [INFO] [system] [Wallbox-Broadcast-Listener] State geändert: 3 → 1 (not ready for charging) (von 192.168.40.16)
+Nov 22 09:47:31 hmland node[4170777]: [09:47:31,105] [INFO] [system] Ladestrom angepasst: 8A → 9A @ 1P
+Nov 22 09:47:33 hmland node[4170777]: [09:47:33,204] [INFO] [system] [RECONCILE] Context sagt isActive=true, aber Wallbox lädt nicht (State=1, Power=0mW) → setze isActive=false
+Nov 22 09:47:33 hmland node[4170777]: [09:47:33,215] [INFO] [system] Start-Bedingung erfüllt: Überschuss 1991W > 1500W für 147.702s
+Nov 22 09:47:39 hmland node[4170777]: [09:47:39,505] [INFO] [system] Ladung gestartet mit 9A @ 1P (Strategie: surplus_vehicle_prio)
+Nov 22 09:47:41 hmland node[4170777]: [09:47:41,604] [INFO] [system] [RECONCILE] Context sagt isActive=true, aber Wallbox lädt nicht (State=1, Power=0mW) → setze isActive=false
+Nov 22 09:48:12 hmland node[4170777]: [09:48:12,061] [INFO] [system] Start-Bedingung erfüllt: Überschuss 1976W > 1500W für 30.443s
+Nov 22 09:48:17 hmland node[4170777]: [09:48:17,306] [INFO] [system] Ladung gestartet mit 9A @ 1P (Strategie: surplus_vehicle_prio)
+Nov 22 09:48:20 hmland node[4170777]: [09:48:20,455] [INFO] [system] [RECONCILE] Context sagt isActive=true, aber Wallbox lädt nicht (State=1, Power=0mW) → setze isActive=false
+Nov 22 09:49:52 hmland node[4170777]: [09:49:52,160] [INFO] [system] Start-Bedingung erfüllt: Überschuss 1959W > 1500W für 33.799s
+Nov 22 09:49:54 hmland node[4170777]: [09:49:54,255] [INFO] [system] Ladung gestartet mit 9A @ 1P (Strategie: surplus_vehicle_prio)
+Nov 22 09:49:57 hmland node[4170777]: [09:49:57,404] [INFO] [system] [RECONCILE] Context sagt isActive=true, aber Wallbox lädt nicht (State=1, Power=0mW) → setze isActive=false
+Nov 22 09:50:30 hmland node[4170777]: [09:50:30,210] [INFO] [system] Start-Bedingung erfüllt: Überschuss 1828W > 1500W für 32.792s
+Nov 22 09:50:33 hmland node[4170777]: [09:50:33,354] [INFO] [system] Ladung gestartet mit 8A @ 1P (Strategie: surplus_vehicle_prio)
+Nov 22 09:50:35 hmland node[4170777]: [09:50:35,453] [INFO] [system] [RECONCILE] Context sagt isActive=true, aber Wallbox lädt nicht (State=1, Power=0mW) → setze isActive=false
+Nov 22 09:51:08 hmland node[4170777]: [09:51:08,111] [INFO] [system] Start-Bedingung erfüllt: Überschuss 1757W > 1500W für 32.64s
+Nov 22 09:51:10 hmland node[4170777]: [09:51:10,206] [INFO] [system] Ladung gestartet mit 8A @ 1P (Strategie: surplus_vehicle_prio)
+Nov 22 09:51:14 hmland node[4170777]: [09:51:14,405] [INFO] [system] [RECONCILE] Context sagt isActive=true, aber Wallbox lädt nicht (State=1, Power=0mW) → setze isActive=false
