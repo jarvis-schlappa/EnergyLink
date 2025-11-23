@@ -575,7 +575,7 @@ export default function E3dcPage() {
 
       {/* E3DC Console Dialog */}
       <Dialog open={showE3dcConsole} onOpenChange={setShowE3dcConsole}>
-        <DialogContent className="max-w-2xl sm:top-[10%] sm:translate-y-0" data-testid="dialog-e3dc-console">
+        <DialogContent className="max-w-2xl" style={{ top: '10%', transform: 'translateX(-50%)' }} data-testid="dialog-e3dc-console">
           <DialogHeader>
             <DialogTitle>E3DC Console</DialogTitle>
             <DialogDescription>
