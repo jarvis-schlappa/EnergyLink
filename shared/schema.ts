@@ -184,6 +184,7 @@ export const e3dcLiveDataSchema = z.object({
   wallboxPower: z.number(),
   autarky: z.number(),
   selfConsumption: z.number(),
+  gridFrequency: z.number().optional(),
   timestamp: z.string(),
 });
 

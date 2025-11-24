@@ -211,6 +211,14 @@ export class E3dcMockService {
     // 9. Autarkie & Eigenverbrauch berechnen
     const { autarky, selfConsumption } = this.calculateEfficiency(pvPower, totalConsumption, gridPower);
 
+    // 10. Mock Grid Frequency (Netzfrequenz) - realistisches Rauschen um 50Hz
+    // Normalbereich: 49.5 - 50.5 Hz
+    // Mit leichtem Rauschen: Base 50.0 Hz ± 0.3 Hz
+    const baseFrequency = 50.0;
+    const noiseAmplitude = 0.15; // ±0.15 Hz
+    const noise = (Math.sin(Date.now() / 3000) * noiseAmplitude) + (Math.random() - 0.5) * 0.05; // Sine + Random
+    const gridFrequency = parseFloat((baseFrequency + noise).toFixed(2)); // Round to 2 decimals
+
     return {
       pvPower: Math.max(0, Math.round(pvPower)),
       batteryPower: Math.round(batteryPower),
@@ -220,6 +228,7 @@ export class E3dcMockService {
       wallboxPower,
       autarky: Math.round(autarky),
       selfConsumption: Math.round(selfConsumption),
+      gridFrequency,
       timestamp: now.toISOString(),
     };
   }

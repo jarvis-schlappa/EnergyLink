@@ -23,6 +23,7 @@ const E3DC_REGISTERS = {
   BATTERY_SOC: 82,           // Holding Register 40083, UINT16, Prozent
   EMERGENCY_POWER: 83,       // Holding Register 40084, UINT16, Emergency Power Status (0-4)
   EMS_STATUS: 84,            // Holding Register 40085, UINT16, Bitflags für EMS-Status
+  GRID_FREQUENCY: 1024,      // Holding Register 41025 (0-basiert: 41025 - 40001 = 1024), UINT16, Hz × 100 (z.B. 5000 = 50.00 Hz)
 } as const;
 
 const MODBUS_PORT = 502;
@@ -273,7 +274,7 @@ export class E3dcModbusService {
 
     try {
       // Alle E3DC Register parallel auslesen (OHNE Wallbox - die kommt von KEBA)
-      const [pvPower, batteryPower, housePower, gridPower, autarkySelfCons, batterySoc, emergencyPowerStatus, emsStatus] = await Promise.all([
+      const [pvPower, batteryPower, housePower, gridPower, autarkySelfCons, batterySoc, emergencyPowerStatus, emsStatus, gridFrequencyRaw] = await Promise.all([
         this.readInt32(E3DC_REGISTERS.PV_POWER),
         this.readInt32(E3DC_REGISTERS.BATTERY_POWER),
         this.readInt32(E3DC_REGISTERS.HOUSE_POWER),
@@ -282,11 +283,16 @@ export class E3dcModbusService {
         this.readUint16(E3DC_REGISTERS.BATTERY_SOC),
         this.readUint16(E3DC_REGISTERS.EMERGENCY_POWER),
         this.readUint16(E3DC_REGISTERS.EMS_STATUS),
+        this.readUint16(E3DC_REGISTERS.GRID_FREQUENCY).catch(() => null), // Fallback: Frequency optional
       ]);
 
       // Register 40082: Autarkie (High Byte) & Eigenverbrauch (Low Byte)
       const autarky = (autarkySelfCons >> 8) & 0xFF;
       const selfConsumption = autarkySelfCons & 0xFF;
+
+      // Register 41025: Grid Frequency (Netzfrequenz) - 0-basiert: Offset 1024
+      // Rohwert: UINT16, Skalierung: ×0.01 → z.B. 5000 = 50.00 Hz
+      const gridFrequency = gridFrequencyRaw !== null ? (gridFrequencyRaw * 0.01) : undefined;
 
       // Register 40085: EMS-Status Bitflags dekodieren
       // WICHTIG: Bit-Nummerierung könnte je nach E3DC-Firmware variieren
@@ -304,7 +310,8 @@ export class E3dcModbusService {
       log("debug", "system", `E3DC EMS-Status RAW: 0x${emsStatus.toString(16).padStart(4, '0')} = 0b${emsStatus.toString(2).padStart(16, '0')}`);
 
       // DEBUG: Kompakte einzeilige Ausgabe bei LogLevel DEBUG
-      log("debug", "system", `E3DC Register gelesen: PV=${pvPower}W, Batterie=${batteryPower}W (SOC=${batterySoc}%), Haus=${housePower}W, Netz=${gridPower}W, Autarkie=${autarky}%, Eigenverbrauch=${selfConsumption}%, Wallbox=${kebaWallboxPower}W`);
+      const frequencyStr = gridFrequency !== undefined ? `, Netzfrequenz=${gridFrequency.toFixed(2)}Hz` : '';
+      log("debug", "system", `E3DC Register gelesen: PV=${pvPower}W, Batterie=${batteryPower}W (SOC=${batterySoc}%), Haus=${housePower}W, Netz=${gridPower}W, Autarkie=${autarky}%, Eigenverbrauch=${selfConsumption}%, Wallbox=${kebaWallboxPower}W${frequencyStr}`);
       
       // DEBUG: EMS-Status separat loggen (nur wenn Flags gesetzt sind, um Logs sauber zu halten)
       const activeFlags = Object.entries(emsFlags)
@@ -335,6 +342,7 @@ export class E3dcModbusService {
         wallboxPower: kebaWallboxPower,
         autarky,
         selfConsumption,
+        gridFrequency,
         timestamp,
       };
       
