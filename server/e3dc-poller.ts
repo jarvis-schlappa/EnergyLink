@@ -172,6 +172,14 @@ export function startE3dcPoller(): NodeJS.Timeout {
 }
 
 /**
+ * Gibt den aktuellen Backoff-Level zurück
+ * 0 = Normal (10s), 1-4 = Backoff aktiv
+ */
+export function getE3dcBackoffLevel(): number {
+  return backoffLevel;
+}
+
+/**
  * Stoppt den E3DC-Background-Poller und wartet auf laufenden Poll
  */
 export async function stopE3dcPoller(): Promise<void> {

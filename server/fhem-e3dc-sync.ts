@@ -2,6 +2,7 @@ import { Socket } from "net";
 import { log } from "./logger";
 import { storage } from "./storage";
 import { getE3dcModbusService, getE3dcLiveDataHub } from "./e3dc-modbus";
+import { getE3dcBackoffLevel } from "./e3dc-poller";
 import type { FhemSync } from "@shared/schema";
 
 /**
@@ -126,6 +127,19 @@ export async function syncE3dcToFhem(): Promise<void> {
     const liveData = e3dcModbus.getLastReadLiveData();
     
     if (!liveData) {
+      // Wenn E3DC gerade im Backoff-Modus ist, schweige still (Sync pausiert)
+      // Backoff Level > 0 bedeutet: E3DC-Verbindung fehlt, kein Grund für Warnung
+      if (getE3dcBackoffLevel() > 0) {
+        log(
+          "debug",
+          "fhem",
+          "E3DC im Backoff-Modus - FHEM-Sync pausiert",
+          `Backoff Level ${getE3dcBackoffLevel()}/4`
+        );
+        return;
+      }
+      
+      // Backoff Level 0 aber keine Daten = echtes Problem (erste Abfrage noch nicht fertig)
       log(
         "warning",
         "fhem",
