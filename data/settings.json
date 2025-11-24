@@ -2,5 +2,10 @@
   "wallboxIp": "127.0.0.1",
   "e3dcIp": "127.0.0.1:5502",
   "mockWallboxPhases": 3,
-  "mockWallboxPlugStatus": 7
+  "mockWallboxPlugStatus": 7,
+  "fhemSync": {
+    "enabled": false,
+    "port": 7072,
+    "host": "127.0.0.1"
+  }
 }
