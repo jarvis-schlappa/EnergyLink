@@ -1,11 +1,6 @@
 {
   "wallboxIp": "127.0.0.1",
   "e3dcIp": "192.168.99.99:5502",
-  "e3dc": {
-    "enabled": true,
-    "modbusPauseSeconds": 3,
-    "pollingIntervalSeconds": 10
-  },
   "mockWallboxPhases": 3,
   "mockWallboxPlugStatus": 7
 }

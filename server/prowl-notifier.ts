@@ -217,6 +217,22 @@ export class ProwlNotifier {
     );
   }
 
+  async sendE3dcConnectionLost(): Promise<void> {
+    await this.send(
+      "E3DC Verbindung verloren",
+      "Die Verbindung zum E3DC S10 konnte nicht aufgebaut werden. Exponential Backoff aktiviert.",
+      1 // High priority
+    );
+  }
+
+  async sendE3dcConnectionRestored(): Promise<void> {
+    await this.send(
+      "E3DC Verbindung wiederhergestellt",
+      "Die Verbindung zum E3DC S10 wurde erfolgreich wiederhergestellt.",
+      0
+    );
+  }
+
   private strategyDisplayName(strategy: string): string {
     const names: Record<string, string> = {
       off: "Aus",

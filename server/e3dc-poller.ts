@@ -2,6 +2,7 @@ import { log } from "./logger";
 import { storage } from "./storage";
 import { getE3dcModbusService, getE3dcLiveDataHub } from "./e3dc-modbus";
 import { sendUdpCommand } from "./wallbox-transport";
+import { getProwlNotifier } from "./prowl-notifier";
 
 /**
  * E3DC-Background-Poller
@@ -26,6 +27,7 @@ let runningStopPromise: Promise<void> | null = null;
 
 // Exponential Backoff State
 let backoffLevel = 0;
+let previousBackoffLevel = 0; // Für State-Transition Detection (Prowl-Notifikationen)
 const BACKOFF_INTERVALS = [10, 30, 60, 300, 600]; // In Sekunden: 10s, 30s, 1min, 5min, 10min
 const MAX_BACKOFF_LEVEL = 4; // Max Level (10min)
 let basePollingIntervalSeconds = 10;
@@ -93,11 +95,24 @@ async function pollE3dcData(): Promise<boolean> {
       if (backoffLevel > 0) {
         log("info", "e3dc-poller", `E3DC Verbindung wiederhergestellt - Backoff-Level zurück auf 0 (Intervall: ${BACKOFF_INTERVALS[0]}s)`);
         backoffLevel = 0;
+        
+        // Prowl-Notifikation: Verbindung wiederhergestellt (nur bei Transition >0 → 0)
+        if (previousBackoffLevel > 0) {
+          log("info", "e3dc-poller", "📱 Sende Prowl-Notification: E3DC Verbindung wiederhergestellt");
+          try {
+            const notifier = getProwlNotifier();
+            void notifier.sendE3dcConnectionRestored();
+          } catch (error) {
+            log("debug", "e3dc-poller", "Prowl-Notifier nicht verfügbar");
+          }
+        }
       }
 
       pollSuccessful = true;
     } catch (error) {
       // ❌ Fehler: Backoff erhöhen
+      const wasConnected = backoffLevel === 0;
+      
       if (backoffLevel < MAX_BACKOFF_LEVEL) {
         backoffLevel++;
       }
@@ -110,10 +125,23 @@ async function pollE3dcData(): Promise<boolean> {
         error instanceof Error ? error.message : String(error)
       );
       
+      // Prowl-Notifikation: Verbindung verloren (nur bei Transition 0 → >0)
+      if (wasConnected && backoffLevel > 0 && previousBackoffLevel === 0) {
+        log("info", "e3dc-poller", "📱 Sende Prowl-Notification: E3DC Verbindung verloren");
+        try {
+          const notifier = getProwlNotifier();
+          void notifier.sendE3dcConnectionLost();
+        } catch (e) {
+          log("debug", "e3dc-poller", "Prowl-Notifier nicht verfügbar");
+        }
+      }
+      
       pollSuccessful = false;
     }
   })().finally(() => {
     runningPollPromise = null;
+    // Update previousBackoffLevel für nächsten Poll
+    previousBackoffLevel = backoffLevel;
   });
 
   await runningPollPromise;
