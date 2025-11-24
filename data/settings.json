@@ -6,14 +6,8 @@
     "startTime": "00:00",
     "endTime": "05:00"
   },
-  "fhemSync": {
-    "enabled": false,
-    "host": "127.0.0.1",
-    "port": 7072
-  },
-  "mockWallboxPhases": 3,
-  "mockWallboxPlugStatus": 7,
   "chargingStrategy": {
+    "activeStrategy": "off",
     "minStartPowerWatt": 1400,
     "stopThresholdWatt": 1000,
     "startDelaySeconds": 120,
@@ -21,7 +15,13 @@
     "physicalPhaseSwitch": 3,
     "minCurrentChangeAmpere": 1,
     "minChangeIntervalSeconds": 60,
-    "inputX1Strategy": "max_without_battery",
-    "activeStrategy": "max_without_battery"
-  }
+    "inputX1Strategy": "max_without_battery"
+  },
+  "fhemSync": {
+    "enabled": false,
+    "host": "127.0.0.1",
+    "port": 7072
+  },
+  "mockWallboxPhases": 3,
+  "mockWallboxPlugStatus": 7
 }

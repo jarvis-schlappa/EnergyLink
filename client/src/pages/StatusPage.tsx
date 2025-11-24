@@ -606,8 +606,9 @@ export default function StatusPage() {
                       const strategy = settings?.chargingStrategy?.activeStrategy;
                       const isSurplusStrategy = strategy === "surplus_battery_prio" || strategy === "surplus_vehicle_prio";
                       
-                      // Wenn keine Ladestrategie aktiv UND Zeitgesteuerte Ladung aktiv => Zeige Zeitfenster
-                      if (!chargingContext?.isActive && settings?.nightChargingSchedule?.enabled) {
+                      // Wenn keine Ladestrategie aktiv UND Zeitgesteuerte Ladung aktiv UND nicht ladend => Zeige Zeitfenster
+                      // chargingContext muss geladen sein UND strategy muss 'off' sein (verhindert Flackern beim Laden)
+                      if (chargingContext && !chargingContext.isActive && strategy === "off" && settings?.nightChargingSchedule?.enabled && !isCharging) {
                         return getScheduleTimeRange();
                       }
                       
