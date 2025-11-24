@@ -1,11 +1,27 @@
 {
   "wallboxIp": "127.0.0.1",
   "e3dcIp": "127.0.0.1:5502",
-  "mockWallboxPhases": 3,
-  "mockWallboxPlugStatus": 7,
+  "nightChargingSchedule": {
+    "enabled": true,
+    "startTime": "00:00",
+    "endTime": "05:00"
+  },
   "fhemSync": {
     "enabled": false,
-    "port": 7072,
-    "host": "127.0.0.1"
+    "host": "127.0.0.1",
+    "port": 7072
+  },
+  "mockWallboxPhases": 3,
+  "mockWallboxPlugStatus": 7,
+  "chargingStrategy": {
+    "minStartPowerWatt": 1400,
+    "stopThresholdWatt": 1000,
+    "startDelaySeconds": 120,
+    "stopDelaySeconds": 300,
+    "physicalPhaseSwitch": 3,
+    "minCurrentChangeAmpere": 1,
+    "minChangeIntervalSeconds": 60,
+    "inputX1Strategy": "max_without_battery",
+    "activeStrategy": "max_without_battery"
   }
 }

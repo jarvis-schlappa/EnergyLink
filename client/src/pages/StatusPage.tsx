@@ -606,6 +606,11 @@ export default function StatusPage() {
                       const strategy = settings?.chargingStrategy?.activeStrategy;
                       const isSurplusStrategy = strategy === "surplus_battery_prio" || strategy === "surplus_vehicle_prio";
                       
+                      // Wenn keine Ladestrategie aktiv UND Zeitgesteuerte Ladung aktiv => Zeige Zeitfenster
+                      if (!chargingContext?.isActive && settings?.nightChargingSchedule?.enabled) {
+                        return getScheduleTimeRange();
+                      }
+                      
                       // UI-Verbesserung für Überschuss-Strategien
                       if (isSurplusStrategy) {
                         // Lädt und Stopp-Countdown aktiv (PV zu niedrig)
