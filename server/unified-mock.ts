@@ -335,7 +335,31 @@ const updateE3dcCache = async () => {
 // Modbus-Server Vector  
 const modbusVector = {
   getHoldingRegister: (addr: number, unitID: number, callback: (err: Error | null, value: number) => void) => {
-    // Register relativ zur Basis-Adresse
+    // HINWEIS: modbus-serial nutzt 0-basierte Offsets!
+    // Holding Register 40001-40085 sind Offsets 0-84
+    // Holding Register 41025 ist Offset 1024
+    
+    // Schneller Path für Grid Frequency (Register 41025, Offset 1024)
+    if (addr === 1024) {
+      updateE3dcCache()
+        .then(data => {
+          try {
+            const frequency = (data?.gridFrequency) ?? 50.0;
+            const registerValue = Math.round(frequency * 100);
+            callback(null, registerValue);
+          } catch (err) {
+            log("error", "e3dc-mock", `[E3DC-Modbus] Error getting frequency register:`, err instanceof Error ? err.message : String(err));
+            callback(err instanceof Error ? err : new Error(String(err)), 0);
+          }
+        })
+        .catch(err => {
+          log("error", "e3dc-mock", `[E3DC-Modbus] Cache update error for frequency register:`, err instanceof Error ? err.message : String(err));
+          callback(err instanceof Error ? err : new Error(String(err)), 0);
+        });
+      return;
+    }
+    
+    // Register relativ zur Basis-Adresse für die Standard-Register (67-84)
     const registerOffset = addr - E3DC_REGISTER_BASE;
     
     // KRITISCH: Cache SYNCHRON holen und snapshot erstellen
@@ -352,6 +376,7 @@ const modbusVector = {
           wallboxPower: 0,
           autarky: 0,
           selfConsumption: 0,
+          gridFrequency: 50.0,
           timestamp: new Date().toISOString()
         };
         
@@ -521,6 +546,9 @@ export async function startUnifiedMock(): Promise<void> {
     debug: false,
     unitID: 1
   });
+  
+  // Optional: Log info dass auch Register 41025 verfügbar ist
+  // (wird nach initialized Event ausgegeben)
 
   // Modbus Server Event-Handler
   modbusServer.on('socketError', (err: Error) => {
@@ -529,7 +557,7 @@ export async function startUnifiedMock(): Promise<void> {
 
   modbusServer.on('initialized', () => {
     log("info", "e3dc-mock", `✅ [E3DC-Modbus] E3DC S10 Mock läuft auf ${HOST}:${E3DC_MODBUS_PORT}`);
-    log("info", "e3dc-mock", `   Register 40067-40085 (Holding Registers) verfügbar`);
+    log("info", "e3dc-mock", `   Register 40067-40085 + 41025 (Netzfrequenz) verfügbar`);
   });
 
   // FHEM-Sync-IP auf Localhost setzen (Demo-Modus verwendet lokalen Mock)
