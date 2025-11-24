@@ -338,6 +338,15 @@ const modbusVector = {
     // HINWEIS: modbus-serial nutzt 0-basierte Offsets!
     // Holding Register 40001-40085 sind Offsets 0-84
     // Holding Register 41025 ist Offset 1024
+    // 
+    // WICHTIG: Register-Nummern → Offsets:
+    // - 40001 → Offset 0
+    // - 40067 → Offset 66 (PV Power LSW)
+    // - 40085 → Offset 84 (EMS Status)
+    // - 41025 → Offset 1024 (Grid Frequency)
+    
+    // DEBUG: Alle Register-Zugriffe mit Offset loggen
+    log("debug", "e3dc-mock", `[Modbus] Register-Zugriff: Offset ${addr}, UnitID ${unitID}`);
     
     // Schneller Path für Grid Frequency (Register 41025, Offset 1024)
     if (addr === 1024) {
@@ -346,6 +355,8 @@ const modbusVector = {
           try {
             const frequency = (data?.gridFrequency) ?? 50.0;
             const registerValue = Math.round(frequency * 100);
+            // DEBUG: Rohdaten für Register 41025 (Netzfrequenz)
+            log("debug", "e3dc-mock", `[Modbus-Register 41025] GridFrequency: ${frequency.toFixed(2)} Hz → Raw-Wert: ${registerValue} (dezimal) / 0x${registerValue.toString(16).padStart(4, '0')} (hex)`);
             callback(null, registerValue);
           } catch (err) {
             log("error", "e3dc-mock", `[E3DC-Modbus] Error getting frequency register:`, err instanceof Error ? err.message : String(err));
@@ -381,6 +392,10 @@ const modbusVector = {
         };
         
         try {
+          // DEBUG: Register-Offset zur Bezeichnung mappen
+          const registerNumber = addr + 40001; // 0-basierte Offset zu Holding Register konvertieren
+          log("debug", "e3dc-mock", `[Modbus-Register ${registerNumber}] Offset ${addr} angefordert`);
+          
           // Convert values to INT32 (Little-Endian: LSW first)
           const toInt32Registers = (value: number): [number, number] => {
             const buffer = Buffer.allocUnsafe(4);
@@ -396,6 +411,7 @@ const modbusVector = {
           if (registerOffset === 1 || registerOffset === 2) {
             const [lsw, msw] = toInt32Registers(liveData.pvPower);
             registerValue = registerOffset === 1 ? lsw : msw;
+            log("debug", "e3dc-mock", `[Modbus-Register ${registerNumber}] PV Power ${liveData.pvPower}W → LSW=${lsw}, MSW=${msw}`);
           }
           // Battery Power: Register 69-70 (offset 3-4)
           else if (registerOffset === 3 || registerOffset === 4) {
@@ -421,6 +437,7 @@ const modbusVector = {
           // Battery SOC: Register 82 (offset 16)
           else if (registerOffset === 16) {
             registerValue = Math.round(liveData.batterySoc); // SOC in % (50% = 50)
+            log("debug", "e3dc-mock", `[Modbus-Register ${registerNumber}] Battery SOC: ${registerValue}%`);
           }
           // Emergency Power Status: Register 84 (offset 17)
           else if (registerOffset === 17) {
@@ -453,8 +470,11 @@ const modbusVector = {
             }
             
             registerValue = emsStatus;
+            log("debug", "e3dc-mock", `[Modbus-Register ${registerNumber}] EMS Status: 0x${emsStatus.toString(16).padStart(4, '0')} (Bitflags)`);
           }
           
+          // DEBUG: Finaler Wert ausgeben
+          log("debug", "e3dc-mock", `[Modbus] → Rückgabe für Offset ${addr} (Register ${registerNumber}): ${registerValue}`);
           callback(null, registerValue);
         } catch (err) {
           log("error", "e3dc-mock", `[E3DC-Modbus] Error getting register ${addr}:`, err instanceof Error ? err.message : String(err));
