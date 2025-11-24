@@ -23,9 +23,7 @@ const E3DC_REGISTERS = {
   BATTERY_SOC: 82,           // Holding Register 40083, UINT16, Prozent
   EMERGENCY_POWER: 83,       // Holding Register 40084, UINT16, Emergency Power Status (0-4)
   EMS_STATUS: 84,            // Holding Register 40085, UINT16, Bitflags für EMS-Status
-  GRID_FREQUENCY_41024: 1023, // Test: Holding Register 41024 (0-basiert), UINT16, Hz × 100
-  GRID_FREQUENCY_41025: 1024, // Holding Register 41025 (0-basiert: 41025 - 40001 = 1024), UINT16, Hz × 100 (z.B. 5000 = 50.00 Hz)
-  GRID_FREQUENCY_41026: 1025, // Test: Holding Register 41026 (0-basiert), UINT16, Hz × 100
+  GRID_FREQUENCY: 1025,      // Holding Register 41026 (0-basiert: 41026 - 40001 = 1025), UINT16, Hz × 100 (z.B. 5001 = 50.01 Hz)
 } as const;
 
 const MODBUS_PORT = 502;
@@ -276,7 +274,7 @@ export class E3dcModbusService {
 
     try {
       // Alle E3DC Register parallel auslesen (OHNE Wallbox - die kommt von KEBA)
-      const [pvPower, batteryPower, housePower, gridPower, autarkySelfCons, batterySoc, emergencyPowerStatus, emsStatus, gridFreq41024, gridFreq41025, gridFreq41026] = await Promise.all([
+      const [pvPower, batteryPower, housePower, gridPower, autarkySelfCons, batterySoc, emergencyPowerStatus, emsStatus, gridFrequencyRaw] = await Promise.all([
         this.readInt32(E3DC_REGISTERS.PV_POWER),
         this.readInt32(E3DC_REGISTERS.BATTERY_POWER),
         this.readInt32(E3DC_REGISTERS.HOUSE_POWER),
@@ -285,21 +283,16 @@ export class E3dcModbusService {
         this.readUint16(E3DC_REGISTERS.BATTERY_SOC),
         this.readUint16(E3DC_REGISTERS.EMERGENCY_POWER),
         this.readUint16(E3DC_REGISTERS.EMS_STATUS),
-        this.readUint16(E3DC_REGISTERS.GRID_FREQUENCY_41024).catch(() => null), // Test Register 41024
-        this.readUint16(E3DC_REGISTERS.GRID_FREQUENCY_41025).catch(() => null), // Test Register 41025
-        this.readUint16(E3DC_REGISTERS.GRID_FREQUENCY_41026).catch(() => null), // Test Register 41026
+        this.readUint16(E3DC_REGISTERS.GRID_FREQUENCY).catch(() => null), // Fallback: Frequency optional
       ]);
 
       // Register 40082: Autarkie (High Byte) & Eigenverbrauch (Low Byte)
       const autarky = (autarkySelfCons >> 8) & 0xFF;
       const selfConsumption = autarkySelfCons & 0xFF;
 
-      // DEBUG: Teste alle 3 Frequenz-Register mit Raw-Werten
-      log("debug", "system", `E3DC Frequenz-Register RAW [41024, 41025, 41026]: [${gridFreq41024}, ${gridFreq41025}, ${gridFreq41026}]`);
-      log("debug", "system", `E3DC Frequenz-Register SKALIERT (×0.01) [41024, 41025, 41026]: [${gridFreq41024 !== null ? (gridFreq41024 * 0.01).toFixed(2) : 'null'}, ${gridFreq41025 !== null ? (gridFreq41025 * 0.01).toFixed(2) : 'null'}, ${gridFreq41026 !== null ? (gridFreq41026 * 0.01).toFixed(2) : 'null'}] Hz`);
-
-      // Verwende Register 41025 als Default, fall zurück auf null wenn nicht vorhanden
-      const gridFrequency = gridFreq41025 !== null ? (gridFreq41025 * 0.01) : undefined;
+      // Register 41026: Grid Frequency (Netzfrequenz) - 0-basiert: Offset 1025
+      // Rohwert: UINT16, Skalierung: ×0.01 → z.B. 5001 = 50.01 Hz
+      const gridFrequency = gridFrequencyRaw !== null ? (gridFrequencyRaw * 0.01) : undefined;
 
       // Register 40085: EMS-Status Bitflags dekodieren
       // WICHTIG: Bit-Nummerierung könnte je nach E3DC-Firmware variieren
