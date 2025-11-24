@@ -446,14 +446,14 @@ export default function E3dcPage() {
               </Card>
             </div>
 
-            {/* Effizienzwerte */}
+            {/* System-Informationen */}
             <Card 
               className={`${isE3dcEnabled ? 'cursor-pointer hover-elevate active-elevate-2' : ''}`}
               onClick={() => isE3dcEnabled && setShowE3dcConsole(true)}
               data-testid="card-efficiency"
             >
               <CardHeader className="pb-3">
-                <CardTitle className="text-base">Effizienz</CardTitle>
+                <CardTitle className="text-base">System-Informationen</CardTitle>
               </CardHeader>
               <CardContent className="space-y-2 pb-4">
                 {isLoading ? (
@@ -468,8 +468,8 @@ export default function E3dcPage() {
                       <span className="text-lg font-semibold" data-testid="text-autarky">{e3dcData.autarky}%</span>
                     </div>
                     <div className="flex items-center justify-between">
-                      <span className="text-sm text-muted-foreground">Eigenverbrauch</span>
-                      <span className="text-lg font-semibold" data-testid="text-self-consumption">{e3dcData.selfConsumption}%</span>
+                      <span className="text-sm text-muted-foreground">Netzfrequenz</span>
+                      <span className="text-lg font-semibold" data-testid="text-grid-frequency">{e3dcData.gridFrequency?.toFixed(2) ?? 'N/A'} Hz</span>
                     </div>
                   </>
                 ) : null}
