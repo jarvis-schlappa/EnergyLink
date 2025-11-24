@@ -36,12 +36,12 @@ export function initSSEClient(res: Response): string {
     lastPing: Date.now(),
   });
   
-  log("info", "system", `[SSE] Client verbunden: ${clientId} (${connectedClients.size} gesamt)`);
+  log("debug", "system", `[SSE] Client verbunden: ${clientId} (${connectedClients.size} gesamt)`);
   
   // Cleanup bei Disconnect
   res.on('close', () => {
     connectedClients.delete(clientId);
-    log("info", "system", `[SSE] Client getrennt: ${clientId} (${connectedClients.size} übrig)`);
+    log("debug", "system", `[SSE] Client getrennt: ${clientId} (${connectedClients.size} übrig)`);
   });
   
   // Initiales Keep-Alive senden
