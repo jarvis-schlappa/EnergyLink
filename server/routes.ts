@@ -22,7 +22,7 @@ import { wallboxMockService } from "./wallbox-mock";
 import { sendUdpCommand, sendUdpCommandNoResponse } from "./wallbox-transport";
 import { getBuildInfo } from "./build-info";
 import { syncE3dcToFhem, startFhemSyncScheduler, stopFhemSyncScheduler } from "./fhem-e3dc-sync";
-import { startE3dcPoller, stopE3dcPoller } from "./e3dc-poller";
+import { startE3dcPoller, stopE3dcPoller, getE3dcBackoffLevel } from "./e3dc-poller";
 import { initializeProwlNotifier, triggerProwlEvent, extractTargetWh, getProwlNotifier } from "./prowl-notifier";
 import { initSSEClient, broadcastWallboxStatus } from "./wallbox-sse";
 
@@ -854,11 +854,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
         res.json(cachedData);
       } else {
         // Cache-Miss: Erste Anfrage vor erstem Poll
-        log(
-          "warning",
-          "system",
-          "E3DC Cache leer - warte auf ersten Poller-Durchlauf (alle 5s)",
-        );
+        const backoffLevel = getE3dcBackoffLevel();
+        
+        // Wenn E3DC im Backoff ist, stille Pause (DEBUG-Level)
+        // Wenn nicht im Backoff aber kein Cache, dann echtes Problem (WARNING)
+        if (backoffLevel > 0) {
+          log(
+            "debug",
+            "system",
+            `E3DC Cache leer (Backoff-Modus Level ${backoffLevel}) - warte auf nächsten Poller-Versuch`,
+          );
+        } else {
+          log(
+            "warning",
+            "system",
+            "E3DC Cache leer - warte auf ersten Poller-Durchlauf (alle 5s)",
+          );
+        }
+        
         res.status(503).json({
           error: "E3DC-Daten noch nicht verfügbar - bitte kurz warten und erneut versuchen",
         });

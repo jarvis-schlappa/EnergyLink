@@ -1,0 +1,14 @@
+Nov 24 18:32:43 hmland node[4187591]: [18:32:43,083] [ERROR] [system] E3DC Modbus TCP Verbindungsfehler zu 192.168.40.200:502 - connect ECONNREFUSED 192.168.40.200:502
+Nov 24 18:32:43 hmland node[4187591]: [18:32:43,087] [WARNING] [e3dc-poller] E3DC-Polling fehlgeschlagen (Backoff Level 1/4, nächster Versuch in 30s) - E3DC Modbus-Verbindung fehlgeschlagen: connect ECONNREFUSED 192.168.40.200:502
+Nov 24 18:32:43 hmland node[4187591]: [18:32:43,370] [INFO] [system] [SSE] Client verbunden: k260eky (1 gesamt)
+Nov 24 18:32:55 hmland node[4187591]: [18:32:55,385] [INFO] [system] [SSE] Client getrennt: k260eky (0 übrig)
+Nov 24 18:32:55 hmland node[4187591]: [18:32:55,392] [WARNING] [system] E3DC Cache leer - warte auf ersten Poller-Durchlauf (alle 5s)
+Nov 24 18:33:00 hmland node[4187591]: [18:33:00,416] [WARNING] [system] E3DC Cache leer - warte auf ersten Poller-Durchlauf (alle 5s)
+Nov 24 18:33:05 hmland node[4187591]: [18:33:05,435] [WARNING] [system] E3DC Cache leer - warte auf ersten Poller-Durchlauf (alle 5s)
+Nov 24 18:33:10 hmland node[4187591]: [18:33:10,455] [WARNING] [system] E3DC Cache leer - warte auf ersten Poller-Durchlauf (alle 5s)
+Nov 24 18:33:13 hmland node[4187591]: [18:33:13,099] [ERROR] [system] E3DC Modbus TCP Verbindungsfehler zu 192.168.40.200:502 - connect ECONNREFUSED 192.168.40.200:502
+Nov 24 18:33:13 hmland node[4187591]: [18:33:13,102] [WARNING] [e3dc-poller] E3DC-Polling fehlgeschlagen (Backoff Level 2/4, nächster Versuch in 60s) - E3DC Modbus-Verbindung fehlgeschlagen: connect ECONNREFUSED 192.168.40.200:502
+Nov 24 18:33:21 hmland node[4187591]: [18:33:21,094] [WARNING] [system] E3DC Cache leer - warte auf ersten Poller-Durchlauf (alle 5s)
+Nov 24 18:33:26 hmland node[4187591]: [18:33:26,114] [WARNING] [system] E3DC Cache leer - warte auf ersten Poller-Durchlauf (alle 5s)
+Nov 24 18:33:31 hmland node[4187591]: [18:33:31,132] [WARNING] [system] E3DC Cache leer - warte auf ersten Poller-Durchlauf (alle 5s)
+Nov 24 18:33:36 hmland node[4187591]: [18:33:36,164] [WARNING] [system] E3DC Cache leer - warte auf ersten Poller-Durchlauf (alle 5s)
