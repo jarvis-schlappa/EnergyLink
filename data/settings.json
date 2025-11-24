@@ -1,64 +1,11 @@
 {
   "wallboxIp": "127.0.0.1",
-  "wallboxIpBackup": "192.168.40.16",
   "e3dcIp": "127.0.0.1:5502",
-  "pvSurplusOnUrl": "http://127.0.0.1:8083/fhem?cmd.autoWallboxPV=on",
-  "pvSurplusOffUrl": "http://127.0.0.1:8083/fhem?cmd.autoWallboxPV=off",
-  "pvSurplusOnUrlBackup": "http://127.0.0.1:8083/fhem?cmd.autoWallboxPV=on",
-  "pvSurplusOffUrlBackup": "http://127.0.0.1:8083/fhem?cmd.autoWallboxPV=off",
-  "nightChargingSchedule": {
-    "enabled": true,
-    "startTime": "15:51",
-    "endTime": "15:52"
-  },
   "e3dc": {
     "enabled": true,
-    "prefix": "/pfad/zum/tool/e3dcset -p /pfad/zur/config//e3dcset.config",
-    "dischargeLockEnableCommand": "-d 1",
-    "dischargeLockDisableCommand": "-a",
-    "gridChargeEnableCommand": "-c 2500 -e 6000",
-    "gridChargeDisableCommand": "-e 0",
-    "gridChargeDuringNightCharging": true,
-    "modbusPauseSeconds": 10,
+    "modbusPauseSeconds": 3,
     "pollingIntervalSeconds": 10
   },
-  "chargingStrategy": {
-    "activeStrategy": "max_without_battery",
-    "minStartPowerWatt": 500,
-    "stopThresholdWatt": 1000,
-    "startDelaySeconds": 30,
-    "stopDelaySeconds": 60,
-    "physicalPhaseSwitch": 3,
-    "minCurrentChangeAmpere": 1,
-    "minChangeIntervalSeconds": 30,
-    "inputX1Strategy": "max_without_battery"
-  },
-  "fhemSync": {
-    "enabled": true,
-    "port": 7072,
-    "host": "127.0.0.1"
-  },
-  "prowl": {
-    "enabled": true,
-    "apiKey": "1234",
-    "events": {
-      "appStarted": true,
-      "chargingStarted": true,
-      "chargingStopped": true,
-      "currentAdjusted": true,
-      "plugConnected": true,
-      "plugDisconnected": true,
-      "batteryLockActivated": true,
-      "batteryLockDeactivated": true,
-      "gridChargingActivated": true,
-      "gridChargingDeactivated": true,
-      "strategyChanged": true,
-      "errors": true
-    }
-  },
-  "demoMode": true,
-  "mockWallboxPhases": 1,
-  "mockWallboxPlugStatus": 7,
-  "mockTimeEnabled": false,
-  "mockDateTime": ""
+  "mockWallboxPhases": 3,
+  "mockWallboxPlugStatus": 7
 }
