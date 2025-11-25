@@ -1,7 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Battery, Home as HomeIcon, Sun, Grid3x3, TrendingUp, TrendingDown, AlertCircle, PlugZap, ShieldOff, Zap, Clock, Settings as SettingsIcon, Info, Play } from "lucide-react";
+import { Battery, Home as HomeIcon, Sun, Grid3x3, TrendingUp, TrendingDown, AlertCircle, AlertTriangle, CheckCircle, Circle, PlugZap, ShieldOff, Zap, Clock, Settings as SettingsIcon, Info, Play } from "lucide-react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import type { E3dcLiveData, Settings, ControlState } from "@shared/schema";
+import type { E3dcLiveData, Settings, ControlState, GridFrequencyStatus } from "@shared/schema";
 import { buildInfoSchema } from "@shared/schema";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
@@ -75,6 +75,17 @@ export default function E3dcPage() {
     queryKey: ["/api/e3dc/live-data"],
     refetchInterval: 5000, // Aktualisiere alle 5 Sekunden
   });
+
+  // Berechne Frequenz-Tier direkt aus dem Wert für perfekte Synchronisierung mit der Anzeige
+  const calculateFrequencyTier = (frequency: number | undefined): number => {
+    if (!frequency || frequency === 0) return 0;
+    const deviation = Math.abs(frequency - 50.0);
+    if (deviation <= 0.1) return 1;
+    if (deviation <= 0.2) return 2;
+    return 3;
+  };
+  
+  const frequencyTier = calculateFrequencyTier(e3dcData?.gridFrequency);
 
   // Mutation für Control State Updates (MUSS vor jedem Return definiert werden!)
   const updateControlsMutation = useMutation({
@@ -469,7 +480,21 @@ export default function E3dcPage() {
                     </div>
                     <div className="flex items-center justify-between">
                       <span className="text-sm text-muted-foreground">Netzfrequenz</span>
-                      <span className="text-lg font-semibold" data-testid="text-grid-frequency">{e3dcData.gridFrequency?.toFixed(2) ?? 'N/A'} Hz</span>
+                      <div className="flex items-center gap-2">
+                        {frequencyTier === 0 && (
+                          <Circle className="w-4 h-4 text-muted-foreground" data-testid="icon-frequency-unknown" />
+                        )}
+                        {frequencyTier === 1 && (
+                          <CheckCircle className="w-4 h-4 text-green-500" data-testid="icon-frequency-ok" />
+                        )}
+                        {frequencyTier === 2 && (
+                          <AlertTriangle className="w-4 h-4 text-yellow-500" data-testid="icon-frequency-warning" />
+                        )}
+                        {frequencyTier === 3 && (
+                          <AlertCircle className="w-4 h-4 text-red-500" data-testid="icon-frequency-critical" />
+                        )}
+                        <span className="text-lg font-semibold" data-testid="text-grid-frequency">{e3dcData.gridFrequency?.toFixed(2) ?? 'N/A'} Hz</span>
+                      </div>
                     </div>
                   </>
                 ) : null}

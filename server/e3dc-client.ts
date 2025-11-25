@@ -312,18 +312,46 @@ class E3dcClient {
     await this.executeCommand(this.config.dischargeLockDisableCommand, 'Entladesperre deaktivieren');
   }
 
-  async enableGridCharge(): Promise<void> {
+  /**
+   * Aktiviert Netzstrom-Laden mit einer bestimmten Ladungsmenge
+   * 
+   * @param chargeAmountWh - Ladungsmenge in Wh (wenn nicht angegeben, wird der konfigurierte Befehl verwendet)
+   */
+  async enableGridCharge(chargeAmountWh?: number): Promise<void> {
     if (!this.config) {
       throw new Error('E3DC not configured');
     }
-    await this.executeCommand(this.config.gridChargeEnableCommand, 'Netzstrom-Laden aktivieren');
+    
+    const settings = storage.getSettings();
+    let command: string | undefined;
+    
+    if (chargeAmountWh !== undefined && chargeAmountWh > 0) {
+      // Ladungsmenge angegeben → verwende -e <Wh> um Netzladung zu starten
+      command = `-e ${Math.round(chargeAmountWh)}`;
+    } else if (this.config.gridChargeEnableCommand) {
+      // Kein Wert, aber konfigurierter Befehl vorhanden
+      command = this.config.gridChargeEnableCommand;
+    } else if (settings?.demoMode) {
+      // Demo-Modus ohne Konfiguration: Standard 1750 Wh (ca. 25% eines 7kWh Akkus)
+      command = '-e 1750';
+    }
+    
+    await this.executeCommand(command, 'Netzstrom-Laden aktivieren');
   }
 
   async disableGridCharge(): Promise<void> {
     if (!this.config) {
       throw new Error('E3DC not configured');
     }
-    await this.executeCommand(this.config.gridChargeDisableCommand, 'Netzstrom-Laden deaktivieren');
+    
+    // Im Demo-Modus: Standard-Mock-Befehl wenn kein Befehl konfiguriert
+    const settings = storage.getSettings();
+    let command = this.config.gridChargeDisableCommand;
+    if (!command && settings?.demoMode) {
+      command = '-a'; // Standard Grid Charging Disable (zurück auf Automatik)
+    }
+    
+    await this.executeCommand(command, 'Netzstrom-Laden deaktivieren');
   }
 
   /**

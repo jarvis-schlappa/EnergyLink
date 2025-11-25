@@ -25,6 +25,7 @@ import { syncE3dcToFhem, startFhemSyncScheduler, stopFhemSyncScheduler } from ".
 import { startE3dcPoller, stopE3dcPoller, getE3dcBackoffLevel } from "./e3dc-poller";
 import { initializeProwlNotifier, triggerProwlEvent, extractTargetWh, getProwlNotifier } from "./prowl-notifier";
 import { initSSEClient, broadcastWallboxStatus } from "./wallbox-sse";
+import { startGridFrequencyMonitor, stopGridFrequencyMonitor, getGridFrequencyState } from "./grid-frequency-monitor";
 
 // Module-scope Scheduler Handles (überleben Hot-Reload)
 let chargingStrategyInterval: NodeJS.Timeout | null = null;
@@ -66,6 +67,9 @@ export async function shutdownSchedulers(): Promise<void> {
   // Stoppe E3DC-Background-Poller (wartet auf laufenden Poll)
   await stopE3dcPoller();
   e3dcPollerInterval = null;
+  
+  // Stoppe Netzfrequenz-Monitor
+  stopGridFrequencyMonitor();
   
   log("info", "system", "Alle Scheduler erfolgreich gestoppt");
 }
@@ -913,6 +917,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
     } catch (error) {
       log("error", "system", "Fehler in E3DC Console", error instanceof Error ? error.message : String(error));
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.get("/api/grid-frequency-status", (req, res) => {
+    try {
+      const status = getGridFrequencyState();
+      res.json(status);
+    } catch (error) {
+      log("error", "system", "Fehler beim Abrufen des Netzfrequenz-Status", error instanceof Error ? error.message : String(error));
       res.status(500).json({ error: "Internal server error" });
     }
   });
@@ -1917,6 +1931,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   if (!e3dcPollerInterval) {
     e3dcPollerInterval = startE3dcPoller();
   }
+
+  // === STARTE NETZFREQUENZ-MONITOR ===
+  // Überwacht Netzfrequenz und reagiert auf Abweichungen (Tier 2: Warnung, Tier 3: Notladung)
+  startGridFrequencyMonitor();
 
   // === STARTE FHEM-E3DC-SYNC SCHEDULER ===
   // Startet separaten 10s-Scheduler, damit FHEM auch Updates bekommt wenn kein Client aktiv ist

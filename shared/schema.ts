@@ -94,6 +94,8 @@ export const prowlEventsSchema = z.object({
   gridChargingDeactivated: z.boolean(),
   strategyChanged: z.boolean(),
   errors: z.boolean(),
+  gridFrequencyWarning: z.boolean().optional(),
+  gridFrequencyCritical: z.boolean().optional(),
 });
 
 export type ProwlEvents = z.infer<typeof prowlEventsSchema>;
@@ -105,6 +107,15 @@ export const prowlSchema = z.object({
 });
 
 export type Prowl = z.infer<typeof prowlSchema>;
+
+export const gridFrequencyMonitorConfigSchema = z.object({
+  enabled: z.boolean(),
+  tier2Threshold: z.number().min(0.01).max(0.5),
+  tier3Threshold: z.number().min(0.1).max(1.0),
+  enableEmergencyCharging: z.boolean(),
+});
+
+export type GridFrequencyMonitorConfig = z.infer<typeof gridFrequencyMonitorConfigSchema>;
 
 export const settingsSchema = z.object({
   wallboxIp: z.string(),
@@ -120,6 +131,7 @@ export const settingsSchema = z.object({
   chargingStrategy: chargingStrategyConfigSchema.optional(),
   fhemSync: fhemSyncSchema.optional(),
   prowl: prowlSchema.optional(),
+  gridFrequencyMonitor: gridFrequencyMonitorConfigSchema.optional(),
   demoMode: z.boolean().optional(),
   mockWallboxPhases: z.union([z.literal(1), z.literal(3)]).optional().default(3),
   mockWallboxPlugStatus: z.number().min(0).max(7).optional().default(7), // 0-7 gemäß KEBA Spezifikation
@@ -152,7 +164,7 @@ export const logEntrySchema = z.object({
   id: z.string(),
   timestamp: z.string(),
   level: logLevelSchema,
-  category: z.enum(["wallbox", "wallbox-mock", "e3dc", "e3dc-mock", "e3dc-poller", "e3dc-hub", "fhem", "fhem-mock", "webhook", "system", "storage", "strategy"]),
+  category: z.enum(["wallbox", "wallbox-mock", "e3dc", "e3dc-mock", "e3dc-poller", "e3dc-hub", "fhem", "fhem-mock", "webhook", "system", "storage", "strategy", "grid-frequency"]),
   message: z.string(),
   details: z.string().optional(),
 });
@@ -207,3 +219,13 @@ export const chargingContextSchema = z.object({
 });
 
 export type ChargingContext = z.infer<typeof chargingContextSchema>;
+
+export const gridFrequencyStatusSchema = z.object({
+  tier: z.number().min(0).max(3),
+  frequency: z.number(),
+  deviation: z.number(),
+  chargingActive: z.boolean(),
+  lastUpdate: z.string(),
+});
+
+export type GridFrequencyStatus = z.infer<typeof gridFrequencyStatusSchema>;

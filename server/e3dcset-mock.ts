@@ -6,10 +6,10 @@
  * Schreibt Befehle in State-Datei statt an echtes E3DC zu senden.
  * 
  * Verwendung (gleich wie echtes e3dcset):
- *   e3dcset-mock -s discharge 0      # Entladesperre aktivieren
- *   e3dcset-mock -s discharge 1      # Entladesperre deaktivieren
- *   e3dcset-mock -s charge 1 -c 2500 # Netzladen mit 2500W aktivieren
- *   e3dcset-mock -s charge 0         # Netzladen deaktivieren
+ *   e3dcset-mock -d <watts>    # Maximale Entladeleistung setzen (1W = gesperrt)
+ *   e3dcset-mock -a            # Zurück auf Automatik
+ *   e3dcset-mock -c <watts>    # Maximale Ladeleistung setzen
+ *   e3dcset-mock -e <Wh>       # Netzladung starten mit Energiemenge (0 = deaktivieren)
  */
 
 import fs from 'fs/promises';
@@ -89,12 +89,16 @@ async function main() {
       console.log(`[E3DC Mock] Netzladen aktiviert mit ${chargePower}W`);
       i += 1;
     } else if (arg === '-e' && i + 1 < args.length) {
-      // -e <watts>: Netzladen deaktivieren wenn 0
-      const enablePower = parseInt(args[i + 1], 10);
-      if (enablePower === 0) {
+      // -e <Wh>: Netzladung starten mit Energiemenge (Wh), oder deaktivieren wenn 0
+      const chargeAmountWh = parseInt(args[i + 1], 10);
+      if (chargeAmountWh > 0) {
+        state.gridCharging = true;
+        state.gridChargePower = 2500; // Standard-Ladeleistung
+        console.log(`[E3DC Mock] Netzladung gestartet: ${chargeAmountWh} Wh (Ladeleistung: ${state.gridChargePower}W)`);
+      } else {
         state.gridCharging = false;
         state.gridChargePower = 0;
-        console.log('[E3DC Mock] Netzladen deaktiviert');
+        console.log('[E3DC Mock] Netzladung deaktiviert');
       }
       i += 1;
     }

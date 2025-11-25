@@ -211,13 +211,32 @@ export class E3dcMockService {
     // 9. Autarkie & Eigenverbrauch berechnen
     const { autarky, selfConsumption } = this.calculateEfficiency(pvPower, totalConsumption, gridPower);
 
-    // 10. Mock Grid Frequency (Netzfrequenz) - realistisches Rauschen um 50Hz
-    // Normalbereich: 49.5 - 50.5 Hz
-    // Mit leichtem Rauschen: Base 50.0 Hz ± 0.3 Hz
-    const baseFrequency = 50.0;
-    const noiseAmplitude = 0.15; // ±0.15 Hz
-    const noise = (Math.sin(Date.now() / 3000) * noiseAmplitude) + (Math.random() - 0.5) * 0.05; // Sine + Random
-    const gridFrequency = parseFloat((baseFrequency + noise).toFixed(2)); // Round to 2 decimals
+    // 10. Mock Grid Frequency (Netzfrequenz) - mit Test-Simulation
+    // Testzyklus pro Minute für Hysterese-Test (2 aufeinanderfolgende Messungen bei 10s Polling):
+    // 0-20s Normal (Tier 1), 20-35s Tier 2 (Warnung), 35-55s Tier 3 (Kritisch), 55-60s Normal
+    // Jede Phase ist lang genug für mindestens 2 Messungen (Hysterese-Counter)
+    let gridFrequency = 50.0;
+    const secondsInMinute = Math.floor((Date.now() / 1000) % 60);
+    
+    if (secondsInMinute < 20) {
+      // Tier 1: Normal - Abweichung < 0.05 Hz (unter Tier 2 Schwelle)
+      // Kleines Rauschen ±0.02 Hz um 50.0 Hz → max Abweichung 0.02 Hz
+      const noise = (Math.random() - 0.5) * 0.04;
+      gridFrequency = parseFloat((50.0 + noise).toFixed(2));
+    } else if (secondsInMinute < 35) {
+      // Tier 2: Warnung - Abweichung 0.05-0.1 Hz (zwischen Tier 2 und Tier 3 Schwelle)
+      // Stabil bei 50.07 Hz (Abweichung 0.07 Hz)
+      gridFrequency = 50.07;
+    } else if (secondsInMinute < 55) {
+      // Tier 3: KRITISCH - Abweichung > 0.1 Hz (über Tier 3 Schwelle)
+      // Stabil bei 50.15 Hz (Abweichung 0.15 Hz) - triggert Batterie-Notladung!
+      // 20 Sekunden = mindestens 2 Messungen für Hysterese
+      gridFrequency = 50.15;
+    } else {
+      // Zurück zu Tier 1: Normal (um zu testen, dass Notladung weiterläuft bis 90% SOC)
+      const noise = (Math.random() - 0.5) * 0.04;
+      gridFrequency = parseFloat((50.0 + noise).toFixed(2));
+    }
 
     return {
       pvPower: Math.max(0, Math.round(pvPower)),

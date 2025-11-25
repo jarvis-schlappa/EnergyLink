@@ -35,7 +35,8 @@ type LogCategory =
   | "fhem-mock"
   | "webhook"
   | "system"
-  | "storage";
+  | "storage"
+  | "grid-frequency";
 
 const ALL_CATEGORIES: LogCategory[] = [
   "wallbox",
@@ -48,6 +49,7 @@ const ALL_CATEGORIES: LogCategory[] = [
   "webhook",
   "system",
   "storage",
+  "grid-frequency",
 ];
 
 export default function LogsPage() {
@@ -184,6 +186,8 @@ export default function LogsPage() {
         return "System";
       case "storage":
         return "Storage";
+      case "grid-frequency":
+        return "Netzfrequenz-Monitor";
     }
   };
 
@@ -224,6 +228,8 @@ export default function LogsPage() {
         return "bg-purple-500 text-white dark:bg-purple-600";
       case "storage":
         return "bg-gray-500 text-white dark:bg-gray-600";
+      case "grid-frequency":
+        return "bg-red-500 text-white dark:bg-red-600";
       default:
         return "bg-muted text-muted-foreground";
     }

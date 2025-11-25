@@ -1,7 +1,7 @@
 {
   "maxDischargePower": 3000,
-  "gridCharging": false,
-  "gridChargePower": 0,
-  "lastCommand": "e3dcset -a -e",
-  "lastCommandTime": "2025-11-22T14:52:00.433Z"
+  "gridCharging": true,
+  "gridChargePower": 2500,
+  "lastCommand": "e3dcset -e",
+  "lastCommandTime": "2025-11-25T16:48:51.771Z"
 }

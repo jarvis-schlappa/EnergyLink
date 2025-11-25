@@ -167,6 +167,7 @@ export default function SettingsPage() {
         enabled: false,
         apiKey: "",
         events: {
+          appStarted: false,
           chargingStarted: true,
           chargingStopped: true,
           currentAdjusted: false,
@@ -179,6 +180,17 @@ export default function SettingsPage() {
           strategyChanged: false,
           errors: false,
         },
+      },
+      gridFrequencyMonitor: {
+        enabled: false,
+        tier2Threshold: 0.1,
+        tier3Threshold: 0.2,
+        enableEmergencyCharging: true,
+      },
+      fhemSync: {
+        enabled: false,
+        host: "192.168.1.100",
+        port: 7072,
       },
       demoMode: false,
       mockWallboxPhases: 3,
@@ -213,6 +225,7 @@ export default function SettingsPage() {
         enabled: false,
         apiKey: "",
         events: {
+          appStarted: false,
           chargingStarted: true,
           chargingStopped: true,
           currentAdjusted: false,
@@ -227,8 +240,39 @@ export default function SettingsPage() {
         },
       };
 
+      const gridFrequencyMonitorDefaults = {
+        enabled: false,
+        tier2Threshold: 0.1,
+        tier3Threshold: 0.2,
+        enableEmergencyCharging: true,
+      };
+
+      const e3dcDefaults = {
+        enabled: false,
+        pollingIntervalSeconds: 10,
+        prefix: "",
+        dischargeLockEnableCommand: "",
+        dischargeLockDisableCommand: "",
+        gridChargeEnableCommand: "",
+        gridChargeDisableCommand: "",
+      };
+
+      const fhemSyncDefaults = {
+        enabled: false,
+        host: "192.168.1.100",
+        port: 7072,
+      };
+
       form.reset({
         ...settings,
+        e3dc: {
+          ...e3dcDefaults,
+          ...settings.e3dc,
+        },
+        fhemSync: {
+          ...fhemSyncDefaults,
+          ...settings.fhemSync,
+        },
         chargingStrategy: {
           ...strategyDefaults,
           ...settings.chargingStrategy,
@@ -240,6 +284,10 @@ export default function SettingsPage() {
             ...prowlDefaults.events,
             ...settings.prowl?.events,
           },
+        },
+        gridFrequencyMonitor: {
+          ...gridFrequencyMonitorDefaults,
+          ...settings.gridFrequencyMonitor,
         },
       });
       formHydratedRef.current = true;
@@ -630,6 +678,96 @@ export default function SettingsPage() {
                       Bestimmt, wie oft die Modbus-Register ausgelesen werden
                       (5-60 Sekunden, Standard: 10).
                     </p>
+                  </div>
+
+                  <Separator />
+
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="space-y-0.5">
+                        <Label htmlFor="grid-freq-enabled" className="text-sm font-medium">
+                          Netzfrequenz-Überwachung
+                        </Label>
+                        <p className="text-xs text-muted-foreground">
+                          Überwache Netzfrequenz und reagiere auf Abweichungen
+                        </p>
+                      </div>
+                      <Switch
+                        id="grid-freq-enabled"
+                        checked={form.watch("gridFrequencyMonitor.enabled")}
+                        onCheckedChange={(checked) =>
+                          form.setValue("gridFrequencyMonitor.enabled", checked)
+                        }
+                        data-testid="switch-grid-freq-enabled"
+                      />
+                    </div>
+
+                    {form.watch("gridFrequencyMonitor.enabled") && (
+                      <div className="space-y-4 pl-4 border-l-2 border-muted">
+                        <div className="space-y-2">
+                          <Label
+                            htmlFor="tier2-threshold"
+                            className="text-sm font-medium"
+                          >
+                            Tier 2 Schwelle (Hz)
+                          </Label>
+                          <Input
+                            id="tier2-threshold"
+                            type="number"
+                            min="0.01"
+                            max="0.5"
+                            step="0.01"
+                            {...form.register("gridFrequencyMonitor.tier2Threshold", { valueAsNumber: true })}
+                            className="h-12"
+                            data-testid="input-tier2-threshold"
+                          />
+                          <p className="text-xs text-muted-foreground">
+                            Abweichung von 50 Hz für Warnung (Standard: 0,1 Hz)
+                          </p>
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label
+                            htmlFor="tier3-threshold"
+                            className="text-sm font-medium"
+                          >
+                            Tier 3 Schwelle (Hz)
+                          </Label>
+                          <Input
+                            id="tier3-threshold"
+                            type="number"
+                            min="0.1"
+                            max="1.0"
+                            step="0.01"
+                            {...form.register("gridFrequencyMonitor.tier3Threshold", { valueAsNumber: true })}
+                            className="h-12"
+                            data-testid="input-tier3-threshold"
+                          />
+                          <p className="text-xs text-muted-foreground">
+                            Abweichung von 50 Hz für kritischen Modus (Standard: 0,2 Hz)
+                          </p>
+                        </div>
+
+                        <div className="flex items-center justify-between">
+                          <div className="space-y-0.5">
+                            <Label htmlFor="emergency-charging" className="text-xs font-normal">
+                              Notladung aktivieren
+                            </Label>
+                            <p className="text-xs text-muted-foreground">
+                              Batterie zu 90% laden bei kritischer Frequenz
+                            </p>
+                          </div>
+                          <Switch
+                            id="emergency-charging"
+                            checked={form.watch("gridFrequencyMonitor.enableEmergencyCharging")}
+                            onCheckedChange={(checked) =>
+                              form.setValue("gridFrequencyMonitor.enableEmergencyCharging", checked)
+                            }
+                            data-testid="switch-emergency-charging"
+                          />
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   <Separator />
