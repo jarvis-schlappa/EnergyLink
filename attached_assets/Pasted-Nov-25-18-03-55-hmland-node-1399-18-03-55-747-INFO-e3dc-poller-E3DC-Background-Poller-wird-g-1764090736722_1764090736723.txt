@@ -1,0 +1,24 @@
+Nov 25 18:03:55 hmland node[1399]: [18:03:55,747] [INFO] [e3dc-poller] E3DC-Background-Poller wird gestartet mit Exponential Backoff - Basis-Intervall: 15s, Backoff-Stufen: 15, 30, 60, 300, 600s
+Nov 25 18:03:55 hmland node[1399]: [18:03:55,751] [INFO] [grid-frequency] Überwachung ist deaktiviert in den Einstellungen
+Nov 25 18:03:55 hmland node[1399]: [18:03:55,755] [INFO] [fhem] FHEM-E3DC-Sync wird gestartet - Strategie: Event-Listener (primär) + 10s-Timer (Fallback)
+Nov 25 18:03:55 hmland node[1399]: [18:03:55,756] [INFO] [fhem] Event-Listener registriert - FHEM wird sofort bei neuen E3DC-Daten aktualisiert
+Nov 25 18:03:55 hmland node[1399]: [18:03:55,759] [INFO] [system] SSE-Server für Wallbox-Status-Updates bereit
+Nov 25 18:03:55 hmland node[1399]: [18:03:55,761] [INFO] [system] ✅ SSE-Server bereit auf /api/wallbox/stream
+Nov 25 18:03:55 hmland node[1399]: 6:03:55 PM [express] serving on port 8080
+Nov 25 18:04:03 hmland node[1399]: [18:04:03,924] [INFO] [system] [Wallbox-Broadcast-Listener] Plug-Status geändert (seit letztem Start): 7 → 3 (von 192.168.40.16)
+Nov 25 18:05:41 hmland node[1399]: [18:05:41,577] [INFO] [system] E3DC-Konfiguration wird gespeichert
+Nov 25 18:05:41 hmland node[1399]: [18:05:41,579] [INFO] [system] E3DC-Konfiguration erfolgreich gespeichert
+Nov 25 18:08:43 hmland node[1399]: [18:08:43,689] [INFO] [system] [Wallbox-Broadcast-Listener] Plug-Status geändert: 3 → 7 (von 192.168.40.16)
+Nov 25 18:09:33 hmland node[1399]: [18:09:33,842] [INFO] [wallbox] Ladestrategie aktiviert: max_without_battery
+Nov 25 18:09:37 hmland node[1399]: [18:09:37,285] [INFO] [system] Ladung gestartet mit 32A @ 1P - X1-Optimiert in 3434ms
+Nov 25 18:09:37 hmland node[1399]: [18:09:37,288] [INFO] [wallbox] Laden erfolgreich gestartet
+Nov 25 18:09:37 hmland node[1399]: [18:09:37,705] [INFO] [system] [Wallbox-Broadcast-Listener] State geändert: 5 → 2 (ready for charging) (von 192.168.40.16)
+Nov 25 18:09:37 hmland node[1399]: [18:09:37,917] [INFO] [system] [Wallbox-Broadcast-Listener] State geändert: 2 → 3 (charging) (von 192.168.40.16)
+Nov 25 18:09:57 hmland node[1399]: [18:09:57,934] [INFO] [system] [RECONCILE] Phasen-Korrektur: 1P → 3P (gemessen aus Strömen)
+Nov 25 18:10:13 hmland node[1399]: [18:10:13,984] [INFO] [system] Ladestrom angepasst: 32A → 16A @ 3P
+Nov 25 18:11:30 hmland node[1399]: [18:11:30,064] [INFO] [wallbox] Ladestrategie deaktiviert (auf "off" gesetzt)
+Nov 25 18:11:30 hmland node[1399]: [18:11:30,090] [INFO] [wallbox] Laden erfolgreich gestoppt
+Nov 25 18:11:30 hmland node[1399]: [18:11:30,116] [INFO] [system] [Wallbox-Broadcast-Listener] State geändert: 3 → 5 (authorization rejected) (von 192.168.40.16)
+Nov 25 18:11:37 hmland node[1399]: [18:11:37,465] [INFO] [system] [ChargingStrategyController] Strategie auf "off" → Wallbox wird gestoppt
+Nov 25 18:11:38 hmland node[1399]: [18:11:38,489] [INFO] [system] Ladung gestoppt
+Nov 25 18:11:38 hmland node[1399]: [18:11:38,522] [INFO] [system] [ChargingStrategyController] Wallbox gestoppt, Strategie auf "off" gesetzt
