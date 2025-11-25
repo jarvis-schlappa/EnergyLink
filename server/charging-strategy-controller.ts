@@ -70,6 +70,30 @@ export class ChargingStrategyController {
     }
     
     try {
+      // Battery Lock aktivieren VOR Wallbox-Start (falls E3DC aktiviert)
+      if (settings?.e3dc?.enabled) {
+        const controlState = storage.getControlState();
+        if (!controlState.batteryLock) {
+          log('info', 'system', '[X1-Optimierung] Battery Lock aktivieren');
+          storage.saveControlState({ ...controlState, batteryLock: true });
+          
+          try {
+            if (!e3dcClient.isConfigured()) {
+              e3dcClient.configure(settings.e3dc);
+            }
+            await e3dcClient.lockDischarge();
+            
+            triggerProwlEvent(settings, "batteryLockActivated", (notifier) => 
+              notifier.sendBatteryLockActivated()
+            );
+          } catch (error) {
+            log('error', 'system', '[X1-Optimierung] Fehler beim Aktivieren der Entladesperre', 
+              error instanceof Error ? error.message : String(error));
+            storage.saveControlState({ ...controlState, batteryLock: false });
+          }
+        }
+      }
+      
       // Für max_without_battery: Verwende physicalPhaseSwitch aus Settings
       // Default 1P weil User's Setup: KEBA manueller Phasenschalter auf 1P fixiert
       // Begründung: Minimale Startleistung ~1380W (1P) vs ~4140W (3P)

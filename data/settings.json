@@ -21,7 +21,7 @@
     "pollingIntervalSeconds": 10
   },
   "chargingStrategy": {
-    "activeStrategy": "off",
+    "activeStrategy": "max_without_battery",
     "minStartPowerWatt": 1400,
     "stopThresholdWatt": 1000,
     "startDelaySeconds": 120,
