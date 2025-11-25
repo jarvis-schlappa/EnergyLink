@@ -177,6 +177,8 @@ export default function SettingsPage() {
           batteryLockDeactivated: false,
           gridChargingActivated: false,
           gridChargingDeactivated: false,
+          gridFrequencyWarning: true,
+          gridFrequencyCritical: true,
           strategyChanged: false,
           errors: false,
         },
@@ -235,6 +237,8 @@ export default function SettingsPage() {
           batteryLockDeactivated: false,
           gridChargingActivated: false,
           gridChargingDeactivated: false,
+          gridFrequencyWarning: true,
+          gridFrequencyCritical: true,
           strategyChanged: false,
           errors: false,
         },
@@ -1214,6 +1218,34 @@ export default function SettingsPage() {
                               form.setValue("prowl.events.gridChargingDeactivated", checked)
                             }
                             data-testid="switch-event-grid-charging-deactivated"
+                          />
+                        </div>
+                        
+                        <div className="flex items-center justify-between">
+                          <Label htmlFor="event-grid-frequency-warning" className="text-xs font-normal">
+                            Netzfrequenz Warnung (Tier 2)
+                          </Label>
+                          <Switch
+                            id="event-grid-frequency-warning"
+                            checked={form.watch("prowl.events.gridFrequencyWarning")}
+                            onCheckedChange={(checked) =>
+                              form.setValue("prowl.events.gridFrequencyWarning", checked)
+                            }
+                            data-testid="switch-event-grid-frequency-warning"
+                          />
+                        </div>
+                        
+                        <div className="flex items-center justify-between">
+                          <Label htmlFor="event-grid-frequency-critical" className="text-xs font-normal">
+                            Netzfrequenz Kritisch (Tier 3)
+                          </Label>
+                          <Switch
+                            id="event-grid-frequency-critical"
+                            checked={form.watch("prowl.events.gridFrequencyCritical")}
+                            onCheckedChange={(checked) =>
+                              form.setValue("prowl.events.gridFrequencyCritical", checked)
+                            }
+                            data-testid="switch-event-grid-frequency-critical"
                           />
                         </div>
                         
