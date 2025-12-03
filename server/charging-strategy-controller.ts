@@ -50,10 +50,10 @@ export class ChargingStrategyController {
    * WICHTIG: Setzt NUR den Wallbox-Status (isActive, currentAmpere).
    * Die Strategie wird vom Aufrufer gesetzt (wallbox-broadcast-listener finally-Block).
    * 
-   * Optimiert für schnelle UI-Reaktion beim X1-Wechsel:
-   * 1. Wallbox sofort starten (32A @ 1P)
-   * 2. Context updaten (OHNE strategy - wird vom Aufrufer gesetzt)
-   * 3. Battery Lock wird separat im Hintergrund aktiviert (vom Aufrufer)
+   * Optimiert für schnelle UI-Reaktion:
+   * 1. Wallbox SOFORT starten (32A @ 1P) - keine Verzögerung!
+   * 2. Context updaten
+   * 3. Battery Lock DANACH aktivieren (sequentiell, aber nach Wallbox-Start)
    */
   async activateMaxPowerImmediately(wallboxIp: string): Promise<void> {
     const startTime = Date.now();
@@ -70,30 +70,6 @@ export class ChargingStrategyController {
     }
     
     try {
-      // Battery Lock aktivieren VOR Wallbox-Start (falls E3DC aktiviert)
-      if (settings?.e3dc?.enabled) {
-        const controlState = storage.getControlState();
-        if (!controlState.batteryLock) {
-          log('info', 'system', '[X1-Optimierung] Battery Lock aktivieren');
-          storage.saveControlState({ ...controlState, batteryLock: true });
-          
-          try {
-            if (!e3dcClient.isConfigured()) {
-              e3dcClient.configure(settings.e3dc);
-            }
-            await e3dcClient.lockDischarge();
-            
-            triggerProwlEvent(settings, "batteryLockActivated", (notifier) => 
-              notifier.sendBatteryLockActivated()
-            );
-          } catch (error) {
-            log('error', 'system', '[X1-Optimierung] Fehler beim Aktivieren der Entladesperre', 
-              error instanceof Error ? error.message : String(error));
-            storage.saveControlState({ ...controlState, batteryLock: false });
-          }
-        }
-      }
-      
       // Für max_without_battery: Verwende physicalPhaseSwitch aus Settings
       // Default 1P weil User's Setup: KEBA manueller Phasenschalter auf 1P fixiert
       // Begründung: Minimale Startleistung ~1380W (1P) vs ~4140W (3P)
@@ -106,7 +82,7 @@ export class ChargingStrategyController {
       
       log('debug', 'system', `[X1-Optimierung] Konfiguration: ${targetAmpere}A @ ${phases}P (physicalPhaseSwitch=${config?.physicalPhaseSwitch ?? 'default'})`);
       
-      // 1. Wallbox SOFORT starten
+      // 1. Wallbox SOFORT starten - KEINE Verzögerung durch Battery Lock!
       await this.sendUdpCommand(wallboxIp, "ena 1");
       await this.sendUdpCommand(wallboxIp, `curr ${targetCurrentMa}`);
       
@@ -125,7 +101,33 @@ export class ChargingStrategyController {
       
       const duration = Date.now() - startTime;
       log('info', 'system', `Ladung gestartet mit ${targetAmpere}A @ ${phases}P - X1-Optimiert in ${duration}ms`);
-      log('debug', 'system', `[X1-Optimierung] Max Power Aktivierung ENDE - Dauer: ${duration}ms`);
+      
+      // 3. Battery Lock DANACH aktivieren (sequentiell, blockiert UI nicht mehr)
+      if (settings?.e3dc?.enabled) {
+        const controlState = storage.getControlState();
+        if (!controlState.batteryLock) {
+          log('info', 'system', '[X1-Optimierung] Battery Lock aktivieren (nach Wallbox-Start)');
+          storage.saveControlState({ ...controlState, batteryLock: true });
+          
+          try {
+            if (!e3dcClient.isConfigured()) {
+              e3dcClient.configure(settings.e3dc);
+            }
+            await e3dcClient.lockDischarge();
+            
+            triggerProwlEvent(settings, "batteryLockActivated", (notifier) => 
+              notifier.sendBatteryLockActivated()
+            );
+            log('debug', 'system', '[X1-Optimierung] Battery Lock erfolgreich aktiviert');
+          } catch (error) {
+            log('error', 'system', '[X1-Optimierung] Fehler beim Aktivieren der Entladesperre', 
+              error instanceof Error ? error.message : String(error));
+            storage.saveControlState({ ...controlState, batteryLock: false });
+          }
+        }
+      }
+      
+      log('debug', 'system', `[X1-Optimierung] Max Power Aktivierung ENDE - Gesamt: ${Date.now() - startTime}ms`);
       
       // WICHTIG: Prowl-Notification wird vom Aufrufer gesendet (nach Strategie-Persistierung)
     } catch (error) {

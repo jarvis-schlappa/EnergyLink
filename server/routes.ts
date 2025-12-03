@@ -1131,20 +1131,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
         chargingStrategy: updatedConfig,
       });
 
-      // WICHTIG: Nutze X1-Fast-Path für max_without_battery
+      // WICHTIG: Optimierte Reihenfolge für schnelle Wallbox-Reaktion
       if (strategyController) {
         try {
+          const wallboxIp = settings.wallboxIp || "192.168.40.16";
+          
           if (strategy === "max_without_battery") {
-            // X1-Optimierung: Schneller Pfad (Wallbox → SSE → Battery Lock async)
-            const wallboxIp = settings.wallboxIp || "192.168.40.16";
+            // START: Wallbox SOFORT starten, Battery Lock DANACH
             await strategyController.activateMaxPowerImmediately(wallboxIp);
+          } else if (strategy === "off") {
+            // STOPP: Wallbox SOFORT stoppen, Battery Lock DANACH deaktivieren
+            log("info", "system", "Strategie 'off' - Wallbox wird SOFORT gestoppt");
+            
+            // 1. Wallbox SOFORT stoppen (keine Verzögerung!)
+            await strategyController.stopChargingOnly(wallboxIp, "Strategie auf 'off' gesetzt");
+            
+            // 2. Context auf off setzen
+            storage.updateChargingContext({ 
+              isActive: false, 
+              strategy: "off",
+              currentAmpere: 0,
+              targetAmpere: 0,
+            });
+            
+            // 3. Battery Lock DANACH deaktivieren (sequentiell, blockiert UI nicht mehr)
+            await strategyController.handleStrategyChange(strategy);
           } else {
-            // Normale Strategien: Event-driven Flow
+            // Andere Strategien: Event-driven Flow
             await strategyController.handleStrategyChange(strategy);
             
             // Sofortiger Check nach Strategiewechsel (vermeidet 0-15s Verzögerung)
             try {
-              const wallboxIp = settings.wallboxIp || "192.168.40.16";
               await strategyController.triggerImmediateCheck(wallboxIp);
             } catch (error) {
               log(
