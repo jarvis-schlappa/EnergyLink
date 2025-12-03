@@ -1,0 +1,19 @@
+Dez 03 16:10:00 hmland node[3382]: [16:10:00,920] [INFO] [system] [Wallbox-Broadcast-Listener] Plug-Status geändert: 3 → 7 (von 192.168.40.16)
+Dez 03 16:10:40 hmland node[3382]: [16:10:40,220] [INFO] [wallbox] Ladestrategie aktiviert: max_without_battery
+Dez 03 16:10:40 hmland node[3382]: [16:10:40,226] [INFO] [system] [X1-Optimierung] Battery Lock aktivieren
+Dez 03 16:10:40 hmland node[3382]: [16:10:40,229] [INFO] [system] E3DC: Entladesperre aktivieren - Befehl: /opt/keba-wallbox/e3dcset -p /opt/keba-wallbox/e3dcset.config -d 0
+Dez 03 16:10:42 hmland node[3382]: [16:10:42,292] [INFO] [system] E3DC: Entladesperre aktivieren - Ausgabe - Setze EntladeLeistung auf 0W
+Dez 03 16:10:42 hmland node[3382]: [16:10:42,294] [INFO] [system] E3DC: Entladesperre aktivieren erfolgreich ausgeführt
+Dez 03 16:10:46 hmland node[3382]: [16:10:46,930] [INFO] [system] [Wallbox-Broadcast-Listener] State geändert: 5 → 2 (ready for charging) (von 192.168.40.16)
+Dez 03 16:10:47 hmland node[3382]: [16:10:47,596] [INFO] [system] Ladung gestartet mit 32A @ 1P - X1-Optimiert in 7370ms
+Dez 03 16:10:47 hmland node[3382]: [16:10:47,598] [INFO] [wallbox] Laden erfolgreich gestartet
+Dez 03 16:10:47 hmland node[3382]: [16:10:47,942] [INFO] [system] [Wallbox-Broadcast-Listener] State geändert: 2 → 3 (charging) (von 192.168.40.16)
+Dez 03 16:10:49 hmland node[3382]: [16:10:49,696] [INFO] [system] Ladung gestartet mit 32A @ 1P (Strategie: max_without_battery)
+Dez 03 16:10:54 hmland node[3382]: [16:10:54,946] [INFO] [system] [RECONCILE] Phasen-Korrektur: 1P → 3P (gemessen aus Strömen)
+Dez 03 16:11:15 hmland node[3382]: [16:11:15,984] [INFO] [wallbox] Ladestrategie deaktiviert (auf "off" gesetzt)
+Dez 03 16:11:15 hmland node[3382]: [16:11:15,991] [INFO] [system] Strategie-Wechsel: off → Battery Lock deaktivieren
+Dez 03 16:11:16 hmland node[3382]: [16:11:15,996] [INFO] [system] E3DC: Entladesperre deaktivieren - Befehl: /opt/keba-wallbox/e3dcset -p /opt/keba-wallbox/e3dcset.config -a
+Dez 03 16:11:17 hmland node[3382]: [16:11:17,948] [INFO] [system] [RECONCILE] Phasen-Korrektur: 3P → 1P (gemessen aus Strömen)
+Dez 03 16:11:18 hmland node[3382]: [16:11:18,078] [INFO] [system] E3DC: Entladesperre deaktivieren - Ausgabe - Setze Lade-/EntladeLeistung auf Automatik
+Dez 03 16:11:18 hmland node[3382]: [16:11:18,080] [INFO] [system] E3DC: Entladesperre deaktivieren erfolgreich ausgeführt
+Dez 03 16:11:22 hmland node[3382]: [16:11:22,148] [INFO] [wallbox] Laden erfolgreich gestoppt
