@@ -16,64 +16,16 @@ localPort = 5000
 externalPort = 80
 
 [[ports]]
-localPort = 8083
-externalPort = 3002
+localPort = 5502
+externalPort = 3001
 
 [[ports]]
-localPort = 33607
-externalPort = 3003
-
-[[ports]]
-localPort = 33807
-externalPort = 9000
-
-[[ports]]
-localPort = 34835
-externalPort = 8099
-
-[[ports]]
-localPort = 35657
-externalPort = 8081
-
-[[ports]]
-localPort = 35985
-externalPort = 4200
-
-[[ports]]
-localPort = 36097
-externalPort = 8080
-
-[[ports]]
-localPort = 36127
-externalPort = 5000
-
-[[ports]]
-localPort = 37081
-externalPort = 8008
-
-[[ports]]
-localPort = 37211
-externalPort = 6000
-
-[[ports]]
-localPort = 38085
-externalPort = 8000
-
-[[ports]]
-localPort = 43771
-externalPort = 6800
-
-[[ports]]
-localPort = 45053
+localPort = 7072
 externalPort = 3000
 
 [[ports]]
-localPort = 45699
-externalPort = 5173
-
-[[ports]]
-localPort = 46599
-externalPort = 3001
+localPort = 8083
+externalPort = 3002
 
 [env]
 PORT = "5000"

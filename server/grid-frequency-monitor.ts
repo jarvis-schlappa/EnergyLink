@@ -19,8 +19,6 @@ import type { GridFrequencyStatus, E3dcLiveData } from "@shared/schema";
 const NOMINAL_FREQUENCY = 50.0;
 const TIER_2_THRESHOLD = 0.1;
 const TIER_3_THRESHOLD = 0.2;
-const BATTERY_CAPACITY_WH = 7000;
-const TARGET_SOC = 90;
 const HYSTERESIS_COUNT = 2;
 
 interface GridFrequencyState {
@@ -32,7 +30,6 @@ interface GridFrequencyState {
   tier3ChargingActive: boolean;
   consecutiveTierReadings: number;
   pendingTier: 0 | 1 | 2 | 3;
-  currentSoc: number;
 }
 
 let state: GridFrequencyState = {
@@ -44,7 +41,6 @@ let state: GridFrequencyState = {
   tier3ChargingActive: false,
   consecutiveTierReadings: 0,
   pendingTier: 1,
-  currentSoc: 0,
 };
 
 let listenerRegistered = false;
@@ -66,13 +62,6 @@ function calculateTier(frequency: number, tier2Threshold: number = TIER_2_THRESH
   }
 }
 
-function calculateRequiredChargeWh(currentSoc: number): number {
-  const targetWh = BATTERY_CAPACITY_WH * (TARGET_SOC / 100);
-  const currentWh = BATTERY_CAPACITY_WH * (currentSoc / 100);
-  const requiredWh = Math.max(0, targetWh - currentWh);
-  return Math.round(requiredWh);
-}
-
 async function handleTierTransition(newTier: 0 | 1 | 2 | 3, frequency: number, soc: number): Promise<void> {
   const oldTier = state.currentTier;
   const deviation = Math.abs(frequency - NOMINAL_FREQUENCY);
@@ -82,16 +71,12 @@ async function handleTierTransition(newTier: 0 | 1 | 2 | 3, frequency: number, s
   
   state.currentTier = newTier;
   state.currentFrequency = frequency;
-  state.currentSoc = soc;
   state.lastTierChange = new Date().toISOString();
   
   if (newTier === 1) {
     state.tier2NotificationSent = false;
     state.tier3NotificationSent = false;
-    
-    if (state.tier3ChargingActive) {
-      log("info", "grid-frequency", "Frequenz normalisiert - Notladung läuft weiter bis SOC 90% erreicht (E3DC erlaubt nur 1x/Tag Aktivierung)");
-    }
+    state.tier3ChargingActive = false;
   }
   
   if (newTier === 2 && !state.tier2NotificationSent) {
@@ -121,29 +106,21 @@ async function handleTierTransition(newTier: 0 | 1 | 2 | 3, frequency: number, s
     
     state.tier3NotificationSent = true;
     
-    if (!state.tier3ChargingActive && soc < TARGET_SOC && settings?.gridFrequencyMonitor?.enableEmergencyCharging) {
-      const requiredWh = calculateRequiredChargeWh(soc);
+    if (!state.tier3ChargingActive && settings?.gridFrequencyMonitor?.enableEmergencyCharging) {
+      log("warning", "grid-frequency", `Starte Notladung (aktueller SOC: ${soc}%)`);
       
-      if (requiredWh > 0) {
-        log("warning", "grid-frequency", `Starte Notladung: SOC ${soc}% → ${TARGET_SOC}% (${requiredWh} Wh benötigt)`);
-        
-        try {
-          if (settings?.e3dc?.enabled) {
-            // Übergebe Ladungsmenge (Wh) an enableGridCharge → verwendet -e <Wh>
-            await e3dcClient.enableGridCharge(requiredWh);
-            state.tier3ChargingActive = true;
-            log("info", "grid-frequency", `Notladung aktiviert - Ziel: ${TARGET_SOC}% (${requiredWh} Wh)`);
-          } else {
-            log("warning", "grid-frequency", "E3DC nicht aktiviert - Notladung nicht möglich");
-          }
-        } catch (error) {
-          log("error", "grid-frequency", "Fehler beim Starten der Notladung", error instanceof Error ? error.message : String(error));
+      try {
+        if (settings?.e3dc?.enabled) {
+          await e3dcClient.enableGridCharge();
+          state.tier3ChargingActive = true;
+        } else {
+          log("warning", "grid-frequency", "E3DC nicht aktiviert - Notladung nicht möglich");
         }
-      } else {
-        log("info", "grid-frequency", `Batterie bereits bei ${soc}% - keine Notladung nötig`);
+      } catch (error) {
+        log("error", "grid-frequency", "Fehler beim Starten der Notladung", error instanceof Error ? error.message : String(error));
       }
-    } else if (!state.tier3ChargingActive && soc < TARGET_SOC && !settings?.gridFrequencyMonitor?.enableEmergencyCharging) {
-      log("info", "grid-frequency", "Tier 3 erreicht, aber Notladung ist deaktiviert in den Einstellungen");
+    } else if (!state.tier3ChargingActive && !settings?.gridFrequencyMonitor?.enableEmergencyCharging) {
+      log("info", "grid-frequency", "Tier 3 erreicht, aber Notladung ist deaktiviert");
     }
   }
 }
@@ -163,26 +140,12 @@ function onLiveData(data: E3dcLiveData): void {
   const newTier = calculateTier(frequency, tier2Threshold, tier3Threshold);
   
   state.currentFrequency = frequency;
-  state.currentSoc = soc;
   
   const deviation = Math.abs(frequency - NOMINAL_FREQUENCY);
   
   if (newTier >= 2) {
     const tierLabel = newTier === 3 ? "KRITISCH (Tier 3)" : "Warnung (Tier 2)";
     log("info", "grid-frequency", `Frequenz ${tierLabel}: ${frequency.toFixed(2)} Hz (Abweichung: ${deviation.toFixed(3)} Hz)`);
-  }
-  
-  if (state.tier3ChargingActive && soc >= TARGET_SOC) {
-    log("info", "grid-frequency", `Batterie hat ${TARGET_SOC}% erreicht - Notladung beendet`);
-    
-    const settings = storage.getSettings();
-    if (settings?.e3dc?.enabled) {
-      e3dcClient.disableGridCharge().catch((error) => {
-        log("error", "grid-frequency", "Fehler beim Beenden der Notladung", error instanceof Error ? error.message : String(error));
-      });
-    }
-    
-    state.tier3ChargingActive = false;
   }
   
   if (newTier === state.pendingTier) {
@@ -223,9 +186,6 @@ export function startGridFrequencyMonitor(): void {
   log("info", "grid-frequency", "Netzfrequenz-Überwachung gestartet");
   log("info", "grid-frequency", `Schwellwerte: Tier 2 = ±${tier2Threshold} Hz, Tier 3 = ±${tier3Threshold} Hz`);
   log("info", "grid-frequency", `Notladung bei Tier 3: ${emergencyChargingEnabled ? 'aktiviert' : 'deaktiviert'}`);
-  if (emergencyChargingEnabled) {
-    log("info", "grid-frequency", `Batterie: ${BATTERY_CAPACITY_WH} Wh Kapazität, Ziel-SOC ${TARGET_SOC}%`);
-  }
 }
 
 export function stopGridFrequencyMonitor(): void {
@@ -262,7 +222,6 @@ export function resetGridFrequencyState(): void {
     tier3ChargingActive: false,
     consecutiveTierReadings: 0,
     pendingTier: 1,
-    currentSoc: 0,
   };
   log("debug", "grid-frequency", "State zurückgesetzt");
 }

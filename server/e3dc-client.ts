@@ -313,26 +313,18 @@ class E3dcClient {
   }
 
   /**
-   * Aktiviert Netzstrom-Laden mit einer bestimmten Ladungsmenge
-   * 
-   * @param chargeAmountWh - Ladungsmenge in Wh (wenn nicht angegeben, wird der konfigurierte Befehl verwendet)
+   * Aktiviert Netzstrom-Laden mit dem konfigurierten Befehl aus den Einstellungen
    */
-  async enableGridCharge(chargeAmountWh?: number): Promise<void> {
+  async enableGridCharge(): Promise<void> {
     if (!this.config) {
       throw new Error('E3DC not configured');
     }
     
     const settings = storage.getSettings();
-    let command: string | undefined;
+    let command: string | undefined = this.config.gridChargeEnableCommand;
     
-    if (chargeAmountWh !== undefined && chargeAmountWh > 0) {
-      // Ladungsmenge angegeben → verwende -e <Wh> um Netzladung zu starten
-      command = `-e ${Math.round(chargeAmountWh)}`;
-    } else if (this.config.gridChargeEnableCommand) {
-      // Kein Wert, aber konfigurierter Befehl vorhanden
-      command = this.config.gridChargeEnableCommand;
-    } else if (settings?.demoMode) {
-      // Demo-Modus ohne Konfiguration: Standard 1750 Wh (ca. 25% eines 7kWh Akkus)
+    // Demo-Modus Fallback wenn kein Befehl konfiguriert
+    if (!command && settings?.demoMode) {
       command = '-e 1750';
     }
     
