@@ -12,8 +12,8 @@ import BottomNav from "@/components/BottomNav";
 function Router() {
   return (
     <Switch>
-      <Route path="/" component={StatusPage} />
-      <Route path="/e3dc" component={E3dcPage} />
+      <Route path="/" component={E3dcPage} />
+      <Route path="/wallbox" component={StatusPage} />
       <Route path="/logs" component={LogsPage} />
       <Route path="/einstellungen" component={SettingsPage} />
     </Switch>

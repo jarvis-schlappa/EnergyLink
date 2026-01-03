@@ -5,8 +5,8 @@ export default function BottomNav() {
   const [location] = useLocation();
 
   const navItems = [
-    { path: "/", icon: PlugZap, label: "Wallbox" },
-    { path: "/e3dc", icon: Home, label: "E3DC" },
+    { path: "/", icon: Home, label: "E3DC" },
+    { path: "/wallbox", icon: PlugZap, label: "Wallbox" },
     { path: "/einstellungen", icon: Settings, label: "Einstellungen" },
     { path: "/logs", icon: FileText, label: "Logs" },
   ];
