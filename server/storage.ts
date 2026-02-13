@@ -1,6 +1,22 @@
 import type { Settings, ControlState, LogEntry, LogSettings, LogLevel, PlugStatusTracking, ChargingContext } from "@shared/schema";
-import { readFileSync, writeFileSync, existsSync, mkdirSync } from "fs";
+import { readFileSync, writeFileSync, existsSync, mkdirSync, renameSync, unlinkSync } from "fs";
 import { join } from "path";
+
+/**
+ * Atomic file write: writes to a temp file first, then renames.
+ * This prevents data corruption if the process crashes mid-write.
+ */
+function atomicWriteFileSync(filePath: string, data: string, encoding: BufferEncoding = "utf-8"): void {
+  const tmpPath = filePath + ".tmp";
+  writeFileSync(tmpPath, data, encoding);
+  try {
+    renameSync(tmpPath, filePath);
+  } catch (renameError) {
+    // Clean up temp file if rename fails
+    try { unlinkSync(tmpPath); } catch { /* ignore cleanup errors */ }
+    throw renameError;
+  }
+}
 
 // Global cache for log level (loaded once at startup, before storage is created)
 let cachedLogLevel: LogLevel = "info"; // Default: INFO
@@ -177,7 +193,7 @@ export class MemStorage implements IStorage {
 
   private saveSettingsToFile(settings: Settings): void {
     try {
-      writeFileSync(this.settingsFilePath, JSON.stringify(settings, null, 2), "utf-8");
+      atomicWriteFileSync(this.settingsFilePath, JSON.stringify(settings, null, 2), "utf-8");
       logStorage("debug", `Einstellungen gespeichert in: ${this.settingsFilePath}`);
     } catch (error) {
       logStorage("warning", "Fehler beim Speichern der Einstellungen", error instanceof Error ? error.message : String(error));
@@ -215,7 +231,7 @@ export class MemStorage implements IStorage {
 
   private saveControlStateToFile(state: ControlState): void {
     try {
-      writeFileSync(this.controlStateFilePath, JSON.stringify(state, null, 2), "utf-8");
+      atomicWriteFileSync(this.controlStateFilePath, JSON.stringify(state, null, 2), "utf-8");
       logStorage("debug", `Control State gespeichert in: ${this.controlStateFilePath}`);
     } catch (error) {
       logStorage("warning", "Fehler beim Speichern des Control States", error instanceof Error ? error.message : String(error));
@@ -240,7 +256,7 @@ export class MemStorage implements IStorage {
 
   private savePlugTrackingToFile(tracking: PlugStatusTracking): void {
     try {
-      writeFileSync(this.plugTrackingFilePath, JSON.stringify(tracking, null, 2), "utf-8");
+      atomicWriteFileSync(this.plugTrackingFilePath, JSON.stringify(tracking, null, 2), "utf-8");
       logStorage("debug", `Plug Tracking gespeichert in: ${this.plugTrackingFilePath}`);
     } catch (error) {
       logStorage("warning", "Fehler beim Speichern des Plug Trackings", error instanceof Error ? error.message : String(error));
@@ -282,7 +298,7 @@ export class MemStorage implements IStorage {
 
   private saveChargingContextToFile(context: ChargingContext): void {
     try {
-      writeFileSync(this.chargingContextFilePath, JSON.stringify(context, null, 2), "utf-8");
+      atomicWriteFileSync(this.chargingContextFilePath, JSON.stringify(context, null, 2), "utf-8");
       logStorage("debug", `Charging Context gespeichert in: ${this.chargingContextFilePath}`);
     } catch (error) {
       logStorage("warning", "Fehler beim Speichern des Charging Context", error instanceof Error ? error.message : String(error));
@@ -510,7 +526,7 @@ export class MemStorage implements IStorage {
     
     // Save defaults to file for future restarts
     try {
-      writeFileSync(this.logSettingsFilePath, JSON.stringify(defaults, null, 2), "utf-8");
+      atomicWriteFileSync(this.logSettingsFilePath, JSON.stringify(defaults, null, 2), "utf-8");
     } catch (error) {
       // Silent fail - not critical
     }
@@ -527,7 +543,7 @@ export class MemStorage implements IStorage {
     // Update global cache immediately
     cachedLogLevel = settings.level;
     try {
-      writeFileSync(this.logSettingsFilePath, JSON.stringify(settings, null, 2), "utf-8");
+      atomicWriteFileSync(this.logSettingsFilePath, JSON.stringify(settings, null, 2), "utf-8");
     } catch (error) {
       // Silent fail - log settings are not critical for operation
     }

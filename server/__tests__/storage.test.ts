@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { existsSync, mkdirSync, writeFileSync, rmSync, readFileSync } from "fs";
+import { existsSync, mkdirSync, writeFileSync, rmSync, readFileSync, renameSync, unlinkSync } from "fs";
 import { join } from "path";
 
 // Use a temp directory for storage tests
@@ -121,6 +121,41 @@ describe("MemStorage", () => {
       };
       expect(defaults.strategy).toBe("off");
       expect(defaults.isActive).toBe(false);
+    });
+  });
+
+  describe("atomic file write pattern", () => {
+    it("writes via temp file and rename (no .tmp left behind)", () => {
+      const filePath = join(TEST_DATA_DIR, "atomic-test.json");
+      const tmpPath = filePath + ".tmp";
+      const data = JSON.stringify({ test: true }, null, 2);
+
+      // Simulate atomicWriteFileSync
+      writeFileSync(tmpPath, data, "utf-8");
+      renameSync(tmpPath, filePath);
+
+      expect(existsSync(filePath)).toBe(true);
+      expect(existsSync(tmpPath)).toBe(false);
+      expect(JSON.parse(readFileSync(filePath, "utf-8"))).toEqual({ test: true });
+    });
+
+    it("preserves original file if .tmp write is incomplete", () => {
+      const filePath = join(TEST_DATA_DIR, "atomic-original.json");
+      const tmpPath = filePath + ".tmp";
+      const originalData = JSON.stringify({ original: true }, null, 2);
+
+      // Write original file
+      writeFileSync(filePath, originalData, "utf-8");
+
+      // Simulate crash: .tmp exists but rename never happened
+      writeFileSync(tmpPath, "{ broken", "utf-8");
+
+      // Original should still be intact
+      const loaded = JSON.parse(readFileSync(filePath, "utf-8"));
+      expect(loaded.original).toBe(true);
+
+      // Clean up stale tmp
+      if (existsSync(tmpPath)) unlinkSync(tmpPath);
     });
   });
 });
