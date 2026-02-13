@@ -14,7 +14,7 @@
 import { log } from "./logger";
 import { storage } from "./storage";
 import { wallboxUdpChannel } from "./wallbox-udp-channel";
-import { ChargingStrategyController } from "./charging-strategy-controller";
+import { getOrCreateStrategyController } from "./routes/shared-state";
 import { getProwlNotifier, triggerProwlEvent } from "./prowl-notifier";
 import { broadcastWallboxStatus } from "./wallbox-sse";
 
@@ -22,7 +22,6 @@ let lastInputStatus: number | null = null;
 let lastPlugStatus: number | null = null;
 let lastState: number | null = null;
 let isEnabled = false;
-let strategyController: ChargingStrategyController | null = null;
 let sendUdpCommand: ((ip: string, command: string) => Promise<any>) | null =
   null;
 
@@ -225,7 +224,7 @@ const handleBroadcast = async (data: any, rinfo: any) => {
 
       // X1-OPTIMIERUNG: NUR für max_without_battery
       // Andere Strategien (surplus_*) brauchen E3DC-Daten → normale Event-Loop verwenden
-      if (targetStrategy === "max_without_battery" && strategyController && settings?.wallboxIp) {
+      if (targetStrategy === "max_without_battery" && settings?.wallboxIp) {
         // OPTIMIERTER PFAD: Schnelle UI-Reaktion mit Battery Lock Sicherheit
         // 1. Wallbox sofort starten
         // 2. SSE sofort senden (UI bekommt Update in ~2-3s)
@@ -238,7 +237,7 @@ const handleBroadcast = async (data: any, rinfo: any) => {
         try {
           // SCHRITT 1: Wallbox SOFORT starten (ohne auf Battery Lock zu warten)
           log('debug', 'system', '[X1-Optimierung] Schritt 1/3: Wallbox starten');
-          await strategyController.activateMaxPowerImmediately(settings.wallboxIp);
+          await getOrCreateStrategyController().activateMaxPowerImmediately(settings.wallboxIp);
           
           const wallboxDone = Date.now() - x1StartTime;
           log('debug', 'system', `[X1-Optimierung] Schritt 1/3 FERTIG - Wallbox gestartet in ${wallboxDone}ms`);
@@ -253,7 +252,7 @@ const handleBroadcast = async (data: any, rinfo: any) => {
           // SCHRITT 3: Battery Lock aktivieren (KRITISCH: await für Sicherheit!)
           // UI hat bereits Update, aber wir MÜSSEN warten um Batterie zu schützen
           log('debug', 'system', '[X1-Optimierung] Schritt 3/3: Battery Lock aktivieren (KRITISCH)');
-          await strategyController.handleStrategyChange(targetStrategy);
+          await getOrCreateStrategyController().handleStrategyChange(targetStrategy);
           
           const batteryDone = Date.now() - x1StartTime;
           log('debug', 'system', `[X1-Optimierung] Schritt 3/3 FERTIG - Battery Lock aktiviert in ${batteryDone}ms`);
@@ -276,7 +275,7 @@ const handleBroadcast = async (data: any, rinfo: any) => {
           
           // ROLLBACK: Wallbox stoppen weil Battery Lock fehlgeschlagen
           try {
-            await strategyController.stopChargingOnly(settings.wallboxIp, "Battery Lock Fehler - Sicherheits-Rollback");
+            await getOrCreateStrategyController().stopChargingOnly(settings.wallboxIp, "Battery Lock Fehler - Sicherheits-Rollback");
             log('error', 'system', '[X1-Optimierung] Rollback erfolgreich - Wallbox gestoppt');
             
             // Prowl-Notification: Kritischer Fehler
@@ -295,11 +294,11 @@ const handleBroadcast = async (data: any, rinfo: any) => {
           // WICHTIG: targetStrategy auf null setzen → finally-Block setzt KEINE Strategie
           targetStrategy = null;
         }
-      } else if (strategyController) {
+      } else {
         // NORMALER PFAD: Für surplus-Strategien (brauchen E3DC-Daten)
         // Battery Lock aktivieren, dann wartet Event-Loop auf E3DC-Daten
         try {
-          await strategyController.handleStrategyChange(targetStrategy);
+          await getOrCreateStrategyController().handleStrategyChange(targetStrategy);
         } catch (error) {
           log(
             "error",
@@ -309,12 +308,6 @@ const handleBroadcast = async (data: any, rinfo: any) => {
           );
           // Fortfahren - Strategie wird trotzdem gesetzt (finally-Block)
         }
-      } else {
-        log(
-          "warning",
-          "system",
-          "[Wallbox-Broadcast-Listener] ChargingStrategyController nicht verfügbar",
-        );
       }
     } else if (inputStatus === 0) {
       // X1-OPTIMIERUNG: Sofortige UI-Reaktion durch parallele Ausführung
@@ -333,11 +326,11 @@ const handleBroadcast = async (data: any, rinfo: any) => {
       );
 
       const settings = storage.getSettings();
-      if (settings?.wallboxIp && strategyController) {
+      if (settings?.wallboxIp) {
         try {
           // SCHRITT 1: Wallbox SOFORT stoppen (ohne auf Battery Lock zu warten)
           log('debug', 'system', '[X1-Optimierung] Schritt 1/3: Wallbox stoppen');
-          await strategyController.stopChargingOnly(settings.wallboxIp, "Input X1 deaktiviert");
+          await getOrCreateStrategyController().stopChargingOnly(settings.wallboxIp, "Input X1 deaktiviert");
           
           const wallboxDone = Date.now() - x1StopTime;
           log('debug', 'system', `[X1-Optimierung] Schritt 1/3 FERTIG - Wallbox gestoppt in ${wallboxDone}ms`);
@@ -352,7 +345,7 @@ const handleBroadcast = async (data: any, rinfo: any) => {
           // SCHRITT 3: Battery Lock ASYNCHRON im Hintergrund deaktivieren
           // Fire-and-forget: UI wartet nicht darauf
           log('debug', 'system', '[X1-Optimierung] Schritt 3/3: Battery Lock (async im Hintergrund)');
-          void strategyController.handleStrategyChange("off")
+          void getOrCreateStrategyController().handleStrategyChange("off")
             .then(() => {
               const batteryDone = Date.now() - x1StopTime;
               log('debug', 'system', `[X1-Optimierung] Schritt 3/3 FERTIG - Battery Lock deaktiviert in ${batteryDone}ms`);
@@ -498,9 +491,8 @@ export async function startBroadcastListener(
     return;
   }
 
-  // Speichere sendUdpCommand für ChargingStrategyController
+  // Speichere sendUdpCommand für Wallbox-Kommunikation
   sendUdpCommand = udpCommandSender;
-  strategyController = new ChargingStrategyController(udpCommandSender);
 
   // Registriere Broadcast-Handler beim UDP-Channel
   wallboxUdpChannel.onBroadcast(handleBroadcast);
@@ -539,7 +531,6 @@ export async function stopBroadcastListener(): Promise<void> {
   lastInputStatus = null;
   lastPlugStatus = null;
   lastState = null;
-  strategyController = null;
   sendUdpCommand = null;
   log("info", "system", "✅ [Wallbox-Broadcast-Listener] Gestoppt");
 }
