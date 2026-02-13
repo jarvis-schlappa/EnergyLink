@@ -1,13 +1,14 @@
 import { useEffect, useState, useRef } from "react";
-import { Battery, Plug, Zap, AlertCircle, Gauge, Sun, Moon, ShieldOff, PlugZap, Clock, Check, X, Sparkles, Info } from "lucide-react";
+import { Battery, Plug, Zap, AlertCircle, Gauge, Sparkles, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Slider } from "@/components/ui/slider";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import StatusCard from "@/components/StatusCard";
+import PageHeader from "@/components/PageHeader";
+import BuildInfoDialog from "@/components/BuildInfoDialog";
+import CableDetailDrawer from "@/components/status/CableDetailDrawer";
+import EnergyDetailDrawer from "@/components/status/EnergyDetailDrawer";
+import ChargingControlDrawer, { STRATEGY_OPTIONS } from "@/components/status/ChargingControlDrawer";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -16,34 +17,8 @@ import { buildInfoSchema } from "@shared/schema";
 import { useWallboxSSE } from "@/hooks/use-wallbox-sse";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
-import {
-  Drawer,
-  DrawerClose,
-  DrawerContent,
-  DrawerDescription,
-  DrawerFooter,
-  DrawerHeader,
-  DrawerTitle,
-} from "@/components/ui/drawer";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Separator } from "@/components/ui/separator";
-import { formatDistanceToNow, format } from "date-fns";
+import { format } from "date-fns";
 import { de } from "date-fns/locale";
-
-// Strategy Label Mapping
-const STRATEGY_OPTIONS: Array<{ value: ChargingStrategy; label: string; description: string }> = [
-  { value: "off", label: "Aus", description: "Keine automatische Ladung" },
-  { value: "surplus_battery_prio", label: "Überschuss (Batterie priorisiert)", description: "Nur PV Überschuss nutzen" },
-  { value: "surplus_vehicle_prio", label: "Überschuss (Fahrzeug priorisiert)", description: "Fahrzeug nur mit PV Überschuss laden" },
-  { value: "max_with_battery", label: "Max Power (mit Batterieentladung)", description: "Volle Leistung mit Entladung der Hausbatterie" },
-  { value: "max_without_battery", label: "Max Power (ohne Batterieentladung)", description: "Volle Leistung ohne Entladung der Hausbatterie" },
-];
 
 
 export default function StatusPage() {
@@ -68,13 +43,11 @@ export default function StatusPage() {
     }
   });
 
-  // Polling für regelmäßige Updates (5s) + SSE für Echtzeit-Events
   const { data: status, isLoading, error } = useQuery<WallboxStatus>({
     queryKey: ["/api/wallbox/status"],
-    refetchInterval: 5000, // Polling bleibt aktiv (SSE ist nur für Events)
+    refetchInterval: 5000,
   });
 
-  // Nutze SSE-Status wenn verfügbar, sonst Polling-Status
   const displayStatus = sseStatus || status;
 
   const { data: controlState } = useQuery<ControlState>({
@@ -84,19 +57,19 @@ export default function StatusPage() {
 
   const { data: settings } = useQuery<Settings>({
     queryKey: ["/api/settings"],
-    refetchInterval: 5000, // Automatisch aktualisieren wie controlState
-    refetchOnMount: true, // Immer neu laden wenn Seite gemountet wird
-    refetchOnWindowFocus: true, // Neu laden wenn Fenster Fokus bekommt
+    refetchInterval: 5000,
+    refetchOnMount: true,
+    refetchOnWindowFocus: true,
   });
 
   const { data: plugTracking } = useQuery<PlugStatusTracking>({
     queryKey: ["/api/wallbox/plug-tracking"],
-    refetchInterval: 5000, // Synchron mit Status-Updates
+    refetchInterval: 5000,
   });
 
   const { data: chargingContext } = useQuery<ChargingContext>({
     queryKey: ["/api/charging/context"],
-    refetchInterval: 5000, // Synchron mit Status-Updates
+    refetchInterval: 5000,
   });
 
   const { data: buildInfo } = useQuery<BuildInfo>({
@@ -121,7 +94,6 @@ export default function StatusPage() {
         const newCurrent = Math.min(Math.round(displayStatus?.maxCurr), maxAllowed);
         setCurrentAmpere(newCurrent);
       }
-      // Wenn Ladeleistung empfangen wird, "Warte auf Bestätigung" beenden
       if (displayStatus?.power > 0 && waitingForConfirmation) {
         setWaitingForConfirmation(false);
       }
@@ -133,59 +105,43 @@ export default function StatusPage() {
     }
   }, [status, error, waitingForConfirmation]);
 
-  // Wenn zeitgesteuerte Ladung aktiviert wird, setze Strom auf Maximum
   useEffect(() => {
-    // Nur reagieren, wenn wir bereits einen vorherigen Wert haben (nicht beim ersten Laden)
     if (previousNightChargingRef.current !== undefined) {
       if (controlState && status && controlState.nightCharging && !previousNightChargingRef.current) {
-        // Zeitgesteuerte Ladung wurde gerade aktiviert (Wechsel von false auf true)
         const maxAllowed = displayStatus?.phases === 3 ? 16 : 32;
         setCurrentAmpere(maxAllowed);
-        // Sende Befehl an Wallbox
         setCurrentMutation.mutate(maxAllowed);
       }
     }
     previousNightChargingRef.current = controlState?.nightCharging;
   }, [controlState?.nightCharging, status]);
 
-  // Live-Countdown für Überschuss-Strategien (Start)
   useEffect(() => {
     if (chargingContext?.remainingStartDelay !== undefined && chargingContext.remainingStartDelay > 0) {
-      // Backend liefert neuen Wert - setze Live-Countdown
       setLiveCountdown(chargingContext.remainingStartDelay);
-      
-      // Starte sekündlichen Countdown zwischen Backend-Updates
       const interval = setInterval(() => {
         setLiveCountdown(prev => {
           if (prev === null || prev <= 0) return 0;
           return prev - 1;
         });
       }, 1000);
-      
       return () => clearInterval(interval);
     } else {
-      // Kein Countdown aktiv
       setLiveCountdown(null);
     }
   }, [chargingContext?.remainingStartDelay]);
 
-  // Live-Countdown für Überschuss-Strategien (Stopp)
   useEffect(() => {
     if (chargingContext?.remainingStopDelay !== undefined && chargingContext.remainingStopDelay > 0) {
-      // Backend liefert neuen Wert - setze Live-Stopp-Countdown
       setLiveStopCountdown(chargingContext.remainingStopDelay);
-      
-      // Starte sekündlichen Countdown zwischen Backend-Updates
       const interval = setInterval(() => {
         setLiveStopCountdown(prev => {
           if (prev === null || prev <= 0) return 0;
           return prev - 1;
         });
       }, 1000);
-      
       return () => clearInterval(interval);
     } else {
-      // Kein Stopp-Countdown aktiv
       setLiveStopCountdown(null);
     }
   }, [chargingContext?.remainingStopDelay]);
@@ -264,16 +220,13 @@ export default function StatusPage() {
   });
 
   const handleToggleCharging = () => {
-    // Sofort visuell sperren für Mindestanzeigedauer
     setIsButtonLocked(true);
     setTimeout(() => setIsButtonLocked(false), 800);
     
     const isCharging = status?.state === 3;
     if (isCharging) {
-      // Stoppen: Backend setzt Strategie automatisch auf "off"
       stopChargingMutation.mutate();
     } else {
-      // Starten: Aktiviere die in inputX1Strategy konfigurierte Strategie
       const targetStrategy = settings?.chargingStrategy?.inputX1Strategy || "max_without_battery";
       startChargingMutation.mutate(targetStrategy);
     }
@@ -343,61 +296,26 @@ export default function StatusPage() {
     });
   };
 
-  const handlePvSurplusToggle = (enabled: boolean) => {
-    if (!controlState) return;
-    
-    const updatedControls: ControlState = {
-      pvSurplus: enabled,
-      nightCharging: controlState.nightCharging,
-      batteryLock: controlState.batteryLock,
-      gridCharging: controlState.gridCharging,
-    };
-    
-    updateControlsMutation.mutate(updatedControls);
-  };
-
-  const calculatePower = (ampere: number, phases: number) => {
-    if (phases === 3) {
-      return Math.sqrt(3) * 230 * ampere / 1000;
-    } else if (phases === 1) {
-      return 230 * ampere / 1000;
-    }
-    return 0;
-  };
-
   const getPlugStatus = (plug: number) => {
     switch (plug) {
-      case 0:
-        return "Nicht verbunden";
-      case 1:
-        return "Verbunden an Wallbox";
-      case 3:
-        return "Nicht eingesteckt";
-      case 5:
-        return "Eingesteckt";
-      case 7:
-        return "Eingesteckt und verriegelt";
-      default:
-        return "Unbekannt";
+      case 0: return "Nicht verbunden";
+      case 1: return "Verbunden an Wallbox";
+      case 3: return "Nicht eingesteckt";
+      case 5: return "Eingesteckt";
+      case 7: return "Eingesteckt und verriegelt";
+      default: return "Unbekannt";
     }
   };
 
   const getStatusBadge = (state: number) => {
     switch (state) {
-      case 0:
-        return "Startbereit";
-      case 1:
-        return "Nicht bereit";
-      case 2:
-        return "Bereit";  // State 2 = Ready (Kabel gesteckt, bereit zum Laden)
-      case 3:
-        return "Lädt";    // State 3 = Charging (aktiv ladend)
-      case 4:
-        return "Fehler";
-      case 5:
-        return "Unterbrochen";
-      default:
-        return "Unbekannt";
+      case 0: return "Startbereit";
+      case 1: return "Nicht bereit";
+      case 2: return "Bereit";
+      case 3: return "Lädt";
+      case 4: return "Fehler";
+      case 5: return "Unterbrochen";
+      default: return "Unbekannt";
     }
   };
 
@@ -420,12 +338,11 @@ export default function StatusPage() {
     return `${phases}-phasig`;
   };
 
-  const isCharging = status?.state === 3;  // Nur State 3 = Charging, State 2 = Ready
+  const isCharging = status?.state === 3;
   const isPluggedIn = (status?.plug || 0) >= 3;
   const power = status?.power || 0;
   const energySession = (status?.ePres || 0) / 1000;
   const energyTotal = (status?.eTotal || 0) / 1000;
-  // Zeige immer aktuelle Energie auf der Kachel
   const energy = energySession;
   const phases = status?.phases || 0;
 
@@ -435,7 +352,6 @@ export default function StatusPage() {
   };
 
   const getBadgeLabel = (strategy: string | undefined) => {
-    // Kurze Texte nur für Badge-Anzeige
     switch (strategy) {
       case "surplus_battery_prio":
       case "surplus_vehicle_prio":
@@ -451,7 +367,6 @@ export default function StatusPage() {
   const getStatusIcons = () => {
     const icons = [];
     
-    // Strategie-Icon (wenn aktiv)
     if (chargingContext?.isActive && chargingContext.strategy !== "off") {
       icons.push({
         icon: Sparkles,
@@ -491,48 +406,25 @@ export default function StatusPage() {
     return `${start} - ${end}`;
   };
 
-  const getLastChangeFormatted = () => {
-    if (!plugTracking?.lastPlugChange) return null;
-    
-    const lastChange = new Date(plugTracking.lastPlugChange);
-    const relativeTime = formatDistanceToNow(lastChange, { 
-      addSuffix: true, 
-      locale: de 
-    });
-    
-    const absoluteTime = format(lastChange, 'dd.MM.yyyy, HH:mm', { locale: de });
-    
-    return {
-      relative: relativeTime,
-      absolute: absoluteTime
-    };
-  };
-
   const formatRelativeTime = (timestamp: string) => {
     const now = new Date();
     const then = new Date(timestamp);
     const diffInSeconds = Math.floor((now.getTime() - then.getTime()) / 1000);
 
-    // Schutz gegen Zukunfts-Timestamps (Systemuhr-Differenzen)
-    if (diffInSeconds < 0) {
-      return 'gerade eben';
-    }
-
-    if (diffInSeconds < 60) {
-      return `vor ${diffInSeconds} Sekunde${diffInSeconds !== 1 ? 'n' : ''}`;
-    } else if (diffInSeconds < 3600) {
+    if (diffInSeconds < 0) return 'gerade eben';
+    if (diffInSeconds < 60) return `vor ${diffInSeconds} Sekunde${diffInSeconds !== 1 ? 'n' : ''}`;
+    if (diffInSeconds < 3600) {
       const minutes = Math.floor(diffInSeconds / 60);
       return `vor ${minutes} Minute${minutes !== 1 ? 'n' : ''}`;
-    } else if (diffInSeconds < 86400) {
+    }
+    if (diffInSeconds < 86400) {
       const hours = Math.floor(diffInSeconds / 3600);
       return `vor ${hours} Stunde${hours !== 1 ? 'n' : ''}`;
-    } else {
-      const days = Math.floor(diffInSeconds / 86400);
-      return `vor ${days} Tag${days !== 1 ? 'en' : ''}`;
     }
+    const days = Math.floor(diffInSeconds / 86400);
+    return `vor ${days} Tag${days !== 1 ? 'en' : ''}`;
   };
 
-  // Update relative time every second
   useEffect(() => {
     if (!status?.lastUpdated) {
       setRelativeUpdateTime("");
@@ -564,22 +456,11 @@ export default function StatusPage() {
     <div className="flex flex-col h-full">
       <div className="flex-1 overflow-y-auto pb-24 pt-6">
         <div className="max-w-2xl mx-auto px-4 space-y-6">
-          <div className="flex items-center justify-between gap-3">
-            <button 
-              onClick={() => setShowBuildInfoDialog(true)}
-              className="flex items-center gap-3 hover-elevate active-elevate-2 rounded-lg p-2 -m-2 transition-all"
-              aria-label="App-Informationen anzeigen"
-              data-testid="button-show-build-info"
-            >
-              <img src="/apple-touch-icon.png" alt="EnergyLink" className="w-10 h-10 rounded-lg" />
-              <h1 className="text-2xl font-bold mb-0">Wallbox</h1>
-            </button>
-            {settings?.demoMode && (
-              <Badge variant="secondary" className="text-xs shrink-0" data-testid="badge-demo-mode">
-                Demo
-              </Badge>
-            )}
-          </div>
+          <PageHeader
+            title="Wallbox"
+            onLogoClick={() => setShowBuildInfoDialog(true)}
+            isDemoMode={settings?.demoMode}
+          />
 
           {showError && (
             <Alert variant="destructive" data-testid="alert-error">
@@ -606,38 +487,22 @@ export default function StatusPage() {
                       const strategy = settings?.chargingStrategy?.activeStrategy;
                       const isSurplusStrategy = strategy === "surplus_battery_prio" || strategy === "surplus_vehicle_prio";
                       
-                      // Wenn keine Ladestrategie aktiv UND Zeitgesteuerte Ladung aktiv UND nicht ladend => Zeige Zeitfenster
-                      // chargingContext muss geladen sein UND strategy muss 'off' sein (verhindert Flackern beim Laden)
                       if (chargingContext && !chargingContext.isActive && strategy === "off" && settings?.nightChargingSchedule?.enabled && !isCharging) {
                         return getScheduleTimeRange();
                       }
                       
-                      // UI-Verbesserung für Überschuss-Strategien
                       if (isSurplusStrategy) {
-                        // Lädt und Stopp-Countdown aktiv (PV zu niedrig)
                         if (isCharging && liveStopCountdown !== null && liveStopCountdown > 0) {
                           return `Stopp in ${liveStopCountdown}s`;
                         }
-                        
-                        // Lädt normal (genug PV)
-                        if (isCharging) {
-                          return getBadgeLabel(strategy);
-                        }
-                        
-                        // NICHT lädt: Start-Countdown läuft
+                        if (isCharging) return getBadgeLabel(strategy);
                         if (liveCountdown !== null && liveCountdown > 0) {
                           return `Start in ${liveCountdown}s`;
                         }
-                        
-                        // NICHT lädt: Warte auf Überschuss
                         return "Warte auf Überschuss";
                       }
                       
-                      // Normale Anzeige: Strategie-Name oder Status
-                      if (strategy && strategy !== "off") {
-                        return getBadgeLabel(strategy);
-                      }
-                      
+                      if (strategy && strategy !== "off") return getBadgeLabel(strategy);
                       return getStatusBadge(status?.state || 0);
                     })()
               }
@@ -656,11 +521,7 @@ export default function StatusPage() {
                       Ladestrom {(() => {
                         const strategy = settings?.chargingStrategy?.activeStrategy;
                         const isSurplusStrategy = strategy === "surplus_battery_prio" || strategy === "surplus_vehicle_prio";
-                        // Bei Überschuss-Strategien: Zeige echte Wallbox-Stromstärke
-                        if (isSurplusStrategy) {
-                          return Math.round(status?.maxCurr || 0);
-                        }
-                        // Bei manuellen Strategien: Zeige Slider-Wert
+                        if (isSurplusStrategy) return Math.round(status?.maxCurr || 0);
                         return currentAmpere;
                       })()}A
                     </CardTitle>
@@ -694,11 +555,7 @@ export default function StatusPage() {
                   value={[(() => {
                     const strategy = settings?.chargingStrategy?.activeStrategy;
                     const isSurplusStrategy = strategy === "surplus_battery_prio" || strategy === "surplus_vehicle_prio";
-                    // Bei Überschuss-Strategien: Zeige echte Wallbox-Stromstärke (read-only)
-                    if (isSurplusStrategy) {
-                      return Math.round(status?.maxCurr || 6);
-                    }
-                    // Bei manuellen Strategien: Zeige/verwende currentAmpere State
+                    if (isSurplusStrategy) return Math.round(status?.maxCurr || 6);
                     return currentAmpere;
                   })()]}
                   onValueChange={handleCurrentChange}
@@ -767,288 +624,36 @@ export default function StatusPage() {
         </div>
       </div>
 
-      <Drawer open={showCableDrawer} onOpenChange={setShowCableDrawer}>
-        <DrawerContent data-testid="drawer-cable-details">
-          <DrawerHeader>
-            <DrawerTitle>Kabelverbindung</DrawerTitle>
-            <DrawerDescription>
-              Status der Kabelverbindung zum Auto
-            </DrawerDescription>
-          </DrawerHeader>
-          <div className="px-4 pb-4 space-y-4">
-            {/* Aktueller Status */}
-            <div className="space-y-3">
-              <div className="flex items-center gap-3">
-                <div className="flex items-center justify-center w-12 h-12 rounded-full bg-primary/10">
-                  <Plug className="w-6 h-6 text-primary" />
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Aktueller Status</p>
-                  <p className="text-lg font-semibold" data-testid="text-current-cable-status">
-                    {getPlugStatus(status?.plug || 0)}
-                  </p>
-                </div>
-              </div>
-            </div>
+      <CableDetailDrawer
+        open={showCableDrawer}
+        onOpenChange={setShowCableDrawer}
+        plugStatus={status?.plug || 0}
+        plugTracking={plugTracking}
+        getPlugStatus={getPlugStatus}
+      />
 
-            <Separator />
+      <EnergyDetailDrawer
+        open={showEnergyDrawer}
+        onOpenChange={setShowEnergyDrawer}
+        energySession={energySession}
+        energyTotal={energyTotal}
+      />
 
-            {/* Letzter Statuswechsel */}
-            <div className="space-y-3">
-              <div className="flex items-center gap-3">
-                <div className="flex items-center justify-center w-12 h-12 rounded-full bg-blue-500/10 dark:bg-blue-400/10">
-                  <Clock className="w-6 h-6 text-blue-500 dark:text-blue-400" />
-                </div>
-                <div className="flex-1">
-                  <p className="text-sm text-muted-foreground">Letzter Statuswechsel</p>
-                  {getLastChangeFormatted() ? (
-                    <div data-testid="section-last-change">
-                      <p className="text-lg font-semibold" data-testid="text-last-change-relative">
-                        {getLastChangeFormatted()?.relative}
-                      </p>
-                      <p className="text-sm text-muted-foreground" data-testid="text-last-change-absolute">
-                        {getLastChangeFormatted()?.absolute} Uhr
-                      </p>
-                    </div>
-                  ) : (
-                    <p className="text-base text-muted-foreground" data-testid="text-no-change-tracked">
-                      Kein Wechsel seit App-Start erfasst
-                    </p>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-          <DrawerFooter>
-            <DrawerClose asChild>
-              <Button variant="outline" data-testid="button-close-cable-drawer">Schließen</Button>
-            </DrawerClose>
-          </DrawerFooter>
-        </DrawerContent>
-      </Drawer>
+      <ChargingControlDrawer
+        open={showChargingControlDrawer}
+        onOpenChange={setShowChargingControlDrawer}
+        settings={settings}
+        updateSettingsMutation={updateSettingsMutation}
+        onStrategyChange={handleStrategyChange}
+        onNightChargingToggle={handleNightChargingToggle}
+        onNightTimeChange={handleNightTimeChange}
+      />
 
-      <Drawer open={showEnergyDrawer} onOpenChange={setShowEnergyDrawer}>
-        <DrawerContent data-testid="drawer-energy-details">
-          <DrawerHeader>
-            <DrawerTitle>Geladene Energie</DrawerTitle>
-            <DrawerDescription>
-              Übersicht über die geladene Energie
-            </DrawerDescription>
-          </DrawerHeader>
-          <div className="px-4 pb-4 space-y-4">
-            {/* Aktuelle Ladesitzung */}
-            <div className="space-y-3">
-              <div className="flex items-center gap-3">
-                <div className="flex items-center justify-center w-12 h-12 rounded-full bg-primary/10">
-                  <Battery className="w-6 h-6 text-primary" />
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Aktuelle Sitzung</p>
-                  <p className="text-lg font-semibold" data-testid="text-energy-session">
-                    {energySession.toFixed(1)} kWh
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <Separator />
-
-            {/* Gesamtenergie */}
-            <div className="space-y-3">
-              <div className="flex items-center gap-3">
-                <div className="flex items-center justify-center w-12 h-12 rounded-full bg-green-500/10 dark:bg-green-400/10">
-                  <Zap className="w-6 h-6 text-green-500 dark:text-green-400" />
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Gesamtenergie</p>
-                  <p className="text-lg font-semibold" data-testid="text-energy-total">
-                    {energyTotal.toFixed(1)} kWh
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-          <DrawerFooter>
-            <DrawerClose asChild>
-              <Button variant="outline" data-testid="button-close-energy-drawer">Schließen</Button>
-            </DrawerClose>
-          </DrawerFooter>
-        </DrawerContent>
-      </Drawer>
-
-      <Drawer open={showChargingControlDrawer} onOpenChange={setShowChargingControlDrawer}>
-        <DrawerContent data-testid="drawer-charging-control">
-          <div className="mx-auto w-full max-w-sm">
-            <DrawerHeader>
-              <DrawerTitle>Fahrzeugladung konfigurieren</DrawerTitle>
-            </DrawerHeader>
-            <div className="p-4 space-y-4">
-              {/* Ladestrategie */}
-              <div className="space-y-3">
-                <div className="flex items-center gap-2">
-                  <Sparkles className="w-4 h-4 text-muted-foreground" />
-                  <Label className="text-sm font-medium">Ladestrategie</Label>
-                </div>
-                
-                {/* Toggle Switches für Strategien */}
-                <div className="space-y-3">
-                  {STRATEGY_OPTIONS.filter(opt => opt.value !== "off").map((strategy) => {
-                    const isActive = settings?.chargingStrategy?.activeStrategy === strategy.value;
-                    const isDisabled = !settings || updateSettingsMutation.isPending;
-                    
-                    return (
-                      <div 
-                        key={strategy.value} 
-                        className="flex items-start justify-between gap-4"
-                      >
-                        <div className="space-y-0.5 flex-1">
-                          <Label 
-                            htmlFor={`strategy-${strategy.value}`} 
-                            className="text-sm font-medium cursor-pointer"
-                          >
-                            {strategy.label}
-                          </Label>
-                          <p className="text-xs text-muted-foreground">
-                            {strategy.description}
-                          </p>
-                        </div>
-                        <Switch
-                          id={`strategy-${strategy.value}`}
-                          checked={isActive}
-                          onCheckedChange={(checked) => {
-                            handleStrategyChange(checked ? strategy.value : "off");
-                          }}
-                          disabled={isDisabled}
-                          data-testid={`switch-strategy-${strategy.value}`}
-                        />
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-
-              <Separator />
-
-              {/* Zeitgesteuerte Ladung */}
-              <div className="flex items-start justify-between gap-4">
-                <div className="space-y-0.5 flex-1">
-                  <div className="flex items-center gap-2">
-                    <Clock className="w-4 h-4 text-muted-foreground" />
-                    <Label htmlFor="night-charging-drawer" className="text-sm font-medium">
-                      Zeitgesteuerte Ladung
-                    </Label>
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    Lädt das Fahrzeug automatisch im hier angegebenen Zeitfenster
-                  </p>
-                </div>
-                <Switch
-                  id="night-charging-drawer"
-                  checked={settings?.nightChargingSchedule?.enabled || false}
-                  onCheckedChange={handleNightChargingToggle}
-                  disabled={!settings || updateSettingsMutation.isPending}
-                  data-testid="switch-night-charging"
-                />
-              </div>
-
-              {settings?.nightChargingSchedule?.enabled && (
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1.5">
-                    <Label htmlFor="night-start-drawer" className="text-xs font-medium">
-                      Startzeit
-                    </Label>
-                    <Input
-                      id="night-start-drawer"
-                      type="time"
-                      value={settings.nightChargingSchedule.startTime}
-                      onChange={(e) => handleNightTimeChange('startTime', e.target.value)}
-                      className="h-9 text-sm border-none bg-transparent p-0 text-left focus-visible:ring-0 [-webkit-appearance:none] [&::-webkit-calendar-picker-indicator]:dark:invert [&::-webkit-date-and-time-value]:text-left [&::-webkit-datetime-edit]:p-0 [&::-webkit-datetime-edit-text]:p-0 [&::-webkit-datetime-edit-text]:m-0 [&::-webkit-datetime-edit-hour-field]:p-0 [&::-webkit-datetime-edit-hour-field]:m-0 [&::-webkit-datetime-edit-minute-field]:p-0 [&::-webkit-datetime-edit-minute-field]:m-0"
-                      data-testid="input-night-start"
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label htmlFor="night-end-drawer" className="text-xs font-medium">
-                      Endzeit
-                    </Label>
-                    <Input
-                      id="night-end-drawer"
-                      type="time"
-                      value={settings.nightChargingSchedule.endTime}
-                      onChange={(e) => handleNightTimeChange('endTime', e.target.value)}
-                      className="h-9 text-sm border-none bg-transparent p-0 text-left focus-visible:ring-0 [-webkit-appearance:none] [&::-webkit-calendar-picker-indicator]:dark:invert [&::-webkit-date-and-time-value]:text-left [&::-webkit-datetime-edit]:p-0 [&::-webkit-datetime-edit-text]:p-0 [&::-webkit-datetime-edit-text]:m-0 [&::-webkit-datetime-edit-hour-field]:p-0 [&::-webkit-datetime-edit-hour-field]:m-0 [&::-webkit-datetime-edit-minute-field]:p-0 [&::-webkit-datetime-edit-minute-field]:m-0"
-                      data-testid="input-night-end"
-                    />
-                  </div>
-                </div>
-              )}
-            </div>
-            <DrawerFooter>
-              <DrawerClose asChild>
-                <Button variant="outline" data-testid="button-close-control-drawer">Schließen</Button>
-              </DrawerClose>
-            </DrawerFooter>
-          </div>
-        </DrawerContent>
-      </Drawer>
-
-      <Dialog open={showBuildInfoDialog} onOpenChange={setShowBuildInfoDialog}>
-        <DialogContent className="max-w-md" data-testid="dialog-build-info">
-          <DialogHeader>
-            <div className="flex items-center gap-2">
-              <Info className="w-5 h-5 text-primary" />
-              <DialogTitle>EnergyLink App</DialogTitle>
-            </div>
-            <DialogDescription>
-              Smarte Steuerung von KEBA P20 Wallbox und E3DC S10 Hauskraftwerk
-            </DialogDescription>
-          </DialogHeader>
-          
-          {buildInfo ? (
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <p className="text-xs font-medium text-muted-foreground">Version</p>
-                  <p className="text-sm font-mono" data-testid="text-build-version">
-                    v{buildInfo.version}
-                  </p>
-                </div>
-                <div className="space-y-1">
-                  <p className="text-xs font-medium text-muted-foreground">Branch</p>
-                  <p className="text-sm font-mono" data-testid="text-build-branch">
-                    {buildInfo.branch}
-                  </p>
-                </div>
-              </div>
-              
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <p className="text-xs font-medium text-muted-foreground">Commit</p>
-                  <p className="text-sm font-mono" data-testid="text-build-commit">
-                    {buildInfo.commit}
-                  </p>
-                </div>
-                <div className="space-y-1">
-                  <p className="text-xs font-medium text-muted-foreground">Build</p>
-                  <p className="text-sm" data-testid="text-build-time">
-                    {new Date(buildInfo.buildTime).toLocaleDateString("de-DE", {
-                      year: "numeric",
-                      month: "2-digit",
-                      day: "2-digit",
-                    })}, {new Date(buildInfo.buildTime).toLocaleTimeString("de-DE", {
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}
-                  </p>
-                </div>
-              </div>
-            </div>
-          ) : (
-            <p className="text-sm text-muted-foreground">
-              Build-Informationen konnten nicht geladen werden
-            </p>
-          )}
-        </DialogContent>
-      </Dialog>
+      <BuildInfoDialog
+        open={showBuildInfoDialog}
+        onOpenChange={setShowBuildInfoDialog}
+        buildInfo={buildInfo}
+      />
     </div>
   );
 }
