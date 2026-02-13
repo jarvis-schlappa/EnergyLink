@@ -8,6 +8,13 @@ import { sendUdpCommand } from "./wallbox-transport";
 import { log } from "./logger";
 import { initializeProwlNotifier, triggerProwlEvent } from "./prowl-notifier";
 import { requireApiKey } from "./auth";
+import { validateEnvironment } from "./env-validation";
+
+// Validate environment variables before anything else
+const envResult = validateEnvironment();
+if (!envResult.valid) {
+  process.exit(1);
+}
 
 const app = express();
 
