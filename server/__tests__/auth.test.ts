@@ -101,5 +101,69 @@ describe("requireApiKey middleware", () => {
 
       expect(next).toHaveBeenCalled();
     });
+
+    it("should reject Authorization header without Bearer prefix", async () => {
+      const requireApiKey = await loadMiddleware();
+      const { req, res, next } = createMocks({
+        authorization: `Basic ${TEST_KEY}`,
+      });
+
+      requireApiKey(req, res, next);
+
+      expect(next).not.toHaveBeenCalled();
+      expect(res.status).toHaveBeenCalledWith(401);
+    });
+
+    it("should reject Bearer token with empty value", async () => {
+      const requireApiKey = await loadMiddleware();
+      const { req, res, next } = createMocks({
+        authorization: "Bearer ",
+      });
+
+      requireApiKey(req, res, next);
+
+      expect(next).not.toHaveBeenCalled();
+      expect(res.status).toHaveBeenCalledWith(401);
+    });
+
+    it("should reject wrong X-API-Key with 401", async () => {
+      const requireApiKey = await loadMiddleware();
+      const { req, res, next } = createMocks({
+        "x-api-key": "wrong-key",
+      });
+
+      requireApiKey(req, res, next);
+
+      expect(next).not.toHaveBeenCalled();
+      expect(res.status).toHaveBeenCalledWith(401);
+      expect(res.json).toHaveBeenCalledWith({ error: "Invalid API key" });
+    });
+
+    it("should work with keys containing special characters", async () => {
+      vi.resetModules();
+      const specialKey = "key-with-spëcial_chars!@#$%^&*()";
+      vi.stubEnv("API_KEY", specialKey);
+      vi.doMock("../logger", () => ({ log: vi.fn() }));
+      const { requireApiKey } = await import("../auth");
+
+      const { req, res, next } = createMocks({
+        authorization: `Bearer ${specialKey}`,
+      });
+
+      requireApiKey(req, res, next);
+      expect(next).toHaveBeenCalled();
+    });
+
+    it("should fall back to X-API-Key when Authorization has wrong scheme", async () => {
+      const requireApiKey = await loadMiddleware();
+      const { req, res, next } = createMocks({
+        authorization: "Basic some-other-token",
+        "x-api-key": TEST_KEY,
+      });
+
+      requireApiKey(req, res, next);
+
+      expect(next).toHaveBeenCalled();
+    });
   });
 });
