@@ -4,6 +4,7 @@ import { log } from "../logger";
 import { registerWallboxRoutes } from "./wallbox-routes";
 import { registerE3dcRoutes } from "./e3dc-routes";
 import { registerSettingsRoutes } from "./settings-routes";
+import { registerStatusRoutes } from "./status-routes";
 import { startSchedulers, shutdownSchedulers } from "./scheduler";
 
 // Re-export helpers for direct import by tests
@@ -18,6 +19,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   registerWallboxRoutes(app);
   registerE3dcRoutes(app);
   registerSettingsRoutes(app);
+  registerStatusRoutes(app);
 
   // Start all schedulers (night charging, charging strategy, E3DC poller, FHEM sync, grid frequency)
   await startSchedulers();
