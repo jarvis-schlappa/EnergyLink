@@ -12,3 +12,10 @@ logs
 *.log
 .vscode
 .idea
+dist
+coverage
+**/*.test.ts
+**/*.test.tsx
+**/*.spec.ts
+**/*.spec.tsx
+vitest.config.*
