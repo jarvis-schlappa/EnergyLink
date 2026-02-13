@@ -1,22 +1,5 @@
 import { describe, it, expect } from "vitest";
-
-// isTimeInRange is a local function inside routes.ts, not exported.
-// Re-implement the same logic for testing (verified against source).
-function isTimeInRange(current: string, start: string, end: string): boolean {
-  const [currentH, currentM] = current.split(":").map(Number);
-  const [startH, startM] = start.split(":").map(Number);
-  const [endH, endM] = end.split(":").map(Number);
-
-  const currentMinutes = currentH * 60 + currentM;
-  const startMinutes = startH * 60 + startM;
-  const endMinutes = endH * 60 + endM;
-
-  if (endMinutes < startMinutes) {
-    return currentMinutes >= startMinutes || currentMinutes < endMinutes;
-  }
-
-  return currentMinutes >= startMinutes && currentMinutes < endMinutes;
-}
+import { isTimeInRange } from "../routes/helpers";
 
 describe("isTimeInRange", () => {
   describe("normal time windows (no midnight crossing)", () => {
