@@ -1,3 +1,4 @@
+import { timingSafeEqual } from "crypto";
 import type { Request, Response, NextFunction } from "express";
 import { log } from "./logger";
 
@@ -39,7 +40,10 @@ export function requireApiKey(req: Request, res: Response, next: NextFunction): 
     return;
   }
 
-  if (providedKey !== API_KEY) {
+  const keyBuffer = Buffer.from(API_KEY, "utf8");
+  const providedBuffer = Buffer.from(providedKey, "utf8");
+
+  if (keyBuffer.length !== providedBuffer.length || !timingSafeEqual(keyBuffer, providedBuffer)) {
     res.status(401).json({ error: "Invalid API key" });
     return;
   }
