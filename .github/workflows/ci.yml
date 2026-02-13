@@ -28,3 +28,20 @@ jobs:
 
       - name: Build
         run: npm run build
+
+  e2e-demo:
+    runs-on: ubuntu-latest
+    needs: build-and-test
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - name: E2E Demo API Tests
+        run: bash e2e/demo-api-test.sh
