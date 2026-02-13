@@ -7,6 +7,7 @@ import { startBroadcastListener, stopBroadcastListener } from "./wallbox-broadca
 import { sendUdpCommand } from "./wallbox-transport";
 import { log } from "./logger";
 import { initializeProwlNotifier, triggerProwlEvent } from "./prowl-notifier";
+import { requireApiKey } from "./auth";
 
 const app = express();
 
@@ -97,6 +98,9 @@ app.use((req, res, next) => {
   triggerProwlEvent(settings, "appStarted", (notifier) =>
     notifier.sendAppStarted()
   );
+  
+  // API-Key-Authentifizierung für alle API-Routen (inkl. SSE)
+  app.use("/api", requireApiKey);
   
   const server = await registerRoutes(app);
 
