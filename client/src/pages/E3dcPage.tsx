@@ -40,15 +40,18 @@ export default function E3dcPage() {
   const buildInfoResult = buildInfoRaw ? buildInfoSchema.safeParse(buildInfoRaw) : null;
   const buildInfo = buildInfoResult?.success ? buildInfoResult.data : undefined;
 
+  // Lade Settings (für Fehler-Anzeige bei Connection-Fehlern)
   const { data: settings, isLoading: isLoadingSettings } = useQuery<Settings>({
     queryKey: ["/api/settings"],
   });
 
+  // Lade Control State
   const { data: controlState, isLoading: isLoadingControls } = useQuery<ControlState>({
     queryKey: ["/api/controls"],
     refetchInterval: 5000,
   });
 
+  // Lade E3DC Live-Daten
   const { data: e3dcData, isLoading, error, refetch } = useQuery<E3dcLiveData>({
     queryKey: ["/api/e3dc/live-data"],
     refetchInterval: 5000,
@@ -65,6 +68,7 @@ export default function E3dcPage() {
   
   const frequencyTier = calculateFrequencyTier(e3dcData?.gridFrequency);
 
+  // Mutation für Control State Updates
   const updateControlsMutation = useMutation({
     mutationFn: (newState: ControlState) =>
       apiRequest("POST", "/api/controls", newState),
@@ -76,6 +80,7 @@ export default function E3dcPage() {
     },
   });
 
+  // Mutation für Settings Updates
   const updateSettingsMutation = useMutation({
     mutationFn: (newSettings: Settings) =>
       apiRequest("POST", "/api/settings", newSettings),
@@ -100,12 +105,11 @@ export default function E3dcPage() {
   const actualHousePower = (e3dcData?.housePower || 0) - (e3dcData?.wallboxPower || 0);
   const isE3dcEnabled = settings?.e3dc?.enabled === true;
 
-  // Formatiere relative Zeit (Deutsch)
+  // Formatiere relative Zeit
   const formatRelativeTime = (timestamp: string) => {
     const now = new Date();
     const then = new Date(timestamp);
     const diffInSeconds = Math.floor((now.getTime() - then.getTime()) / 1000);
-
     if (diffInSeconds < 0) return 'gerade eben';
     if (diffInSeconds === 0) return 'gerade eben';
     if (diffInSeconds === 1) return 'vor 1 Sekunde';
@@ -120,19 +124,17 @@ export default function E3dcPage() {
     return `vor ${hours} Stunden`;
   };
 
+  // Update relative time every second
   useEffect(() => {
     if (!e3dcData?.timestamp) {
       setRelativeUpdateTime("");
       return;
     }
-
     const updateRelativeTime = () => {
       setRelativeUpdateTime(formatRelativeTime(e3dcData.timestamp!));
     };
-
     updateRelativeTime();
     const interval = setInterval(updateRelativeTime, 1000);
-
     return () => clearInterval(interval);
   }, [e3dcData?.timestamp]);
 
@@ -142,9 +144,7 @@ export default function E3dcPage() {
     if (field === 'batteryLock' || field === 'gridCharging') {
       const modbusPauseSeconds = settings?.e3dc?.modbusPauseSeconds ?? 3;
       const totalLockDuration = modbusPauseSeconds * 2 * 1000;
-      
       setE3dcOperationLocks(prev => ({ ...prev, [field]: true }));
-      
       setTimeout(() => {
         setE3dcOperationLocks(prev => ({ ...prev, [field]: false }));
       }, totalLockDuration);
@@ -170,7 +170,6 @@ export default function E3dcPage() {
 
   const handleGridChargeDuringNightChange = (value: boolean) => {
     if (!settings) return;
-    
     const updatedSettings: Settings = {
       ...settings,
       e3dc: {
@@ -185,7 +184,6 @@ export default function E3dcPage() {
         gridChargeDuringNightCharging: value,
       },
     };
-    
     updateSettingsMutation.mutate(updatedSettings);
   };
 
@@ -251,7 +249,6 @@ export default function E3dcPage() {
                       </div>
                     )}
                   </div>
-                  
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
                       <span className="text-sm text-muted-foreground">Ladezustand (SOC)</span>
@@ -259,7 +256,6 @@ export default function E3dcPage() {
                         {e3dcData.batterySoc}%
                       </span>
                     </div>
-                    
                     <div className="flex items-center justify-between">
                       <span className="text-sm text-muted-foreground">Leistung</span>
                       <span className="text-xl font-bold" data-testid="text-battery-power">
@@ -404,7 +400,6 @@ export default function E3dcPage() {
               </CardContent>
             </Card>
 
-            {/* Letztes Update */}
             {e3dcData?.timestamp && relativeUpdateTime && (
               <div className="text-xs text-left text-muted-foreground" data-testid="text-last-update">
                 Letztes Update: {format(new Date(e3dcData.timestamp), 'HH:mm:ss', { locale: de })} ({relativeUpdateTime})
