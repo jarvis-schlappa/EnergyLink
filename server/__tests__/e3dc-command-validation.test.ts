@@ -95,4 +95,40 @@ describe('validateE3dcCommand', () => {
   it('should reject && injection', () => {
     expect(() => validateE3dcCommand('-a && rm -rf /')).toThrow();
   });
+
+  it('should reject newline injection', () => {
+    expect(() => validateE3dcCommand('-a\nrm -rf /')).toThrow();
+  });
+
+  it('should reject carriage return injection', () => {
+    expect(() => validateE3dcCommand('-a\r-x')).toThrow();
+  });
+
+  it('should reject output redirection', () => {
+    expect(() => validateE3dcCommand('-r EMS_BAT_SOC > /tmp/out')).toThrow();
+  });
+
+  it('should reject input redirection', () => {
+    expect(() => validateE3dcCommand('-r EMS_BAT_SOC < /etc/passwd')).toThrow();
+  });
+
+  it('should reject null bytes', () => {
+    expect(() => validateE3dcCommand('-r EMS\x00BAT')).toThrow();
+  });
+
+  it('should reject path traversal in string values', () => {
+    expect(() => validateE3dcCommand('-r ../../etc/passwd')).toThrow();
+  });
+
+  it('should reject ${} variable expansion', () => {
+    expect(() => validateE3dcCommand('-r ${HOME}')).toThrow();
+  });
+
+  it('should reject quoted string wrapping', () => {
+    expect(() => validateE3dcCommand('-r "EMS_BAT_SOC"')).toThrow();
+  });
+
+  it('should reject single-quoted wrapping', () => {
+    expect(() => validateE3dcCommand("-r 'EMS_BAT_SOC'")).toThrow();
+  });
 });
