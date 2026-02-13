@@ -1,5 +1,3 @@
-import ControlsPage from '../../pages/ControlsPage';
-
 export default function ControlsPageExample() {
-  return <ControlsPage />;
+  return <div>Controls Page Example</div>;
 }

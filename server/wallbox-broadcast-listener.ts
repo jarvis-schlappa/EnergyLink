@@ -280,7 +280,7 @@ const handleBroadcast = async (data: any, rinfo: any) => {
             log('error', 'system', '[X1-Optimierung] Rollback erfolgreich - Wallbox gestoppt');
             
             // Prowl-Notification: Kritischer Fehler
-            triggerProwlEvent(settings, "errorOccurred", (notifier) =>
+            triggerProwlEvent(settings, "errors", (notifier) =>
               notifier.sendError("X1 Aktivierung fehlgeschlagen: Battery Lock konnte nicht aktiviert werden. Wallbox wurde gestoppt.")
             );
           } catch (rollbackError) {
