@@ -162,7 +162,7 @@ class WallboxUdpChannel extends EventEmitter {
     });
 
     // Emittiere 'message' und 'broadcast'-Event auch lokal (Socket empfängt eigenen Broadcast nicht)
-    const rinfo = { address: '127.0.0.1', port: WALLBOX_UDP_PORT, family: 'IPv4', size: buffer.length };
+    const rinfo = { address: '127.0.0.1', port: WALLBOX_UDP_PORT, family: 'IPv4' as const, size: buffer.length };
     const wallboxMessage: WallboxMessage = {
       raw: broadcast,
       parsed: data,
