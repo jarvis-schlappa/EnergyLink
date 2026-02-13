@@ -16,6 +16,22 @@ import { wallboxUdpChannel, type WallboxMessage } from "./wallbox-udp-channel";
 
 const UDP_TIMEOUT = 6000;
 
+// Retry-Konfiguration für UDP-Befehle
+export interface UdpRetryConfig {
+  /** Maximale Anzahl Versuche (inkl. erster Versuch). Default: 3 */
+  maxAttempts: number;
+  /** Basis-Wartezeit zwischen Versuchen in ms. Default: 500 */
+  baseDelayMs: number;
+  /** Exponentieller Backoff-Faktor. Default: 2 */
+  backoffFactor: number;
+}
+
+const DEFAULT_RETRY_CONFIG: UdpRetryConfig = {
+  maxAttempts: 3,
+  baseDelayMs: 500,
+  backoffFactor: 2,
+};
+
 // Command Queue für Request/Response-Kommunikation
 let currentRequest: { command: string, targetIp: string, resolve: (data: any) => void, reject: (error: Error) => void, timeout: NodeJS.Timeout } | null = null;
 let commandQueue: Array<{ ip: string, command: string, resolve: (data: any) => void, reject: (error: Error) => void }> = [];
@@ -259,16 +275,49 @@ function processCommandQueue(): void {
 }
 
 /**
- * Sendet einen UDP-Befehl an die Wallbox und wartet auf Antwort.
+ * Einzelner UDP-Befehl ohne Retry (interne Hilfsfunktion).
  * Wird in die Command-Queue eingereiht um Race-Conditions zu vermeiden.
  */
-export async function sendUdpCommand(ip: string, command: string): Promise<any> {
-  await initWallboxSocket();
-  
+function sendUdpCommandOnce(ip: string, command: string): Promise<any> {
   return new Promise((resolve, reject) => {
     commandQueue.push({ ip, command, resolve, reject });
     processCommandQueue();
   });
+}
+
+/**
+ * Sendet einen UDP-Befehl an die Wallbox und wartet auf Antwort.
+ * Bei Timeout wird der Befehl mit exponentiellem Backoff wiederholt.
+ */
+export async function sendUdpCommand(ip: string, command: string, retryConfig?: Partial<UdpRetryConfig>): Promise<any> {
+  await initWallboxSocket();
+  
+  const config = { ...DEFAULT_RETRY_CONFIG, ...retryConfig };
+  
+  for (let attempt = 1; attempt <= config.maxAttempts; attempt++) {
+    try {
+      return await sendUdpCommandOnce(ip, command);
+    } catch (error) {
+      const isTimeout = error instanceof Error && error.message.includes("timeout");
+      const isLastAttempt = attempt >= config.maxAttempts;
+      
+      if (!isTimeout || isLastAttempt) {
+        // Nicht-Timeout-Fehler oder letzter Versuch: sofort werfen
+        if (isTimeout && isLastAttempt) {
+          log("error", "wallbox", `UDP-Befehl fehlgeschlagen nach ${config.maxAttempts} Versuchen`, `IP: ${ip}, Befehl: ${command}`);
+        }
+        throw error;
+      }
+      
+      // Retry mit exponentiellem Backoff
+      const delay = config.baseDelayMs * Math.pow(config.backoffFactor, attempt - 1);
+      log("warning", "wallbox", `UDP-Timeout, Retry ${attempt}/${config.maxAttempts - 1}`, `IP: ${ip}, Befehl: ${command}, nächster Versuch in ${delay}ms`);
+      await new Promise(resolve => setTimeout(resolve, delay));
+    }
+  }
+  
+  // Sollte nie erreicht werden, aber TypeScript braucht es
+  throw new Error("UDP retry logic error");
 }
 
 /**
