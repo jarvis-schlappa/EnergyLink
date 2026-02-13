@@ -1,10 +1,64 @@
 import { log } from "../logger";
 
 /**
+ * Prüft ob eine URL für SmartHome-Aufrufe erlaubt ist (SSRF-Schutz).
+ *
+ * - Nur http/https-Schemes erlaubt
+ * - Wenn ALLOWED_SMARTHOME_ORIGINS gesetzt: URL muss mit einer der Origins beginnen
+ * - Sonst: Blockiert Link-Local (169.254.x.x) und Metadata-Endpunkte
+ */
+export function isSmartHomeUrlAllowed(url: string): boolean {
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return false;
+  }
+
+  // Nur http/https erlauben
+  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+    return false;
+  }
+
+  // Allowlist aus Umgebungsvariable (kommaseparierte Origins, z.B. "http://192.168.40.11:8083,http://192.168.40.11:8084")
+  const allowedOrigins = process.env.ALLOWED_SMARTHOME_ORIGINS;
+  if (allowedOrigins) {
+    const origins = allowedOrigins.split(",").map((o) => o.trim()).filter(Boolean);
+    return origins.some((origin) => url.startsWith(origin));
+  }
+
+  // Ohne Allowlist: Blockiere bekannte gefährliche Ziele
+  const hostname = parsed.hostname;
+
+  // Link-Local / Cloud-Metadata (169.254.x.x)
+  if (hostname.startsWith("169.254.")) {
+    return false;
+  }
+
+  // Null-Adresse
+  if (hostname === "0.0.0.0") {
+    return false;
+  }
+
+  return true;
+}
+
+/**
  * Ruft eine SmartHome-URL auf (z.B. FHEM-Befehle)
  */
 export async function callSmartHomeUrl(url: string | undefined): Promise<void> {
   if (!url) return;
+
+  if (!isSmartHomeUrlAllowed(url)) {
+    log(
+      "warning",
+      "webhook",
+      "SmartHome-URL blockiert (SSRF-Schutz)",
+      `URL: ${url}`,
+    );
+    return;
+  }
+
   try {
     log("info", "webhook", `Rufe SmartHome-URL auf`, `URL: ${url}`);
     const response = await fetch(url, { method: "GET" });

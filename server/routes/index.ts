@@ -9,7 +9,7 @@ import { startSchedulers, shutdownSchedulers } from "./scheduler";
 
 // Re-export helpers for direct import by tests
 export { isTimeInRange, getCurrentTimeInTimezone } from "./helpers";
-export { callSmartHomeUrl, getFhemDeviceState, extractDeviceNameFromUrl, extractBaseUrlFromUrl } from "./helpers";
+export { callSmartHomeUrl, isSmartHomeUrlAllowed, getFhemDeviceState, extractDeviceNameFromUrl, extractBaseUrlFromUrl } from "./helpers";
 
 // Re-export shutdownSchedulers for index.ts
 export { shutdownSchedulers };
