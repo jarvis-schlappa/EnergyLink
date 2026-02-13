@@ -8,6 +8,7 @@ import { sendUdpCommand } from "./wallbox-transport";
 import { log } from "./logger";
 import { initializeProwlNotifier, triggerProwlEvent } from "./prowl-notifier";
 import { requireApiKey } from "./auth";
+import { healthHandler } from "./health";
 import { validateEnvironment } from "./env-validation";
 
 // Validate environment variables before anything else
@@ -106,6 +107,9 @@ app.use((req, res, next) => {
     notifier.sendAppStarted()
   );
   
+  // Health-check endpoint (before auth — must be accessible by monitoring tools)
+  app.get("/api/health", healthHandler);
+
   // API-Key-Authentifizierung für alle API-Routen (inkl. SSE)
   app.use("/api", requireApiKey);
   
