@@ -32,6 +32,92 @@ function shouldApplyModbusPause(command: string): boolean {
   return eValue > 0;
 }
 
+/**
+ * Whitelist der erlaubten e3dcset-Flags und ob sie einen numerischen Parameter erwarten.
+ * Nur diese Flags werden für die Console akzeptiert.
+ */
+const ALLOWED_E3DCSET_FLAGS: Record<string, 'none' | 'number' | 'string'> = {
+  '-d': 'number',   // Maximale Entladeleistung (Watt)
+  '-a': 'none',     // Zurück auf Automatik
+  '-c': 'number',   // Maximale Ladeleistung (Watt)
+  '-e': 'number',   // Netzladung Energiemenge (Wh)
+  '-s': 'string',   // Set-Befehle (z.B. "discharge 0")
+  '-r': 'string',   // Read-Tag abfragen
+  '-l': 'number',   // Tags auflisten (optional Kategorie-Nummer)
+  '-H': 'string',   // Historische Daten (day/week/month/year)
+  '-D': 'string',   // Datum für historische Daten (YYYY-MM-DD)
+  '-m': 'number',   // Batterie-Modul Details
+  '-q': 'none',     // Quiet-Modus (nur Wert ausgeben)
+  '-E': 'number',   // Emergency Power Reserve (Wh)
+};
+
+/**
+ * Validiert einen e3dcset-Befehl gegen die Whitelist.
+ * Gibt die bereinigten Argumente zurück oder wirft einen Fehler.
+ * 
+ * @param command - Der Befehl (ohne "e3dcset" Prefix)
+ * @returns Array von validierten Argumenten
+ * @throws Error wenn ungültige Flags oder Parameter gefunden werden
+ */
+export function validateE3dcCommand(command: string): string[] {
+  const trimmed = command.replace(/^e3dcset\s+/, '').trim();
+  if (trimmed === '') {
+    throw new Error('Befehl ist leer');
+  }
+
+  // Tokenize: split on whitespace
+  const tokens = trimmed.split(/\s+/);
+  const validated: string[] = [];
+  let i = 0;
+
+  while (i < tokens.length) {
+    const token = tokens[i];
+
+    // Must be a known flag
+    if (!ALLOWED_E3DCSET_FLAGS[token]) {
+      throw new Error(`Unbekannter Parameter: ${token}. Erlaubt: ${Object.keys(ALLOWED_E3DCSET_FLAGS).join(', ')}`);
+    }
+
+    const paramType = ALLOWED_E3DCSET_FLAGS[token];
+    validated.push(token);
+
+    if (paramType === 'none') {
+      i++;
+    } else if (paramType === 'number') {
+      // Next token must be a number (optional for -l)
+      if (i + 1 < tokens.length && /^\d+$/.test(tokens[i + 1])) {
+        validated.push(tokens[i + 1]);
+        i += 2;
+      } else if (token === '-l' || token === '-q') {
+        // -l can be used without argument
+        i++;
+      } else {
+        throw new Error(`Parameter ${token} erwartet einen numerischen Wert`);
+      }
+    } else if (paramType === 'string') {
+      // Next token is required, must not contain shell metacharacters
+      if (i + 1 >= tokens.length) {
+        throw new Error(`Parameter ${token} erwartet einen Wert`);
+      }
+      const value = tokens[i + 1];
+      // Allow only alphanumeric, dash, underscore, dot, colon
+      if (!/^[a-zA-Z0-9_.\-:]+$/.test(value)) {
+        throw new Error(`Ungültiger Wert für ${token}: ${value}`);
+      }
+      validated.push(value);
+      i += 2;
+      
+      // -s can have a second argument (e.g. "discharge 0")
+      if (token === '-s' && i < tokens.length && /^\d+$/.test(tokens[i])) {
+        validated.push(tokens[i]);
+        i++;
+      }
+    }
+  }
+
+  return validated;
+}
+
 class E3dcClient {
   private config: E3dcConfig | null = null;
   private lastCommandTime: number = 0;
@@ -252,14 +338,23 @@ class E3dcClient {
       return 'Befehl ist leer';
     }
 
+    // Validiere Befehl gegen Whitelist (verhindert Command Injection)
+    let validatedArgs: string[];
+    try {
+      validatedArgs = validateE3dcCommand(command);
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      log('warning', 'system', `E3DC Console: Ungültiger Befehl abgelehnt`, `Input: ${command}, Grund: ${msg}`);
+      return `Ungültiger Befehl: ${msg}`;
+    }
+
     const settings = storage.getSettings();
     let output = '';
     
-    // Demo-Modus
+    // Demo-Modus: Verwende validierte Args
     if (settings?.demoMode) {
-      const mockCommand = command.replace(/^e3dcset\s+/, '');
       const mockScriptPath = path.join(process.cwd(), 'server', 'e3dcset-mock.ts');
-      const fullCommand = `tsx ${mockScriptPath} ${mockCommand}`;
+      const fullCommand = `tsx ${mockScriptPath} ${validatedArgs.join(' ')}`;
       
       try {
         const stdout = await execAsync(fullCommand);
@@ -270,11 +365,12 @@ class E3dcClient {
       return output;
     }
 
-    // Production-Modus
+    // Production-Modus: Baue Befehl aus validierten Args
     const prefix = this.config?.prefix?.trim() || '';
+    const safeCommand = validatedArgs.join(' ');
     const fullCommand = prefix 
-      ? `${prefix} ${command}`.trim() 
-      : command;
+      ? `${prefix} ${safeCommand}`.trim() 
+      : safeCommand;
 
     log('info', 'system', `E3DC Console: Befehl wird ausgeführt: ${fullCommand}`);
 
