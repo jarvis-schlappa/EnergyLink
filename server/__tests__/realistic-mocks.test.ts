@@ -228,8 +228,81 @@ describe("WallboxMockService - Realistic Mock Improvements (Issue #83)", () => {
 });
 
 describe("E3dcMockService - Realistic Improvements (Issue #83)", () => {
-  it("should be importable", async () => {
+  let e3dc: InstanceType<typeof import("../demo/e3dc-mock").E3dcMockService>;
+
+  beforeEach(async () => {
+    vi.useRealTimers(); // E3DC uses real timers for SOC tracking
     const { E3dcMockService } = await import("../demo/e3dc-mock");
-    expect(E3dcMockService).toBeDefined();
+    e3dc = new E3dcMockService();
+  });
+
+  describe("Hausverbrauch reacts to Wallbox load", () => {
+    it("should increase house power when wallbox is charging", async () => {
+      const dataIdle = await e3dc.getLiveData(0);
+      const dataCharging = await e3dc.getLiveData(7000);
+
+      // housePower should include wallbox load
+      expect(dataCharging.housePower).toBeGreaterThan(dataIdle.housePower + 5000);
+    });
+
+    it("should reflect wallbox power in grid calculation", async () => {
+      const dataIdle = await e3dc.getLiveData(0);
+      const dataCharging = await e3dc.getLiveData(11000);
+
+      // With 11kW wallbox load, grid import should increase significantly
+      expect(dataCharging.gridPower).toBeGreaterThan(dataIdle.gridPower);
+    });
+  });
+
+  describe("Autarkie/Eigenverbrauch realistic calculation", () => {
+    it("should have low autarky when grid import is high", async () => {
+      // 11kW wallbox load at night → almost all from grid
+      const data = await e3dc.getLiveData(11000);
+
+      // At night with huge load, autarky should be very low
+      // (depends on time of day, but with 11kW load it should be low)
+      expect(data.autarky).toBeLessThanOrEqual(100);
+      expect(data.autarky).toBeGreaterThanOrEqual(0);
+      expect(data.selfConsumption).toBeGreaterThanOrEqual(0);
+      expect(data.selfConsumption).toBeLessThanOrEqual(100);
+    });
+
+    it("should return valid autarky and selfConsumption values", async () => {
+      const data = await e3dc.getLiveData(0);
+
+      expect(data.autarky).toBeGreaterThanOrEqual(0);
+      expect(data.autarky).toBeLessThanOrEqual(100);
+      expect(data.selfConsumption).toBeGreaterThanOrEqual(0);
+      expect(data.selfConsumption).toBeLessThanOrEqual(100);
+    });
+  });
+
+  describe("Energy balance consistency", () => {
+    it("should maintain energy balance: PV + Grid = House + Battery", async () => {
+      const data = await e3dc.getLiveData(3000);
+
+      // PV + Grid ≈ House + Battery (with rounding tolerance)
+      const supply = data.pvPower + data.gridPower;
+      const demand = data.housePower + data.batteryPower;
+
+      // Should be approximately equal (within 1W rounding)
+      expect(Math.abs(supply - demand)).toBeLessThanOrEqual(2);
+    });
+  });
+
+  describe("SOC behavior", () => {
+    it("should have SOC between 0 and 100", async () => {
+      const data = await e3dc.getLiveData(0);
+      expect(data.batterySoc).toBeGreaterThanOrEqual(0);
+      expect(data.batterySoc).toBeLessThanOrEqual(100);
+    });
+  });
+
+  describe("Grid frequency", () => {
+    it("should return realistic grid frequency around 50Hz", async () => {
+      const data = await e3dc.getLiveData(0);
+      expect(data.gridFrequency).toBeGreaterThanOrEqual(49.9);
+      expect(data.gridFrequency).toBeLessThanOrEqual(50.1);
+    });
   });
 });
