@@ -615,24 +615,31 @@ export async function startUnifiedMock(): Promise<void> {
   // Broadcast-Callback ist bereits in startUnifiedMock() gesetzt
   // (verwendet wallboxUdpChannel.sendBroadcast)
   
-  // Timer für periodische E pres Broadcasts (alle 3 Sekunden während des Ladens)
-  broadcastTimer = setInterval(() => {
-    const report2 = wallboxMockService.getReport2();
-    const isCharging = report2.State === 3; // State 3 = Charging
-    
-    if (isCharging) {
-      const ePres = wallboxMockService.getEPres();
-      const broadcastData = { "E pres": ePres };
+  // Timer für periodische E pres Broadcasts (alle 1-2s während des Ladens, wie echte KEBA)
+  const scheduleEPresBroadcast = () => {
+    // Randomisiertes Intervall 1000-2000ms (wie echte KEBA)
+    const interval = 1000 + Math.random() * 1000;
+    broadcastTimer = setTimeout(() => {
+      const report2 = wallboxMockService.getReport2();
+      const isCharging = report2.State === 3;
       
-      log("debug", "wallbox-mock", `[Mock-Wallbox → Broadcast] E pres (während Ladung): ${JSON.stringify(broadcastData)}`);
+      if (isCharging) {
+        const ePres = wallboxMockService.getEPres();
+        // E pres in 0.1 Wh units (wie echte KEBA broadcast)
+        const broadcastData = { "E pres": Math.round(ePres * 10) };
+        
+        log("debug", "wallbox-mock", `[Mock-Wallbox → Broadcast] E pres (während Ladung): ${JSON.stringify(broadcastData)}`);
+        wallboxUdpChannel.sendBroadcast(broadcastData);
+      }
       
-      // Broadcast über UDP-Channel senden
-      wallboxUdpChannel.sendBroadcast(broadcastData);
-    }
-  }, 3000); // Alle 3 Sekunden
+      // Schedule next broadcast
+      scheduleEPresBroadcast();
+    }, interval);
+  };
+  scheduleEPresBroadcast();
   
   log("info", "system", "📡 UDP Broadcasts aktiviert:");
-  log("info", "system", "   - E pres alle 3s (während Ladung)");
+  log("info", "system", "   - E pres alle 1-2s (während Ladung, wie echte KEBA)");
   log("info", "system", "   - Input/State/Plug bei Änderungen\n");
   
   isRunning = true;
