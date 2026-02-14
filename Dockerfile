@@ -29,11 +29,11 @@ COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/public ./public
 
 # Expose port
-EXPOSE 5000
+EXPOSE 3000
 
 # Set environment variables
 ENV NODE_ENV=production
-ENV PORT=5000
+ENV PORT=3000
 
 # Start the application
 CMD ["node", "dist/index.js"]

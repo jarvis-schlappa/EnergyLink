@@ -31,7 +31,7 @@ git clone https://github.com/mschlappa/EnergyLink.git && cd EnergyLink
 
 ```bash
 docker-compose up -d
-# App öffnen: http://localhost:5000
+# App öffnen: http://localhost:3000
 ```
 
 ### Bare Metal
@@ -39,7 +39,7 @@ docker-compose up -d
 ```bash
 npm install && npm run build
 NODE_ENV=production node dist/index.js
-# App öffnen: http://localhost:5000
+# App öffnen: http://localhost:3000
 ```
 
 ## Dokumentation
