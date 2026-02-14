@@ -6,7 +6,7 @@
 
 set -euo pipefail
 
-PORT="${PORT:-5000}"
+PORT="${PORT:-3000}"
 BASE_URL="${BASE_URL:-http://localhost:$PORT}"
 PASS=0
 FAIL=0

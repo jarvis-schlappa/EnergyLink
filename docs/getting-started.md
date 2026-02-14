@@ -38,7 +38,7 @@ docker build -t energylink .
 docker run -d --name energylink --network host energylink
 ```
 
-Die App ist erreichbar unter `http://localhost:5000`.
+Die App ist erreichbar unter `http://localhost:3000`.
 
 > **Hinweis:** `--network host` ist erforderlich für UDP-Kommunikation mit der Wallbox im LAN.
 
