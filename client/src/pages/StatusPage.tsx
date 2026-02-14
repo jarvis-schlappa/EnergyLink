@@ -13,8 +13,8 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { WallboxStatus, ControlState, Settings, PlugStatusTracking, ChargingContext, ChargingStrategy, BuildInfo } from "@shared/schema";
-import { buildInfoSchema } from "@shared/schema";
 import { useWallboxSSE } from "@/hooks/use-wallbox-sse";
+import { useStatus } from "@/hooks/use-status";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
@@ -50,40 +50,14 @@ export default function StatusPage() {
 
   const displayStatus = sseStatus || status;
 
-  const { data: controlState } = useQuery<ControlState>({
-    queryKey: ["/api/controls"],
-    refetchInterval: 5000,
-  });
-
-  const { data: settings } = useQuery<Settings>({
-    queryKey: ["/api/settings"],
-    refetchInterval: 5000,
-    refetchOnMount: true,
-    refetchOnWindowFocus: true,
-  });
-
-  const { data: plugTracking } = useQuery<PlugStatusTracking>({
-    queryKey: ["/api/wallbox/plug-tracking"],
-    refetchInterval: 5000,
-  });
-
-  const { data: chargingContext } = useQuery<ChargingContext>({
-    queryKey: ["/api/charging/context"],
-    refetchInterval: 5000,
-  });
-
-  const { data: buildInfo } = useQuery<BuildInfo>({
-    queryKey: ["/api/build-info"],
-    staleTime: Infinity,
-    select: (data) => {
-      const parsed = buildInfoSchema.safeParse(data);
-      if (!parsed.success) {
-        console.error("Build-Info validation failed:", parsed.error);
-        throw new Error("Invalid build info data");
-      }
-      return parsed.data;
-    },
-  });
+  // Consolidated poll: one request instead of 5 separate ones
+  // useStatus() also distributes data into individual query caches for backwards compat
+  const { data: consolidatedStatus } = useStatus(5000);
+  const controlState = consolidatedStatus?.controls;
+  const settings = consolidatedStatus?.settings;
+  const plugTracking = consolidatedStatus?.plugTracking;
+  const chargingContext = consolidatedStatus?.chargingContext;
+  const buildInfo = consolidatedStatus?.buildInfo;
 
   useEffect(() => {
     if (displayStatus) {
@@ -146,12 +120,15 @@ export default function StatusPage() {
     }
   }, [chargingContext?.remainingStopDelay]);
 
+  /** Invalidate consolidated status to trigger immediate refetch after mutations */
+  const invalidateStatus = () => queryClient.invalidateQueries({ queryKey: ["/api/status"] });
+
   const startChargingMutation = useMutation({
     mutationFn: (strategy?: string) => apiRequest("POST", "/api/wallbox/start", { strategy }),
     onSuccess: () => {
       setWaitingForConfirmation(true);
       queryClient.invalidateQueries({ queryKey: ["/api/wallbox/status"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/settings"] });
+      invalidateStatus();
     },
     onError: () => {
       setWaitingForConfirmation(false);
@@ -169,7 +146,7 @@ export default function StatusPage() {
     mutationFn: () => apiRequest("POST", "/api/wallbox/stop"),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/wallbox/status"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/settings"] });
+      invalidateStatus();
     },
     onError: () => {
       // Revert optimistic update
@@ -203,12 +180,10 @@ export default function StatusPage() {
     mutationFn: (newSettings: Settings) =>
       apiRequest("POST", "/api/settings", newSettings),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/settings"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/controls"] });
+      invalidateStatus();
     },
     onError: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/settings"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/controls"] });
+      invalidateStatus();
     },
   });
 
@@ -216,10 +191,10 @@ export default function StatusPage() {
     mutationFn: (newState: ControlState) =>
       apiRequest("POST", "/api/controls", newState),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/controls"] });
+      invalidateStatus();
     },
     onError: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/controls"] });
+      invalidateStatus();
     },
   });
 
