@@ -44,4 +44,4 @@ jobs:
       - run: npm ci
 
       - name: E2E Demo API Tests
-        run: bash e2e/demo-api-test.sh
+        run: bash scripts/demo-api-test.sh
