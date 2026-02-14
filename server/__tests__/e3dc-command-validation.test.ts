@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { validateE3dcCommand } from '../e3dc-client';
+import { validateE3dcCommand } from '../e3dc/client';
 
 describe('validateE3dcCommand', () => {
   // Valid commands

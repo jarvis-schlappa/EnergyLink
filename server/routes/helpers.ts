@@ -1,4 +1,4 @@
-import { log } from "../logger";
+import { log } from "../core/logger";
 
 /**
  * Prüft ob eine URL für SmartHome-Aufrufe erlaubt ist (SSRF-Schutz).

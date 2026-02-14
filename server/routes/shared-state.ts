@@ -1,12 +1,12 @@
 import type { Settings } from "@shared/schema";
-import { log } from "../logger";
-import { e3dcClient } from "../e3dc-client";
-import { getE3dcModbusService } from "../e3dc-modbus";
-import { sendUdpCommand } from "../wallbox-transport";
-import { ChargingStrategyController } from "../charging-strategy-controller";
-import { triggerProwlEvent, extractTargetWh } from "../prowl-notifier";
-import { RealPhaseProvider, MockPhaseProvider } from "../phase-provider";
-import { storage } from "../storage";
+import { log } from "../core/logger";
+import { e3dcClient } from "../e3dc/client";
+import { getE3dcModbusService } from "../e3dc/modbus";
+import { sendUdpCommand } from "../wallbox/transport";
+import { ChargingStrategyController } from "../strategy/charging-strategy-controller";
+import { triggerProwlEvent, extractTargetWh } from "../monitoring/prowl-notifier";
+import { RealPhaseProvider, MockPhaseProvider } from "../strategy/phase-provider";
+import { storage } from "../core/storage";
 
 // Module-scope Scheduler Handles (überleben Hot-Reload)
 export let chargingStrategyInterval: NodeJS.Timeout | null = null;

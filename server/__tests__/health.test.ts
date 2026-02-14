@@ -7,7 +7,7 @@ describe("healthHandler", () => {
   });
 
   it("should return status ok with required fields", async () => {
-    vi.doMock("../build-info", () => ({
+    vi.doMock("../core/build-info", () => ({
       getBuildInfo: () => ({
         version: "1.0.2",
         branch: "main",
@@ -16,7 +16,7 @@ describe("healthHandler", () => {
       }),
     }));
 
-    const { healthHandler } = await import("../health");
+    const { healthHandler } = await import("../core/health");
 
     const req = {} as Request;
     const json = vi.fn();

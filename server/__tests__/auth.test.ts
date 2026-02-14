@@ -21,8 +21,8 @@ describe("requireApiKey middleware", () => {
     it("should allow all requests through", async () => {
       vi.stubEnv("API_KEY", "");
       // Mock logger to avoid side effects
-      vi.doMock("../logger", () => ({ log: vi.fn() }));
-      const { requireApiKey } = await import("../auth");
+      vi.doMock("../core/logger", () => ({ log: vi.fn() }));
+      const { requireApiKey } = await import("../core/auth");
 
       const { req, res, next } = createMocks();
       requireApiKey(req, res, next);
@@ -37,8 +37,8 @@ describe("requireApiKey middleware", () => {
 
     async function loadMiddleware() {
       vi.stubEnv("API_KEY", TEST_KEY);
-      vi.doMock("../logger", () => ({ log: vi.fn() }));
-      const mod = await import("../auth");
+      vi.doMock("../core/logger", () => ({ log: vi.fn() }));
+      const mod = await import("../core/auth");
       return mod.requireApiKey;
     }
 
@@ -143,8 +143,8 @@ describe("requireApiKey middleware", () => {
       vi.resetModules();
       const specialKey = "key-with-spëcial_chars!@#$%^&*()";
       vi.stubEnv("API_KEY", specialKey);
-      vi.doMock("../logger", () => ({ log: vi.fn() }));
-      const { requireApiKey } = await import("../auth");
+      vi.doMock("../core/logger", () => ({ log: vi.fn() }));
+      const { requireApiKey } = await import("../core/auth");
 
       const { req, res, next } = createMocks({
         authorization: `Bearer ${specialKey}`,

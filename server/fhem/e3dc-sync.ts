@@ -1,8 +1,8 @@
 import { Socket } from "net";
-import { log } from "./logger";
-import { storage } from "./storage";
-import { getE3dcModbusService, getE3dcLiveDataHub } from "./e3dc-modbus";
-import { getE3dcBackoffLevel } from "./e3dc-poller";
+import { log } from "../core/logger";
+import { storage } from "../core/storage";
+import { getE3dcModbusService, getE3dcLiveDataHub } from "../e3dc/modbus";
+import { getE3dcBackoffLevel } from "../e3dc/poller";
 import type { FhemSync } from "@shared/schema";
 
 /**

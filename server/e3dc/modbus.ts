@@ -1,7 +1,7 @@
 import ModbusRTU from "modbus-serial";
 import type { E3dcLiveData } from "@shared/schema";
-import { storage } from "./storage";
-import { log } from "./logger";
+import { storage } from "../core/storage";
+import { log } from "../core/logger";
 
 /**
  * E3DC S10 Modbus TCP Register Mapping (Simple Mode)

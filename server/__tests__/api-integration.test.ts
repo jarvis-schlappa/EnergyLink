@@ -23,10 +23,10 @@ beforeAll(async () => {
 
   // Dynamically import and bootstrap the server
   const express = (await import("express")).default;
-  const { healthHandler } = await import("../health");
-  const { registerRoutes } = await import("../routes");
-  const { storage } = await import("../storage");
-  const { startUnifiedMock } = await import("../unified-mock");
+  const { healthHandler } = await import("../core/health");
+  const { registerRoutes } = await import("../routes/index");
+  const { storage } = await import("../core/storage");
+  const { startUnifiedMock } = await import("../demo/unified-mock");
 
   const app = express();
   app.use(express.json());
@@ -71,13 +71,13 @@ afterAll(async () => {
   }
   // Stop mock
   try {
-    const { stopUnifiedMock } = await import("../unified-mock");
+    const { stopUnifiedMock } = await import("../demo/unified-mock");
     await stopUnifiedMock();
   } catch {
     // ignore
   }
   try {
-    const { shutdownSchedulers } = await import("../routes");
+    const { shutdownSchedulers } = await import("../routes/index");
     await shutdownSchedulers();
   } catch {
     // ignore

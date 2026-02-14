@@ -1,8 +1,8 @@
-import { log } from "./logger";
-import { storage } from "./storage";
-import { getE3dcModbusService, getE3dcLiveDataHub } from "./e3dc-modbus";
-import { sendUdpCommand } from "./wallbox-transport";
-import { getProwlNotifier } from "./prowl-notifier";
+import { log } from "../core/logger";
+import { storage } from "../core/storage";
+import { getE3dcModbusService, getE3dcLiveDataHub } from "./modbus";
+import { sendUdpCommand } from "../wallbox/transport";
+import { getProwlNotifier } from "../monitoring/prowl-notifier";
 
 /**
  * E3DC-Background-Poller

@@ -1,8 +1,8 @@
-import { DEFAULT_WALLBOX_IP } from "../defaults";
+import { DEFAULT_WALLBOX_IP } from "../core/defaults";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 // Mock dependencies before importing the module under test
-vi.mock("../storage", () => ({
+vi.mock("../core/storage", () => ({
   storage: {
     getSettings: vi.fn(() => ({
       wallboxIp: DEFAULT_WALLBOX_IP,
@@ -28,7 +28,7 @@ vi.mock("../storage", () => ({
   },
 }));
 
-vi.mock("../e3dc-modbus", () => ({
+vi.mock("../e3dc/modbus", () => ({
   getE3dcModbusService: vi.fn(() => ({
     getLastReadLiveData: vi.fn(() => ({
       pvPower: 3500,
@@ -41,7 +41,7 @@ vi.mock("../e3dc-modbus", () => ({
   })),
 }));
 
-vi.mock("../grid-frequency-monitor", () => ({
+vi.mock("../monitoring/grid-frequency-monitor", () => ({
   getGridFrequencyState: vi.fn(() => ({
     enabled: true,
     frequency: 50.01,
@@ -49,14 +49,14 @@ vi.mock("../grid-frequency-monitor", () => ({
   })),
 }));
 
-vi.mock("../build-info", () => ({
+vi.mock("../core/build-info", () => ({
   getBuildInfo: vi.fn(() => ({
     version: "1.0.0",
     buildDate: "2026-02-13",
   })),
 }));
 
-vi.mock("../logger", () => ({
+vi.mock("../core/logger", () => ({
   log: vi.fn(),
 }));
 
@@ -121,7 +121,7 @@ describe("/api/status", () => {
   });
 
   it("returns null e3dcLiveData when cache is empty", async () => {
-    const { getE3dcModbusService } = await import("../e3dc-modbus");
+    const { getE3dcModbusService } = await import("../e3dc/modbus");
     (getE3dcModbusService as any).mockReturnValueOnce({
       getLastReadLiveData: () => null,
     });

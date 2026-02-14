@@ -1,5 +1,5 @@
 import type { ChargingStrategyConfig } from "@shared/schema";
-import { storage } from "./storage";
+import { storage } from "../core/storage";
 
 /**
  * Interface für die Bestimmung der Phasenzahl beim Ladestart.

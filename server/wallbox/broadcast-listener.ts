@@ -11,12 +11,12 @@
  * Verwendet den zentralen UDP-Channel (kein eigener Socket).
  */
 
-import { log } from "./logger";
-import { storage } from "./storage";
-import { wallboxUdpChannel } from "./wallbox-udp-channel";
-import { getOrCreateStrategyController } from "./routes/shared-state";
-import { getProwlNotifier, triggerProwlEvent } from "./prowl-notifier";
-import { broadcastWallboxStatus } from "./wallbox-sse";
+import { log } from "../core/logger";
+import { storage } from "../core/storage";
+import { wallboxUdpChannel } from "./udp-channel";
+import { getOrCreateStrategyController } from "../routes/shared-state";
+import { getProwlNotifier, triggerProwlEvent } from "../monitoring/prowl-notifier";
+import { broadcastWallboxStatus } from "./sse";
 
 let lastInputStatus: number | null = null;
 let lastPlugStatus: number | null = null;

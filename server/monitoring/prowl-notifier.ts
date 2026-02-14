@@ -1,5 +1,5 @@
 import type { Settings, ProwlEvents } from "@shared/schema";
-import { log } from "./logger";
+import { log } from "../core/logger";
 
 /**
  * Type-safe Event-Key für Prowl-Benachrichtigungen

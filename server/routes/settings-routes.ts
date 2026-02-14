@@ -1,5 +1,5 @@
 import type { Express } from "express";
-import { storage } from "../storage";
+import { storage } from "../core/storage";
 import {
   settingsSchema,
   controlStateSchema,
@@ -8,14 +8,14 @@ import {
   chargingStrategyConfigSchema,
   chargingStrategySchema,
 } from "@shared/schema";
-import { e3dcClient } from "../e3dc-client";
-import { log } from "../logger";
-import { DEFAULT_WALLBOX_IP } from "../defaults";
+import { e3dcClient } from "../e3dc/client";
+import { log } from "../core/logger";
+import { DEFAULT_WALLBOX_IP } from "../core/defaults";
 import { z } from "zod";
-import { wallboxMockService } from "../wallbox-mock";
-import { sendUdpCommand } from "../wallbox-transport";
-import { getBuildInfo } from "../build-info";
-import { triggerProwlEvent, getProwlNotifier } from "../prowl-notifier";
+import { wallboxMockService } from "../demo/wallbox-mock";
+import { sendUdpCommand } from "../wallbox/transport";
+import { getBuildInfo } from "../core/build-info";
+import { triggerProwlEvent, getProwlNotifier } from "../monitoring/prowl-notifier";
 import { callSmartHomeUrl } from "./helpers";
 import {
   getOrCreateStrategyController,

@@ -1,9 +1,9 @@
 import type { Express } from "express";
-import { storage } from "../storage";
-import { log } from "../logger";
-import { getE3dcModbusService } from "../e3dc-modbus";
-import { getGridFrequencyState } from "../grid-frequency-monitor";
-import { getBuildInfo } from "../build-info";
+import { storage } from "../core/storage";
+import { log } from "../core/logger";
+import { getE3dcModbusService } from "../e3dc/modbus";
+import { getGridFrequencyState } from "../monitoring/grid-frequency-monitor";
+import { getBuildInfo } from "../core/build-info";
 
 /**
  * Konsolidierter Status-Endpoint: Liefert alle vom Frontend gepollt Daten

@@ -11,8 +11,8 @@
  * - server/charging-strategy-controller.ts (Ladesteuerung)
  */
 
-import { log } from "./logger";
-import { wallboxUdpChannel, type WallboxMessage } from "./wallbox-udp-channel";
+import { log } from "../core/logger";
+import { wallboxUdpChannel, type WallboxMessage } from "./udp-channel";
 
 const UDP_TIMEOUT = 6000;
 

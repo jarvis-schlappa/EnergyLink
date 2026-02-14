@@ -1,13 +1,13 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
-import { log } from "../logger";
+import { log } from "../core/logger";
 import { registerWallboxRoutes } from "./wallbox-routes";
 import { registerE3dcRoutes } from "./e3dc-routes";
 import { registerSettingsRoutes } from "./settings-routes";
 import { registerStatusRoutes } from "./status-routes";
 import { registerDemoRoutes } from "./demo-routes";
 import { startSchedulers, shutdownSchedulers } from "./scheduler";
-import { storage } from "../storage";
+import { storage } from "../core/storage";
 
 // Re-export helpers for direct import by tests
 export { isTimeInRange, getCurrentTimeInTimezone } from "./helpers";
