@@ -53,7 +53,6 @@ NODE_ENV=production node dist/index.js
 | [Use Cases](docs/use-cases.md) | Praxisszenarien mit Event-Flows |
 | [Design Guidelines](docs/design-guidelines.md) | UI/UX-Richtlinien |
 | [FAQ](docs/faq.md) | Häufige Fragen |
-| [Contributing](CONTRIBUTING.md) | Mitarbeit am Projekt |
 
 ## Technologie
 
