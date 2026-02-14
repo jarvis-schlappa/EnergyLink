@@ -16,11 +16,12 @@ import { storage } from "../core/storage";
 import { wallboxUdpChannel } from "./udp-channel";
 import { getOrCreateStrategyController } from "../routes/shared-state";
 import { getProwlNotifier, triggerProwlEvent } from "../monitoring/prowl-notifier";
-import { broadcastWallboxStatus } from "./sse";
+import { broadcastWallboxStatus, broadcastPartialUpdate } from "./sse";
 
 let lastInputStatus: number | null = null;
 let lastPlugStatus: number | null = null;
 let lastState: number | null = null;
+let lastEpres: number | null = null;
 let isEnabled = false;
 let sendUdpCommand: ((ip: string, command: string) => Promise<any>) | null =
   null;
@@ -143,9 +144,7 @@ const handleBroadcast = async (data: any, rinfo: any) => {
     }
 
     // Verarbeite State-Broadcasts
-    // DESIGN: State wird nur geloggt, nicht persistiert.
-    // Grund: Wallbox-Status wird bereits durch /api/wallbox/status Polling abgerufen.
-    // Dieser Handler dient als zusätzliche Debugging-Information für schnellere Erkennung.
+    // KEBA sendet spontane State-Änderungen (z.B. beim Anstecken/Abstecken)
     if (data.State !== undefined) {
       const state = data.State;
 
@@ -165,18 +164,26 @@ const handleBroadcast = async (data: any, rinfo: any) => {
           `[Wallbox-Broadcast-Listener] State geändert: ${lastState} → ${state} (${stateNames[state] || "unknown"}) (von ${rinfo.address})`,
         );
         
-        // WebSocket-Broadcast: Hol aktuellen Status und push zu Clients
+        // Sofortiges partial SSE update (ohne 3 UDP-Requests)
+        broadcastPartialUpdate({ state });
+        
+        // Vollständigen Status im Hintergrund holen für alle Felder
         void fetchAndBroadcastStatus("State-Änderung");
       }
 
       lastState = state;
     }
 
-    // Verarbeite E pres-Broadcasts (während Ladung)
-    // Throttle E pres Logging um Log-Flooding zu vermeiden (alle 3s von Mock)
+    // Verarbeite E pres-Broadcasts (Session-Energie während Ladung)
+    // KEBA sendet diese spontan alle ~1-2s während der Ladung
+    // Werte in 0.1 Wh → umrechnen in Wh für Frontend
     if (data["E pres"] !== undefined) {
-      // E pres wird vom Frontend per Polling abgerufen
-      // Kein Logging nötig (würde Logs überschwemmen bei 3s-Interval)
+      const epresRaw = data["E pres"];
+      if (epresRaw !== lastEpres) {
+        lastEpres = epresRaw;
+        // Broadcast partial SSE update (Wh = raw / 10)
+        broadcastPartialUpdate({ ePres: epresRaw / 10 });
+      }
     }
 
     // Reagiere auf Input-Broadcasts (Ladestrategie-Wechsel)
@@ -531,6 +538,7 @@ export async function stopBroadcastListener(): Promise<void> {
   lastInputStatus = null;
   lastPlugStatus = null;
   lastState = null;
+  lastEpres = null;
   sendUdpCommand = null;
   log("info", "system", "✅ [Wallbox-Broadcast-Listener] Gestoppt");
 }

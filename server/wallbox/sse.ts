@@ -93,6 +93,34 @@ export function broadcastWallboxStatus(status: WallboxStatus): void {
 }
 
 /**
+ * Sendet ein partielles Status-Update an alle verbundenen Clients.
+ * Verwendet für spontane Wallbox-Broadcasts (E pres, State) ohne vollständigen Poll.
+ */
+export function broadcastPartialUpdate(partialStatus: Partial<WallboxStatus>): void {
+  if (connectedClients.size === 0) {
+    return;
+  }
+
+  const data = JSON.stringify({
+    type: "wallbox-partial",
+    data: { ...partialStatus, lastUpdated: new Date().toISOString() },
+    timestamp: Date.now(),
+  });
+
+  const failedClients: string[] = [];
+
+  connectedClients.forEach((client) => {
+    try {
+      client.res.write(`data: ${data}\n\n`);
+    } catch (error) {
+      failedClients.push(client.id);
+    }
+  });
+
+  failedClients.forEach((id) => connectedClients.delete(id));
+}
+
+/**
  * Ping-System zum Halten der Verbindung
  */
 function startPingSystem(): void {
