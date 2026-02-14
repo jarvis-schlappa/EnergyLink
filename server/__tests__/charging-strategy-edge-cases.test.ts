@@ -180,4 +180,53 @@ describe("ChargingStrategyController - Edge Cases", () => {
       expect(result).toEqual({ currentMa: 6000 });
     });
   });
+
+  describe("Issue #105: shouldStartCharging must return false when strategy is 'off'", () => {
+    const callShouldStart = (ctrl: any, config: any, surplus: number): boolean => {
+      return ctrl.shouldStartCharging(config, surplus);
+    };
+
+    const makeConfig = (overrides: any = {}) => ({
+      activeStrategy: "off" as const,
+      minStartPowerWatt: 1500,
+      stopThresholdWatt: 500,
+      startDelaySeconds: 60,
+      stopDelaySeconds: 120,
+      physicalPhaseSwitch: 1,
+      minCurrentChangeAmpere: 1,
+      minChangeIntervalSeconds: 30,
+      inputX1Strategy: "max_without_battery" as const,
+      ...overrides,
+    });
+
+    it("returns false when strategy is 'off' even with high surplus", () => {
+      // Scenario: X1-OFF sets strategy to "off", but surplus is high enough
+      // to satisfy surplus start conditions. shouldStartCharging MUST still return false.
+      (storage as any)._setContext({
+        isActive: false,
+        currentPhases: 1,
+        strategy: "off",
+      });
+      // Set plug status to 7 (car connected) to rule out plug guard
+      (controller as any).lastPlugStatus = 7;
+
+      const result = callShouldStart(controller, makeConfig({ activeStrategy: "off" }), 5000);
+      expect(result).toBe(false);
+    });
+
+    it("returns false when strategy is 'off' even with plug=7 (max_power path guard)", () => {
+      // Edge case: strategy "off" must not fall through to surplus delay logic
+      // which could return true after startDelaySeconds
+      (storage as any)._setContext({
+        isActive: false,
+        currentPhases: 1,
+        strategy: "off",
+        startDelayTrackerSince: new Date(Date.now() - 120000).toISOString(), // 2min ago
+      });
+      (controller as any).lastPlugStatus = 7;
+
+      const result = callShouldStart(controller, makeConfig({ activeStrategy: "off" }), 5000);
+      expect(result).toBe(false);
+    });
+  });
 });
