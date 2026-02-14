@@ -164,3 +164,29 @@ function stopPingSystem(): void {
 export function getConnectedClientCount(): number {
   return connectedClients.size;
 }
+
+/**
+ * Schließt alle SSE-Verbindungen (Graceful Shutdown).
+ * Sendet ein Close-Event an alle Clients bevor die Verbindung beendet wird.
+ */
+export function closeAllSSEClients(): void {
+  if (connectedClients.size === 0) {
+    return;
+  }
+
+  const clientCount = connectedClients.size;
+
+  connectedClients.forEach((client) => {
+    try {
+      client.res.write(`event: shutdown\ndata: {}\n\n`);
+      client.res.end();
+    } catch {
+      // Client already disconnected - ignore
+    }
+  });
+
+  connectedClients.clear();
+  stopPingSystem();
+
+  log("info", "system", `[SSE] ${clientCount} Client(s) geschlossen (Shutdown)`);
+}
