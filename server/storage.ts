@@ -1,6 +1,7 @@
 import type { Settings, ControlState, LogEntry, LogSettings, LogLevel, PlugStatusTracking, ChargingContext } from "@shared/schema";
 import { readFileSync, writeFileSync, existsSync, mkdirSync, renameSync, unlinkSync } from "fs";
 import { join } from "path";
+import { DEFAULT_WALLBOX_IP } from "./defaults";
 
 /**
  * Atomic file write: writes to a temp file first, then renames.
@@ -169,7 +170,7 @@ export class MemStorage implements IStorage {
 
     // Default-Einstellungen
     const defaults: Settings = {
-      wallboxIp: "192.168.40.16",
+      wallboxIp: DEFAULT_WALLBOX_IP,
       pvSurplusOnUrl: "http://192.168.40.11:8083/fhem?detail=autoWallboxPV&cmd.autoWallboxPV=set%20autoWallboxPV%20on",
       pvSurplusOffUrl: "http://192.168.40.11:8083/fhem?detail=autoWallboxPV&cmd.autoWallboxPV=set%20autoWallboxPV%20off",
       nightChargingSchedule: {
@@ -349,7 +350,7 @@ export class MemStorage implements IStorage {
       } else {
         // Migration/Edge Case: Kein Backup vorhanden
         if (settings.wallboxIp === "127.0.0.1") {
-          settings.wallboxIp = "192.168.40.16";
+          settings.wallboxIp = DEFAULT_WALLBOX_IP;
           logStorage("warning", `Demo-Modus deaktiviert ohne Backup - Wallbox Fallback auf Default-IP: ${settings.wallboxIp}`);
         }
       }

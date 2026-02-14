@@ -4,6 +4,7 @@ import { log } from "./logger";
 import { e3dcClient } from "./e3dc-client";
 import { getE3dcLiveDataHub } from "./e3dc-modbus";
 import { triggerProwlEvent } from "./prowl-notifier";
+import { DEFAULT_WALLBOX_IP } from "./defaults";
 
 const PHASE_VOLTAGE_1P = 230;
 const MIN_CURRENT_AMPERE = 6;
@@ -17,7 +18,7 @@ export class ChargingStrategyController {
   private batteryDischargeSince: Date | null = null;
   private unsubscribeFromHub: (() => void) | null = null;
   private runningStrategyPromise: Promise<void> | null = null;
-  private wallboxIp: string = "192.168.40.16";
+  private wallboxIp: string = DEFAULT_WALLBOX_IP;
   private isShuttingDown: boolean = false;
   private pendingE3dcData: E3dcLiveData | null = null;
   private lastPlugStatus: number = 1;  // Plug-Status: 1=kein Kabel, 7=Auto bereit

@@ -1,3 +1,4 @@
+import { DEFAULT_WALLBOX_IP } from "../defaults";
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { existsSync, mkdirSync, writeFileSync, rmSync, readFileSync, renameSync, unlinkSync } from "fs";
 import { join } from "path";
@@ -30,13 +31,13 @@ describe("MemStorage", () => {
 
       // Simulate what MemStorage does
       const defaults = {
-        wallboxIp: "192.168.40.16",
+        wallboxIp: DEFAULT_WALLBOX_IP,
         nightChargingSchedule: { enabled: false, startTime: "00:00", endTime: "05:00" },
       };
       writeFileSync(settingsPath, JSON.stringify(defaults, null, 2), "utf-8");
       
       const loaded = JSON.parse(readFileSync(settingsPath, "utf-8"));
-      expect(loaded.wallboxIp).toBe("192.168.40.16");
+      expect(loaded.wallboxIp).toBe(DEFAULT_WALLBOX_IP);
     });
 
     it("handles corrupt JSON gracefully", () => {
