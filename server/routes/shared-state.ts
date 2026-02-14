@@ -1,3 +1,4 @@
+import type { Settings } from "@shared/schema";
 import { log } from "../logger";
 import { e3dcClient } from "../e3dc-client";
 import { getE3dcModbusService } from "../e3dc-modbus";
@@ -26,7 +27,7 @@ export function getOrCreateStrategyController(): ChargingStrategyController {
 }
 
 // Hilfsfunktion für Batterie-Entladesperre (E3DC)
-export async function lockBatteryDischarge(settings: any): Promise<void> {
+export async function lockBatteryDischarge(settings: Settings | null): Promise<void> {
   if (settings?.e3dc?.enabled && e3dcClient.isConfigured()) {
     log(
       "info",
@@ -47,7 +48,7 @@ export async function lockBatteryDischarge(settings: any): Promise<void> {
   }
 }
 
-export async function unlockBatteryDischarge(settings: any): Promise<void> {
+export async function unlockBatteryDischarge(settings: Settings | null): Promise<void> {
   if (settings?.e3dc?.enabled && e3dcClient.isConfigured()) {
     log(
       "info",
@@ -69,7 +70,7 @@ export async function unlockBatteryDischarge(settings: any): Promise<void> {
 }
 
 // Hilfsfunktion für Netzstrom-Laden (E3DC)
-export async function enableGridCharging(settings: any): Promise<void> {
+export async function enableGridCharging(settings: Settings | null): Promise<void> {
   if (settings?.e3dc?.enabled && e3dcClient.isConfigured()) {
     try {
       log(
@@ -104,7 +105,7 @@ export async function enableGridCharging(settings: any): Promise<void> {
   }
 }
 
-export async function disableGridCharging(settings: any): Promise<void> {
+export async function disableGridCharging(settings: Settings | null): Promise<void> {
   if (settings?.e3dc?.enabled && e3dcClient.isConfigured()) {
     try {
       log(
