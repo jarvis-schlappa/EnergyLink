@@ -5,6 +5,7 @@ import { e3dcClient } from "./e3dc-client";
 import { getE3dcLiveDataHub } from "./e3dc-modbus";
 import { triggerProwlEvent } from "./prowl-notifier";
 import { DEFAULT_WALLBOX_IP } from "./defaults";
+import type { PhaseProvider } from "./phase-provider";
 
 const PHASE_VOLTAGE_1P = 230;
 const MIN_CURRENT_AMPERE = 6;
@@ -22,9 +23,11 @@ export class ChargingStrategyController {
   private isShuttingDown: boolean = false;
   private pendingE3dcData: E3dcLiveData | null = null;
   private lastPlugStatus: number = 1;  // Plug-Status: 1=kein Kabel, 7=Auto bereit
+  private phaseProvider: PhaseProvider;
   
-  constructor(sendUdpCommand: (ip: string, command: string) => Promise<any>) {
+  constructor(sendUdpCommand: (ip: string, command: string) => Promise<any>, phaseProvider: PhaseProvider) {
     this.sendUdpCommand = sendUdpCommand;
+    this.phaseProvider = phaseProvider;
   }
 
   /**
@@ -472,16 +475,11 @@ export class ChargingStrategyController {
     
     const currentPhases = context.isActive 
       ? context.currentPhases 
-      : (settings?.demoMode 
-          ? (settings.mockWallboxPhases ?? 3) 
-          : (isSurplusStrategy ? 1 : (config.physicalPhaseSwitch ?? 3)));
+      : this.phaseProvider.getStartPhases(isSurplusStrategy, config);
     
     // Debug-Log für Phase-Entscheidung
     if (!context.isActive) {
-      const phaseSource = settings?.demoMode 
-        ? `Demo-Modus (mockWallboxPhases=${settings.mockWallboxPhases})` 
-        : (isSurplusStrategy ? 'Surplus-Strategie (fest 1P)' : `Max-Power (physicalPhaseSwitch=${config.physicalPhaseSwitch})`);
-      log("debug", "system", `Phase-Logik beim Start: ${currentPhases}P via ${phaseSource}`);
+      log("debug", "system", `Phase-Logik beim Start: ${currentPhases}P via ${this.phaseProvider.constructor.name}`);
     }
     
     if (isMaxPowerStrategy) {
@@ -776,12 +774,8 @@ export class ChargingStrategyController {
       // Guard: Prüfe ob Ladung bereits aktiv ist (verhindert doppelte Benachrichtigungen)
       const wasAlreadyActive = context.isActive;
       
-      // Für START:
-      // - Im Demo-Modus: nutze mockWallboxPhases
-      // - Im Produktiv-Modus: nutze physicalPhaseSwitch (User-Konfiguration, Default 3P)
-      const currentPhases = settings?.demoMode 
-        ? (settings.mockWallboxPhases ?? 3) 
-        : (config.physicalPhaseSwitch ?? 3);
+      // Phasen über PhaseProvider bestimmen (entkoppelt Demo/Real)
+      const currentPhases = this.phaseProvider.getStartPhases(false, config);
       const finalAmpere = targetCurrentMa / 1000;
       
       await this.sendUdpCommand(wallboxIp, "ena 1");

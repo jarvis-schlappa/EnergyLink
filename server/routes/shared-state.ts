@@ -5,6 +5,8 @@ import { getE3dcModbusService } from "../e3dc-modbus";
 import { sendUdpCommand } from "../wallbox-transport";
 import { ChargingStrategyController } from "../charging-strategy-controller";
 import { triggerProwlEvent, extractTargetWh } from "../prowl-notifier";
+import { RealPhaseProvider, MockPhaseProvider } from "../phase-provider";
+import { storage } from "../storage";
 
 // Module-scope Scheduler Handles (überleben Hot-Reload)
 export let chargingStrategyInterval: NodeJS.Timeout | null = null;
@@ -21,7 +23,9 @@ export function setStrategyController(v: ChargingStrategyController | null) { st
 
 export function getOrCreateStrategyController(): ChargingStrategyController {
   if (!strategyController) {
-    strategyController = new ChargingStrategyController(sendUdpCommand);
+    const isDemoMode = process.env.DEMO_AUTOSTART === 'true' || storage.getSettings()?.demoMode;
+    const phaseProvider = isDemoMode ? new MockPhaseProvider() : new RealPhaseProvider();
+    strategyController = new ChargingStrategyController(sendUdpCommand, phaseProvider);
   }
   return strategyController;
 }
