@@ -149,8 +149,14 @@ function registerPersistentHandler(): void {
       return;
     }
     
-    // Zusätzliche Filterung: Ignoriere Broadcast-Messages (Adresse 255.255.255.255 oder nicht von Wallbox-IP)
-    // Dies verhindert dass async report 3 Broadcasts (die alle Felder enthalten können) den Request resolven
+    // Issue #77: Spontane Broadcasts (kein ID-Feld) sind KEINE Report-Antworten.
+    // Diese werden vom UDP-Channel als 'broadcast' Event emittiert und vom
+    // Broadcast-Listener verarbeitet. Hier überspringen wir sie.
+    if (msg.isJson && !msg.hasId && !msg.hasTchToken) {
+      return;
+    }
+    
+    // Zusätzliche Filterung: Ignoriere Messages die nicht von der Wallbox-IP kommen
     const isFromWallbox = msg.rinfo.address === currentRequest.targetIp || msg.rinfo.address === '127.0.0.1';
     if (!isFromWallbox) {
       log("debug", "wallbox", `Antwort ignoriert (nicht von Wallbox-IP ${currentRequest.targetIp})`, `Von: ${msg.rinfo.address}`);
