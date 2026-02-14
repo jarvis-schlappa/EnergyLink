@@ -139,7 +139,7 @@ app.use((req, res, next) => {
   // doesn't interfere with the other routes
   if (app.get("env") === "development") {
     // Dynamic import to prevent vite from being bundled into production build
-    const viteMod = "./vite";
+    const viteMod = "./core/vite";
     const { setupVite } = await import(/* @vite-ignore */ viteMod);
     await setupVite(app, server);
   } else {
