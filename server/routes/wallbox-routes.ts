@@ -316,6 +316,11 @@ export function registerWallboxRoutes(app: Express): void {
           .json({ error: "Current change was not applied by wallbox" });
       }
 
+      // User-Limit im Charging-Context speichern für Strategy-Logging
+      storage.updateChargingContext({
+        userCurrentLimitAmpere: current,
+      });
+
       log(
         "info",
         "wallbox",

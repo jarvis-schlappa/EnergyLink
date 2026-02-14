@@ -349,7 +349,14 @@ export class ChargingStrategyController {
     
     const result = this.calculateTargetCurrent(config, surplus, liveData);
     const currentPhases = context.currentPhases;
-    log("debug", "system", `calculateTargetCurrent result: ${result ? `${result.currentMa}mA @ ${currentPhases}P` : 'null'}`);
+    const userLimitAmpere = context.userCurrentLimitAmpere;
+    
+    if (result && userLimitAmpere && userLimitAmpere * 1000 < result.currentMa) {
+      const effectiveMa = userLimitAmpere * 1000;
+      log("debug", "system", `calculateTargetCurrent: Strategy=${result.currentMa}mA, User-Limit=${effectiveMa}mA → effektiv ${effectiveMa}mA @ ${currentPhases}P`);
+    } else {
+      log("debug", "system", `calculateTargetCurrent result: ${result ? `${result.currentMa}mA @ ${currentPhases}P` : 'null'}`);
+    }
     
     if (result === null) {
       if (context.isActive) {
@@ -375,14 +382,24 @@ export class ChargingStrategyController {
     if (!context.isActive) {
       log("debug", "system", `!isActive → prüfe shouldStartCharging`);
       if (this.shouldStartCharging(config, surplus)) {
-        log("debug", "system", `shouldStartCharging = true → startCharging mit ${result.currentMa}mA @ ${currentPhases}P`);
-        await this.startCharging(wallboxIp, result.currentMa, config);
+        const startCurrentMa = (userLimitAmpere && userLimitAmpere * 1000 < result.currentMa) ? userLimitAmpere * 1000 : result.currentMa;
+        if (startCurrentMa < result.currentMa) {
+          log("debug", "system", `shouldStartCharging = true → startCharging: Strategy=${result.currentMa}mA, User-Limit=${startCurrentMa}mA → sende ${startCurrentMa}mA @ ${currentPhases}P`);
+        } else {
+          log("debug", "system", `shouldStartCharging = true → startCharging mit ${result.currentMa}mA @ ${currentPhases}P`);
+        }
+        await this.startCharging(wallboxIp, startCurrentMa, config);
       } else {
         log("debug", "system", `shouldStartCharging = false → warte noch`);
       }
     } else {
-      log("debug", "system", `isActive → adjustCurrent mit ${result.currentMa}mA @ ${currentPhases}P`);
-      await this.adjustCurrent(wallboxIp, result.currentMa, config);
+      if (userLimitAmpere && userLimitAmpere * 1000 < result.currentMa) {
+        log("debug", "system", `isActive → adjustCurrent: Strategy=${result.currentMa}mA, User-Limit=${userLimitAmpere * 1000}mA → sende ${userLimitAmpere * 1000}mA @ ${currentPhases}P`);
+        await this.adjustCurrent(wallboxIp, userLimitAmpere * 1000, config);
+      } else {
+        log("debug", "system", `isActive → adjustCurrent mit ${result.currentMa}mA @ ${currentPhases}P`);
+        await this.adjustCurrent(wallboxIp, result.currentMa, config);
+      }
     }
   }
 
@@ -671,6 +688,14 @@ export class ChargingStrategyController {
         storage.updateChargingContext({
           currentPhases: detectedPhases,
         });
+      }
+      
+      // Sync User-Limit aus Wallbox Max curr (falls nicht bereits gesetzt)
+      const wallboxMaxCurrMa = report2["Max curr"] || 0;
+      if (wallboxMaxCurrMa > 0 && !context.userCurrentLimitAmpere) {
+        const userLimitAmpere = wallboxMaxCurrMa / 1000;
+        storage.updateChargingContext({ userCurrentLimitAmpere: userLimitAmpere });
+        log("debug", "system", `[RECONCILE] User-Limit aus Wallbox übernommen: ${userLimitAmpere}A`);
       }
     } catch (error) {
       log("warning", "system", "Fehler beim Abgleich des Charging Context", error instanceof Error ? error.message : String(error));

@@ -295,4 +295,25 @@ describe("ChargingStrategyController", () => {
       expect(result).toEqual({ currentMa: 6000 });
     });
   });
+
+  describe("userCurrentLimitAmpere in context", () => {
+    it("should store and retrieve userCurrentLimitAmpere", () => {
+      (storage as any)._setContext({ isActive: true, currentPhases: 3, userCurrentLimitAmpere: 10 });
+      const context = storage.getChargingContext();
+      expect(context.userCurrentLimitAmpere).toBe(10);
+    });
+
+    it("should be undefined by default", () => {
+      (storage as any)._setContext({ isActive: false, currentPhases: 1 });
+      const context = storage.getChargingContext();
+      expect(context.userCurrentLimitAmpere).toBeUndefined();
+    });
+
+    it("should update via updateChargingContext", () => {
+      (storage as any)._setContext({ isActive: true, currentPhases: 3 });
+      storage.updateChargingContext({ userCurrentLimitAmpere: 8 });
+      const context = storage.getChargingContext();
+      expect(context.userCurrentLimitAmpere).toBe(8);
+    });
+  });
 });
