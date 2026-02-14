@@ -328,31 +328,31 @@ export class E3dcMockService {
 
   /**
    * Berechnet Hausverbrauch (ohne Wallbox)
-   * Basis-Last + tageszeit-abhängige Variation
-   * Typischer Haushalt: 400-600W Grundlast, Peaks beim Kochen/Fönen
+   * Basierend auf Produktionsdaten: ~2.7kW idle (inkl. Lüftung, Server, Standby)
+   * Peaks beim Kochen/Fönen/Waschen
    */
   private calculateHousePower(timeOfDay: number): number {
-    let basePower = 400; // Grundlast
+    let basePower = 2700; // Grundlast ~2.7kW (like production data)
     
     // Morgens (7-9 Uhr): Erhöhter Verbrauch (Fönen, Frühstück)
     if (timeOfDay >= 7 && timeOfDay < 9) {
-      basePower = 800 + Math.random() * 400; // 800-1200W
+      basePower = 3200 + Math.random() * 800; // 3.2-4.0kW
     }
     // Mittags (12-14 Uhr): Erhöhter Verbrauch (Kochen)
     else if (timeOfDay >= 12 && timeOfDay < 14) {
-      basePower = 800 + Math.random() * 400; // 800-1200W
+      basePower = 3500 + Math.random() * 1500; // 3.5-5.0kW
     }
     // Abends (18-20 Uhr): Erhöhter Verbrauch (Kochen, TV)
     else if (timeOfDay >= 18 && timeOfDay < 20) {
-      basePower = 700 + Math.random() * 300; // 700-1000W
+      basePower = 3000 + Math.random() * 1000; // 3.0-4.0kW
     }
-    // Nachts (22-6 Uhr): Minimaler Verbrauch
+    // Nachts (22-6 Uhr): Reduzierter Verbrauch
     else if (timeOfDay >= 22 || timeOfDay < 6) {
-      basePower = 300 + Math.random() * 200; // 300-500W
+      basePower = 2000 + Math.random() * 500; // 2.0-2.5kW
     }
     // Sonst: Normaler Verbrauch
     else {
-      basePower = 400 + Math.random() * 200; // 400-600W
+      basePower = 2500 + Math.random() * 400; // 2.5-2.9kW
     }
     
     return basePower;

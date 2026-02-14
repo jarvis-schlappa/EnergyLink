@@ -51,6 +51,7 @@ export class WallboxMockService {
   
   // Broadcast system
   private broadcastCallback: ((data: any) => void) | null = null;
+  private ePresBroadcastInterval: NodeJS.Timeout | null = null;
   
   // State transition timers
   private stateTransitionTimer: NodeJS.Timeout | null = null;
@@ -195,8 +196,8 @@ export class WallboxMockService {
         power = Math.round(u1 * i1 + u2 * i2 + u3 * i3); // mW = sum(V * mA per phase)
       }
       
-      // Power Factor 998-999 (wie echte KEBA)
-      pf = 998 + Math.round(Math.random());
+      // Power Factor 990-1000 schwankend (wie echte KEBA, typisch 998-999)
+      pf = 990 + Math.round(Math.random() * 10);
     }
     // Wenn nicht am Laden: Alle Werte 0 (wie echte KEBA im Idle)
     
@@ -276,6 +277,7 @@ export class WallboxMockService {
               this.actualCurrentFraction = 0;
               this.calculateChargingPower();
               this.sendBroadcast({ "State": this.state });
+              this.startEPresBroadcasts();
             }, 2000);
           } else {
             // Already in State 5 or other → go directly to charging
@@ -286,6 +288,7 @@ export class WallboxMockService {
             if (oldState !== this.state) {
               this.sendBroadcast({ "State": this.state });
             }
+            this.startEPresBroadcasts();
           }
         }
         return { "TCH-OK": "done" };
@@ -300,6 +303,7 @@ export class WallboxMockService {
         this.currentPower = 0;
         this.actualCurrentFraction = 0;
         this.rampStartTime = 0;
+        this.stopEPresBroadcasts();
         if (this.stateTransitionTimer) {
           clearTimeout(this.stateTransitionTimer);
           this.stateTransitionTimer = null;
@@ -415,6 +419,7 @@ export class WallboxMockService {
       this.state = this.plug === 7 ? 5 : 2;
       this.enabled = false;
       this.enableUser = false;
+      this.stopEPresBroadcasts();
       if (oldState !== this.state) {
         this.sendBroadcast({ "State": this.state });
       }
@@ -439,6 +444,7 @@ export class WallboxMockService {
         if (oldState !== 3) {
           this.rampStartTime = Date.now();
           this.actualCurrentFraction = 0;
+          this.startEPresBroadcasts();
         }
         if (oldState !== this.state) {
           this.sendBroadcast({ "State": this.state });
@@ -473,6 +479,7 @@ export class WallboxMockService {
       this.targetPower = 0;
       this.currentPower = 0;
       this.actualCurrentFraction = 0;
+      this.stopEPresBroadcasts();
     }
     
     if (oldPlug !== this.plug) {
@@ -546,6 +553,7 @@ export class WallboxMockService {
       clearTimeout(this.stateTransitionTimer);
       this.stateTransitionTimer = null;
     }
+    this.stopEPresBroadcasts();
   }
 
   /**
@@ -561,6 +569,30 @@ export class WallboxMockService {
   private sendBroadcast(data: any): void {
     if (this.broadcastCallback) {
       this.broadcastCallback(data);
+    }
+  }
+
+  /**
+   * Starts spontaneous E pres broadcasts every 1-2s (like real KEBA during charging).
+   * This is the root cause of Bug #77 - the real Keba sends these autonomously.
+   */
+  private startEPresBroadcasts(): void {
+    this.stopEPresBroadcasts();
+    this.ePresBroadcastInterval = setInterval(() => {
+      if (this.state === 3 && this.enabled) {
+        this.updateEnergyCounters();
+        this.sendBroadcast({ "E pres": Math.round(this.sessionEnergy * 10) }); // 0.1 Wh units
+      }
+    }, 1000 + Math.round(Math.random() * 1000)); // 1-2s interval
+  }
+
+  /**
+   * Stops spontaneous E pres broadcasts
+   */
+  private stopEPresBroadcasts(): void {
+    if (this.ePresBroadcastInterval) {
+      clearInterval(this.ePresBroadcastInterval);
+      this.ePresBroadcastInterval = null;
     }
   }
 

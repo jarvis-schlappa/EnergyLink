@@ -115,19 +115,19 @@ describe("WallboxMockService - Realistic Mock Improvements (Issue #83)", () => {
       expect(report.I3).toBeLessThanOrEqual(10200);
     });
 
-    it("should have PF=998-999 when charging (not 1000)", () => {
+    it("should have PF in 990-1000 range when charging", () => {
       wallbox.executeCommand("curr 10000");
       wallbox.executeCommand("ena 1");
       vi.advanceTimersByTime(3000);
 
       const pfs = new Set<number>();
-      for (let i = 0; i < 20; i++) {
+      for (let i = 0; i < 50; i++) {
         pfs.add(wallbox.getReport3().PF);
       }
       
       for (const pf of pfs) {
-        expect(pf).toBeGreaterThanOrEqual(998);
-        expect(pf).toBeLessThanOrEqual(999);
+        expect(pf).toBeGreaterThanOrEqual(990);
+        expect(pf).toBeLessThanOrEqual(1000);
       }
     });
 
@@ -168,6 +168,72 @@ describe("WallboxMockService - Realistic Mock Improvements (Issue #83)", () => {
       const power = wallbox.getCurrentPower();
       // 10A * 3P * ~230V ≈ 6900W
       expect(power).toBeGreaterThan(6000);
+    });
+  });
+
+  describe("Spontaneous E pres Broadcasts (Bug #77 root cause)", () => {
+    it("should send periodic E pres broadcasts during charging (State 3)", () => {
+      const broadcasts: any[] = [];
+      wallbox.setBroadcastCallback((data) => broadcasts.push({...data}));
+      
+      wallbox.executeCommand("curr 10000");
+      wallbox.executeCommand("ena 1");
+      vi.advanceTimersByTime(3000); // Transition to State 3
+      
+      // Clear state transition broadcasts
+      const stateOnlyBroadcasts = broadcasts.length;
+      
+      // Advance 5s - should get multiple E pres broadcasts (every 1-2s)
+      vi.advanceTimersByTime(5000);
+      
+      const ePresBroadcasts = broadcasts.filter(b => b["E pres"] !== undefined);
+      expect(ePresBroadcasts.length).toBeGreaterThanOrEqual(2);
+      
+      // E pres values should be in 0.1 Wh units (non-negative)
+      for (const b of ePresBroadcasts) {
+        expect(b["E pres"]).toBeGreaterThanOrEqual(0);
+      }
+    });
+
+    it("should stop E pres broadcasts after ena 0", () => {
+      const broadcasts: any[] = [];
+      wallbox.setBroadcastCallback((data) => broadcasts.push({...data}));
+      
+      wallbox.executeCommand("curr 10000");
+      wallbox.executeCommand("ena 1");
+      vi.advanceTimersByTime(3000); // Charging
+      
+      wallbox.executeCommand("ena 0"); // Stop
+      
+      const countAfterStop = broadcasts.length;
+      vi.advanceTimersByTime(5000); // Wait more
+      
+      // No new E pres broadcasts after stop
+      const newEPres = broadcasts.slice(countAfterStop).filter(b => b["E pres"] !== undefined);
+      expect(newEPres.length).toBe(0);
+    });
+
+    it("should increment E pres values in broadcasts over time", () => {
+      const ePresValues: number[] = [];
+      wallbox.setBroadcastCallback((data) => {
+        if (data["E pres"] !== undefined) {
+          ePresValues.push(data["E pres"]);
+        }
+      });
+      
+      wallbox.executeCommand("curr 16000");
+      wallbox.executeCommand("ena 1");
+      vi.advanceTimersByTime(3000); // Start charging
+      
+      // Collect over 10s
+      vi.advanceTimersByTime(10000);
+      
+      expect(ePresValues.length).toBeGreaterThanOrEqual(3);
+      
+      // Values should be non-decreasing (energy accumulates)
+      for (let i = 1; i < ePresValues.length; i++) {
+        expect(ePresValues[i]).toBeGreaterThanOrEqual(ePresValues[i - 1]);
+      }
     });
   });
 
@@ -228,8 +294,30 @@ describe("WallboxMockService - Realistic Mock Improvements (Issue #83)", () => {
 });
 
 describe("E3dcMockService - Realistic Improvements (Issue #83)", () => {
-  it("should be importable", async () => {
+  it("should have realistic house power baseline (~2.7kW)", async () => {
     const { E3dcMockService } = await import("../demo/e3dc-mock");
-    expect(E3dcMockService).toBeDefined();
+    const e3dc = new E3dcMockService();
+    
+    // Get multiple readings
+    const powers: number[] = [];
+    for (let i = 0; i < 10; i++) {
+      const data = await e3dc.getLiveData(0);
+      powers.push(data.housePower);
+    }
+    
+    const avgPower = powers.reduce((a, b) => a + b, 0) / powers.length;
+    // Should be around 2000-5000W (depending on time of day), not 300-1200W
+    expect(avgPower).toBeGreaterThanOrEqual(2000);
+  });
+
+  it("should increase house power when wallbox is charging", async () => {
+    const { E3dcMockService } = await import("../demo/e3dc-mock");
+    const e3dc = new E3dcMockService();
+    
+    const idleData = await e3dc.getLiveData(0);
+    const chargingData = await e3dc.getLiveData(11000); // 11kW wallbox
+    
+    // House power should include wallbox power
+    expect(chargingData.housePower).toBeGreaterThan(idleData.housePower + 10000);
   });
 });
