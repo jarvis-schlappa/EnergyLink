@@ -1,10 +1,14 @@
 import { log } from "./logger";
 
+type LogLevel = "warning" | "info" | "debug";
+
 interface EnvVarConfig {
   name: string;
   required: boolean;
   defaultValue?: string;
   description: string;
+  /** Log level when not set (default: "warning") */
+  missingLogLevel?: LogLevel;
 }
 
 const ENV_VARS: EnvVarConfig[] = [
@@ -13,11 +17,13 @@ const ENV_VARS: EnvVarConfig[] = [
     required: false,
     defaultValue: "3000",
     description: "HTTP-Server-Port",
+    missingLogLevel: "info",
   },
   {
     name: "API_KEY",
     required: false,
     description: "API-Schlüssel für Authentifizierung (ohne: ungeschützter Legacy-Modus)",
+    missingLogLevel: "warning",
   },
   {
     name: "NODE_ENV",
@@ -29,28 +35,38 @@ const ENV_VARS: EnvVarConfig[] = [
     name: "DEMO_AUTOSTART",
     required: false,
     description: "Demo-Modus beim Start aktivieren (true/false)",
+    missingLogLevel: "debug",
   },
   {
     name: "BUILD_BRANCH",
     required: false,
     description: "Git-Branch (Build-Zeit, Fallback: git CLI)",
+    missingLogLevel: "debug",
   },
   {
     name: "BUILD_COMMIT",
     required: false,
     description: "Git-Commit-Hash (Build-Zeit, Fallback: git CLI)",
+    missingLogLevel: "debug",
   },
   {
     name: "BUILD_TIME",
     required: false,
     description: "Build-Zeitstempel (Fallback: Startzeit)",
+    missingLogLevel: "debug",
   },
 ];
+
+export interface EnvMessage {
+  level: LogLevel;
+  message: string;
+}
 
 export interface ValidationResult {
   valid: boolean;
   missing: string[];
   warnings: string[];
+  messages: EnvMessage[];
 }
 
 /**
@@ -61,6 +77,7 @@ export interface ValidationResult {
 export function validateEnvironment(): ValidationResult {
   const missing: string[] = [];
   const warnings: string[] = [];
+  const messages: EnvMessage[] = [];
 
   for (const envVar of ENV_VARS) {
     const value = process.env[envVar.name];
@@ -72,14 +89,20 @@ export function validateEnvironment(): ValidationResult {
         const defaultInfo = envVar.defaultValue
           ? ` (Default: ${envVar.defaultValue})`
           : "";
-        warnings.push(`${envVar.name} nicht gesetzt${defaultInfo} – ${envVar.description}`);
+        const msg = `${envVar.name} nicht gesetzt${defaultInfo} – ${envVar.description}`;
+        const level = envVar.missingLogLevel ?? "warning";
+        messages.push({ level, message: msg });
+        if (level === "warning") {
+          warnings.push(msg);
+        }
       }
     }
   }
 
-  // Log warnings
-  for (const warning of warnings) {
-    log("warning", "system", `⚠️ ${warning}`);
+  // Log messages at their appropriate levels
+  for (const { level, message } of messages) {
+    const prefix = level === "warning" ? "⚠️ " : "";
+    log(level, "system", `${prefix}${message}`);
   }
 
   // Log errors and exit if required vars missing
@@ -91,5 +114,5 @@ export function validateEnvironment(): ValidationResult {
     log("error", "system", "Server kann nicht starten. Bitte setze die fehlenden Variablen.");
   }
 
-  return { valid: missing.length === 0, missing, warnings };
+  return { valid: missing.length === 0, missing, warnings, messages };
 }
