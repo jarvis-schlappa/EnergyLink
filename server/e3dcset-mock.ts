@@ -53,67 +53,79 @@ async function saveState(state: E3dcControlState): Promise<void> {
   await fs.writeFile(STATE_FILE, JSON.stringify(state, null, 2), 'utf-8');
 }
 
-async function main() {
-  const args = process.argv.slice(2);
-  
+/**
+ * Führt Mock-e3dcset-Befehle in-process aus.
+ * @param commandString - Befehl wie z.B. "-d 1" oder "-a" oder "-e 6000"
+ * @returns Array von Log-Zeilen (stdout-Äquivalent)
+ */
+export async function executeMockCommand(commandString: string): Promise<string[]> {
+  const args = commandString.trim().split(/\s+/).filter(Boolean);
+
   if (args.length === 0) {
-    console.error('Usage: e3dcset-mock [-d <watts>] [-a] [-c <watts>] [-e <watts>]');
-    process.exit(1);
+    throw new Error('Usage: e3dcset-mock [-d <watts>] [-a] [-c <watts>] [-e <watts>]');
   }
-  
+
   const state = await loadState();
+  const output: string[] = [];
   let commandStr = 'e3dcset';
-  
+
   // Parse Argumente (gleich wie echtes e3dcset)
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
     commandStr += ` ${arg}`;
-    
+
     if (arg === '-d' && i + 1 < args.length) {
-      // -d <watts>: Maximale Entladeleistung setzen
       const dischargePower = parseInt(args[i + 1], 10);
       state.maxDischargePower = dischargePower;
-      console.log(`[E3DC Mock] Maximale Entladeleistung gesetzt auf ${dischargePower}W`);
+      output.push(`[E3DC Mock] Maximale Entladeleistung gesetzt auf ${dischargePower}W`);
       i += 1;
     } else if (arg === '-a') {
-      // -a: Zurück auf Automatik/Default (3000W Entladung)
       state.maxDischargePower = 3000;
       state.gridCharging = false;
       state.gridChargePower = 0;
-      console.log('[E3DC Mock] Zurück auf Automatik: Entladung 3000W, Netzladen aus');
+      output.push('[E3DC Mock] Zurück auf Automatik: Entladung 3000W, Netzladen aus');
     } else if (arg === '-c' && i + 1 < args.length) {
-      // -c <watts>: Netzladen mit bestimmter Leistung
       const chargePower = parseInt(args[i + 1], 10);
       state.gridCharging = true;
       state.gridChargePower = chargePower;
-      console.log(`[E3DC Mock] Netzladen aktiviert mit ${chargePower}W`);
+      output.push(`[E3DC Mock] Netzladen aktiviert mit ${chargePower}W`);
       i += 1;
     } else if (arg === '-e' && i + 1 < args.length) {
-      // -e <Wh>: Netzladung starten mit Energiemenge (Wh), oder deaktivieren wenn 0
       const chargeAmountWh = parseInt(args[i + 1], 10);
       if (chargeAmountWh > 0) {
         state.gridCharging = true;
-        state.gridChargePower = 2500; // Standard-Ladeleistung
-        console.log(`[E3DC Mock] Netzladung gestartet: ${chargeAmountWh} Wh (Ladeleistung: ${state.gridChargePower}W)`);
+        state.gridChargePower = 2500;
+        output.push(`[E3DC Mock] Netzladung gestartet: ${chargeAmountWh} Wh (Ladeleistung: ${state.gridChargePower}W)`);
       } else {
         state.gridCharging = false;
         state.gridChargePower = 0;
-        console.log('[E3DC Mock] Netzladung deaktiviert');
+        output.push('[E3DC Mock] Netzladung deaktiviert');
       }
       i += 1;
     }
   }
-  
+
   // State speichern
   state.lastCommand = commandStr.trim();
   state.lastCommandTime = new Date().toISOString();
   await saveState(state);
-  
-  // Erfolg (wie echtes e3dcset)
-  process.exit(0);
+
+  return output;
 }
 
-main().catch((error) => {
-  console.error('[E3DC Mock] Error:', error.message);
-  process.exit(1);
-});
+// CLI-Modus: Nur ausführen wenn direkt aufgerufen
+const isDirectExecution =
+  process.argv[1]?.endsWith('e3dcset-mock.ts') ||
+  process.argv[1]?.endsWith('e3dcset-mock.js');
+
+if (isDirectExecution) {
+  executeMockCommand(process.argv.slice(2).join(' '))
+    .then((lines) => {
+      lines.forEach((line) => console.log(line));
+      process.exit(0);
+    })
+    .catch((error) => {
+      console.error('[E3DC Mock] Error:', error.message);
+      process.exit(1);
+    });
+}

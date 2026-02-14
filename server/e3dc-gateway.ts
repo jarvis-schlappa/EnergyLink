@@ -1,9 +1,10 @@
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import { log } from './logger';
-import path from 'path';
+import { executeMockCommand } from './e3dcset-mock';
 
 const execAsync = promisify(exec);
+
 
 /**
  * Gateway-Interface für die Ausführung von e3dcset-Befehlen.
@@ -52,31 +53,21 @@ export class RealE3dcGateway implements E3dcGateway {
 }
 
 /**
- * Mock E3DC Gateway - führt das e3dcset-mock.ts Script aus.
- * Wird im Demo-Modus verwendet.
+ * Mock E3DC Gateway - ruft die Mock-Logik direkt in-process auf.
+ * Wird im Demo-Modus verwendet. Kein Subprocess, kein tsx nötig.
  */
 export class MockE3dcGateway implements E3dcGateway {
-  private readonly mockScriptPath: string;
-
-  constructor() {
-    this.mockScriptPath = path.join(process.cwd(), 'server', 'e3dcset-mock.ts');
-  }
-
   async executeCommand(command: string, commandName: string): Promise<string> {
-    const fullCommand = `tsx ${this.mockScriptPath} ${command}`;
-
     log('info', 'system', `E3DC Mock: ${commandName}`, `Befehl: ${command}`);
 
-    const { stdout, stderr } = await execAsync(fullCommand);
+    const outputLines = await executeMockCommand(command);
+    const stdout = outputLines.join('\n');
 
     if (stdout) {
       log('info', 'system', `E3DC Mock: ${commandName} - Ausgabe`, stdout.trim());
     }
-    if (stderr) {
-      log('warning', 'system', `E3DC Mock: ${commandName} - Fehler-Ausgabe`, stderr.trim());
-    }
 
     log('info', 'system', `E3DC Mock: ${commandName} erfolgreich ausgeführt`);
-    return stdout || '';
+    return stdout;
   }
 }
