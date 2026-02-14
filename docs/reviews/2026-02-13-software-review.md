@@ -1,3 +1,5 @@
+> **Historisches Dokument.** Viele der hier genannten Punkte wurden inzwischen umgesetzt.
+
 # EnergyLink — Komplettes Software Review
 
 **Projekt:** EnergyLink v1.0.2
