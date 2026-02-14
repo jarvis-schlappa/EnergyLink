@@ -58,8 +58,13 @@ export function useWallboxSSE(options: UseWallboxSSEOptions = {}) {
               setStatus(message.data);
               onStatusUpdateRef.current?.(message.data);
             } else if (message.type === "wallbox-partial" && message.data) {
-              // Merge partial update into existing status
-              setStatus((prev) => prev ? { ...prev, ...message.data } : null);
+              // Merge partial update into existing status and notify callback
+              setStatus((prev) => {
+                if (!prev) return null;
+                const merged = { ...prev, ...message.data };
+                onStatusUpdateRef.current?.(merged);
+                return merged;
+              });
             }
           } catch (parseError) {
             console.error("[SSE] Fehler beim Parsing der Nachricht:", parseError);
