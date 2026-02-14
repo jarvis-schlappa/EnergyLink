@@ -575,11 +575,16 @@ export async function startUnifiedMock(): Promise<void> {
     log("info", "e3dc-mock", `   Register 40067-40085 + 41026 (Netzfrequenz) verfügbar`);
   });
 
-  // FHEM-Sync-IP auf Localhost setzen (Demo-Modus verwendet lokalen Mock)
+  // Demo-Modus: IPs auf Localhost setzen (Mock-Server laufen lokal)
   const currentSettings = storage.getSettings();
   if (currentSettings) {
     const updatedSettings = {
       ...currentSettings,
+      wallboxIp: '127.0.0.1',
+      wallboxIpBackup: currentSettings.wallboxIpBackup || '127.0.0.1',
+      e3dcIp: '127.0.0.1:5502',
+      e3dcIpBackup: currentSettings.e3dcIpBackup || '127.0.0.1:5502',
+      demoMode: true,
       fhemSync: {
         enabled: currentSettings.fhemSync?.enabled ?? false,
         port: currentSettings.fhemSync?.port ?? 7072,
@@ -587,7 +592,7 @@ export async function startUnifiedMock(): Promise<void> {
       },
     };
     storage.saveSettings(updatedSettings);
-    log("info", "system", "✅ FHEM-Sync IP auf 127.0.0.1 gesetzt (Demo-Modus)");
+    log("info", "system", "✅ Demo-IPs auf 127.0.0.1 gesetzt (Wallbox, E3DC, FHEM)");
   }
 
   log("info", "system", "\n📋 Demo-Modus Konfiguration:");
