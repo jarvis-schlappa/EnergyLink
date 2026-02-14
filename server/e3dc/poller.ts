@@ -32,6 +32,12 @@ const BACKOFF_INTERVALS = [10, 30, 60, 300, 600]; // In Sekunden: 10s, 30s, 1min
 const MAX_BACKOFF_LEVEL = 4; // Max Level (10min)
 let basePollingIntervalSeconds = 10;
 
+// Wallbox Idle-Polling Throttle (Issue #80)
+// Wenn Strategie "off" + Wallbox nicht lädt → Wallbox nur alle 30s abfragen statt jeden E3DC-Poll
+const IDLE_WALLBOX_POLL_INTERVAL_MS = 30_000;
+let lastWallboxPollTime = 0;
+let lastWallboxPower = 0;
+
 /**
  * Einzelner Poll-Durchlauf (mit Promise-Tracking und Exponential Backoff)
  * 
@@ -62,20 +68,34 @@ async function pollE3dcData(): Promise<boolean> {
       await e3dcService.connect(settings.e3dcIp);
 
       // Hole aktuelle Wallbox-Leistung von KEBA (benötigt für korrekte E3DC-Bilanz)
+      // Issue #80: Im Idle (Strategie "off") wird Wallbox nur alle 30s gepollt statt jeden Tick
       let wallboxPower = 0;
-      try {
-        const wallboxIp = settings?.wallboxIp || "127.0.0.1";
-        const report3 = await sendUdpCommand(wallboxIp, "report 3");
-        // Power ist in Report 3 als P (in Milliwatt), dividiert durch 1.000 für Watt
-        wallboxPower = (report3.P || 0) / 1000;
-      } catch (error) {
-        // Wenn Wallbox nicht erreichbar, verwende 0W (non-critical)
-        log(
-          "debug",
-          "e3dc-poller",
-          "Wallbox nicht erreichbar, verwende 0W für E3DC-Polling",
-          error instanceof Error ? error.message : String(error)
-        );
+      const activeStrategy = settings?.chargingStrategy?.activeStrategy;
+      const now = Date.now();
+      const isIdle = activeStrategy === "off";
+      const wallboxPollDue = !isIdle || (now - lastWallboxPollTime >= IDLE_WALLBOX_POLL_INTERVAL_MS);
+      
+      if (wallboxPollDue) {
+        try {
+          const wallboxIp = settings?.wallboxIp || "127.0.0.1";
+          const report3 = await sendUdpCommand(wallboxIp, "report 3");
+          // Power ist in Report 3 als P (in Milliwatt), dividiert durch 1.000 für Watt
+          wallboxPower = (report3.P || 0) / 1000;
+          lastWallboxPower = wallboxPower;
+          lastWallboxPollTime = now;
+        } catch (error) {
+          // Wenn Wallbox nicht erreichbar, verwende 0W (non-critical)
+          log(
+            "debug",
+            "e3dc-poller",
+            "Wallbox nicht erreichbar, verwende 0W für E3DC-Polling",
+            error instanceof Error ? error.message : String(error)
+          );
+        }
+      } else {
+        // Im Idle: Verwende gecachten Wert (normalerweise 0W)
+        wallboxPower = lastWallboxPower;
+        log("debug", "e3dc-poller", `Wallbox-Polling gedrosselt (Idle) - verwende Cache: ${wallboxPower}W`);
       }
 
       // Lese E3DC-Daten (cached für FHEM-Sync und andere Consumer)
@@ -182,8 +202,10 @@ export function startE3dcPoller(): NodeJS.Timeout {
   
   log("info", "e3dc-poller", "E3DC-Background-Poller wird gestartet mit Exponential Backoff", `Basis-Intervall: ${basePollingIntervalSeconds}s, Backoff-Stufen: ${BACKOFF_INTERVALS.join(', ')}s`);
 
-  // Backoff-State zurücksetzen
+  // Backoff-State und Idle-Throttle zurücksetzen
   backoffLevel = 0;
+  lastWallboxPollTime = 0;
+  lastWallboxPower = 0;
 
   // Initialer Poll nach 2s (lässt Server-Start Zeit für Initialisierung)
   initialPollerTimeout = setTimeout(async () => {
@@ -205,6 +227,17 @@ export function startE3dcPoller(): NodeJS.Timeout {
  */
 export function getE3dcBackoffLevel(): number {
   return backoffLevel;
+}
+
+/**
+ * Setzt den Wallbox-Idle-Polling-Throttle zurück (Issue #80).
+ * Wird aufgerufen wenn sich der Wallbox-State ändert (z.B. via Broadcast),
+ * damit der nächste E3DC-Poll sofort die Wallbox abfragt.
+ */
+export function resetWallboxIdleThrottle(): void {
+  lastWallboxPollTime = 0;
+  lastWallboxPower = 0;
+  log("debug", "e3dc-poller", "Wallbox-Idle-Throttle zurückgesetzt (State-Änderung)");
 }
 
 /**
