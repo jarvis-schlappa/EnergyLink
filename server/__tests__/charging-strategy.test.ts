@@ -1,6 +1,7 @@
 import { DEFAULT_WALLBOX_IP } from "../defaults";
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { ChargingStrategyController } from "../charging-strategy-controller";
+import { RealPhaseProvider } from "../phase-provider";
 import type { E3dcLiveData, ChargingStrategy, ChargingStrategyConfig } from "@shared/schema";
 
 // Mock all external dependencies
@@ -96,7 +97,7 @@ describe("ChargingStrategyController", () => {
     vi.clearAllMocks();
     (storage as any)._reset();
     mockSendUdp = vi.fn().mockResolvedValue({});
-    controller = new ChargingStrategyController(mockSendUdp);
+    controller = new ChargingStrategyController(mockSendUdp, new RealPhaseProvider());
   });
 
   describe("calculateSurplus", () => {

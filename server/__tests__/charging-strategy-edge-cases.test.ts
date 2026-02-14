@@ -1,6 +1,7 @@
 import { DEFAULT_WALLBOX_IP } from "../defaults";
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { ChargingStrategyController } from "../charging-strategy-controller";
+import { RealPhaseProvider } from "../phase-provider";
 import type { E3dcLiveData } from "@shared/schema";
 
 // Reuse mocks from charging-strategy.test.ts
@@ -72,7 +73,7 @@ describe("ChargingStrategyController - Edge Cases", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     (storage as any)._reset();
-    controller = new ChargingStrategyController(vi.fn().mockResolvedValue({}));
+    controller = new ChargingStrategyController(vi.fn().mockResolvedValue({}), new RealPhaseProvider());
   });
 
   const callCalculateSurplus = (ctrl: any, strategy: string, data: E3dcLiveData): number => {
