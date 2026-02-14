@@ -169,6 +169,13 @@ export class ChargingStrategyController {
   async stopChargingForStrategyOff(wallboxIp: string): Promise<void> {
     const context = storage.getChargingContext();
     const settings = storage.getSettings();
+    const controlState = storage.getControlState();
+    
+    // Wenn Scheduler (Zeitsteuerung) gerade aktiv lädt, nicht eingreifen
+    if (controlState.nightCharging) {
+      log('debug', 'system', '[ChargingStrategyController] Scheduler-Ladung aktiv (nightCharging=true) - Strategy-Controller greift nicht ein');
+      return;
+    }
     
     // Prüfe ob bereits alles im Zielzustand ist
     const alreadyStopped = !context.isActive;
