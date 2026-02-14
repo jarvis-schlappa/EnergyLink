@@ -3,6 +3,7 @@ import { chargingStrategyConfigSchema } from "@shared/schema";
 import { e3dcClient } from "../e3dc-client";
 import { getE3dcModbusService } from "../e3dc-modbus";
 import { log } from "../logger";
+import { DEFAULT_WALLBOX_IP } from "../defaults";
 import { sendUdpCommand } from "../wallbox-transport";
 import { startFhemSyncScheduler, stopFhemSyncScheduler } from "../fhem-e3dc-sync";
 import { startE3dcPoller, stopE3dcPoller, getE3dcBackoffLevel } from "../e3dc-poller";
@@ -577,7 +578,7 @@ export async function startSchedulers(): Promise<void> {
 
   // === STARTE CHARGING STRATEGY EVENT-LISTENER ===
   const currentSettings = storage.getSettings();
-  const wallboxIp = currentSettings?.wallboxIp || "192.168.40.16";
+  const wallboxIp = currentSettings?.wallboxIp || DEFAULT_WALLBOX_IP;
   
   const controller = getOrCreateStrategyController();
   

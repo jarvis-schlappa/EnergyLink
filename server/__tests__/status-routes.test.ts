@@ -1,10 +1,11 @@
+import { DEFAULT_WALLBOX_IP } from "../defaults";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 // Mock dependencies before importing the module under test
 vi.mock("../storage", () => ({
   storage: {
     getSettings: vi.fn(() => ({
-      wallboxIp: "192.168.40.16",
+      wallboxIp: DEFAULT_WALLBOX_IP,
       e3dcIp: "192.168.40.10",
       demoMode: false,
     })),
@@ -88,7 +89,7 @@ describe("/api/status", () => {
   it("returns correct settings data", async () => {
     const res = await request(app).get("/api/status").expect(200);
 
-    expect(res.body.settings.wallboxIp).toBe("192.168.40.16");
+    expect(res.body.settings.wallboxIp).toBe(DEFAULT_WALLBOX_IP);
   });
 
   it("returns correct control state", async () => {

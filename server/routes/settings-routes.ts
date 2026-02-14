@@ -10,6 +10,7 @@ import {
 } from "@shared/schema";
 import { e3dcClient } from "../e3dc-client";
 import { log } from "../logger";
+import { DEFAULT_WALLBOX_IP } from "../defaults";
 import { z } from "zod";
 import { wallboxMockService } from "../wallbox-mock";
 import { sendUdpCommand } from "../wallbox-transport";
@@ -385,7 +386,7 @@ export function registerSettingsRoutes(app: Express): void {
       // WICHTIG: Optimierte Reihenfolge für schnelle Wallbox-Reaktion
       if (strategyController) {
         try {
-          const wallboxIp = settings.wallboxIp || "192.168.40.16";
+          const wallboxIp = settings.wallboxIp || DEFAULT_WALLBOX_IP;
           
           if (strategy === "max_without_battery") {
             // START: Wallbox SOFORT starten, Battery Lock DANACH

@@ -1,3 +1,4 @@
+import { DEFAULT_WALLBOX_IP } from "../defaults";
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { ChargingStrategyController } from "../charging-strategy-controller";
 import type { E3dcLiveData } from "@shared/schema";
@@ -13,7 +14,7 @@ vi.mock("../storage", () => {
     adjustmentCount: 0,
   };
   const defaultSettings = {
-    wallboxIp: "192.168.40.16",
+    wallboxIp: DEFAULT_WALLBOX_IP,
     chargingStrategy: {
       activeStrategy: "surplus_battery_prio" as const,
       minStartPowerWatt: 1500,
