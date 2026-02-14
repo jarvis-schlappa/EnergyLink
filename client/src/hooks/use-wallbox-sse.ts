@@ -57,6 +57,9 @@ export function useWallboxSSE(options: UseWallboxSSEOptions = {}) {
             if (message.type === "wallbox-status" && message.data) {
               setStatus(message.data);
               onStatusUpdateRef.current?.(message.data);
+            } else if (message.type === "wallbox-partial" && message.data) {
+              // Merge partial update into existing status
+              setStatus((prev) => prev ? { ...prev, ...message.data } : null);
             }
           } catch (parseError) {
             console.error("[SSE] Fehler beim Parsing der Nachricht:", parseError);
