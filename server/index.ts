@@ -159,25 +159,82 @@ app.use((req, res, next) => {
     log('info', 'system', `serving on port ${port}`);
   });
 
-  // Graceful Shutdown für Mock-Server, Broadcast-Listener und Scheduler (falls aktiv)
-  const shutdown = async () => {
-    log('info', 'system', '🛑 Graceful Shutdown wird durchgeführt...');
-    try {
-      // Import shutdownSchedulers dynamisch, da routes.ts erst nach registerRoutes existiert
-      const { shutdownSchedulers } = await import('./routes');
+  // Graceful Shutdown für alle Server-Ressourcen (Issue #82)
+  let isShuttingDown = false;
+  const shutdown = async (signal: string) => {
+    // Verhindere doppeltes Shutdown (z.B. SIGINT + SIGTERM gleichzeitig)
+    if (isShuttingDown) return;
+    isShuttingDown = true;
 
-      // Stoppe alle Dienste parallel
+    log('info', 'system', `🛑 Server wird heruntergefahren... (Signal: ${signal})`);
+
+    // Timeout: Falls Cleanup hängt, trotzdem nach 5s beenden
+    const forceExitTimer = setTimeout(() => {
+      log('warning', 'system', '⚠️ Shutdown-Timeout (5s) erreicht - erzwinge Exit');
+      process.exit(1);
+    }, 5000);
+    forceExitTimer.unref(); // Timer soll process.exit nicht blockieren
+
+    try {
+      // 1. SSE-Clients benachrichtigen und schließen
+      const { closeAllSSEClients } = await import('./wallbox/sse');
+      closeAllSSEClients();
+
+      // 2. Wallbox in sicheren Zustand versetzen (nur wenn gerade geladen wird)
+      try {
+        const context = storage.getChargingContext();
+        if (context.isActive) {
+          const settings = storage.getSettings();
+          if (settings?.wallboxIp) {
+            log('info', 'system', '🔌 Wallbox wird gestoppt (Ladung war aktiv)...');
+            await sendUdpCommand(settings.wallboxIp, "ena 0");
+            log('info', 'system', '✅ Wallbox gestoppt');
+          }
+        }
+      } catch (error) {
+        log('warning', 'system', 'Wallbox-Stopp beim Shutdown fehlgeschlagen', error instanceof Error ? error.message : String(error));
+      }
+
+      // 3. Schedulers, Mock-Server und Broadcast-Listener stoppen
+      const { shutdownSchedulers } = await import('./routes');
       await Promise.all([
         stopUnifiedMock(),
         stopBroadcastListener(),
         shutdownSchedulers()
       ]);
+
+      // 4. Modbus-TCP-Verbindung zum E3DC schließen
+      try {
+        const { getE3dcModbusService } = await import('./e3dc/modbus');
+        const modbusService = getE3dcModbusService();
+        await modbusService.disconnect();
+        log('info', 'system', '✅ E3DC Modbus-Verbindung geschlossen');
+      } catch (error) {
+        log('debug', 'system', 'E3DC Modbus Disconnect beim Shutdown', error instanceof Error ? error.message : String(error));
+      }
+
+      // 5. UDP-Socket schließen
+      try {
+        await wallboxUdpChannel.stop();
+        log('info', 'system', '✅ UDP-Socket geschlossen');
+      } catch (error) {
+        log('debug', 'system', 'UDP-Socket Close beim Shutdown', error instanceof Error ? error.message : String(error));
+      }
+
+      // 6. HTTP-Server schließen
+      server.close(() => {
+        log('info', 'system', '✅ HTTP-Server geschlossen');
+      });
+
+      log('info', 'system', '✅ Graceful Shutdown abgeschlossen');
     } catch (error) {
       log('error', 'system', 'Fehler beim Shutdown', error instanceof Error ? error.message : String(error));
     }
+
+    clearTimeout(forceExitTimer);
     process.exit(0);
   };
 
-  process.on('SIGINT', shutdown);
-  process.on('SIGTERM', shutdown);
+  process.on('SIGINT', () => shutdown('SIGINT'));
+  process.on('SIGTERM', () => shutdown('SIGTERM'));
 })();
