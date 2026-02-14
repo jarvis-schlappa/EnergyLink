@@ -66,6 +66,11 @@ export async function shutdownSchedulers(): Promise<void> {
 // Scheduler für zeitgesteuerte Ladung
 let isNightChargingOperationInProgress = false;
 
+// Tracking für Settings-Änderungen (Issue #109)
+let lastScheduleEnabled: boolean | undefined;
+let lastScheduleStartTime: string | undefined;
+let lastScheduleEndTime: string | undefined;
+
 const checkNightChargingSchedule = async () => {
   try {
     // Lock-Mechanismus: Verhindert parallele E3DC-Operationen
@@ -84,10 +89,28 @@ const checkNightChargingSchedule = async () => {
 
     const currentTime = getCurrentTimeInTimezone("Europe/Berlin");
 
+    // Erkennung von Settings-Änderungen (Issue #109)
+    const scheduleEnabled = schedule?.enabled ?? false;
+    const scheduleStartTime = schedule?.startTime ?? "nicht konfiguriert";
+    const scheduleEndTime = schedule?.endTime ?? "nicht konfiguriert";
+    
+    if (scheduleEnabled !== lastScheduleEnabled || 
+        scheduleStartTime !== lastScheduleStartTime || 
+        scheduleEndTime !== lastScheduleEndTime) {
+      log(
+        "info",
+        "system",
+        `Zeitgesteuerte Ladung: Konfiguration ${lastScheduleEnabled === undefined ? "geladen" : "geändert"} - Aktiviert: ${scheduleEnabled}, Zeitfenster: ${scheduleStartTime}-${scheduleEndTime}`,
+      );
+      lastScheduleEnabled = scheduleEnabled;
+      lastScheduleStartTime = scheduleStartTime;
+      lastScheduleEndTime = scheduleEndTime;
+    }
+
     log(
       "debug",
       "system",
-      `Scheduler für zeitgesteuerte Ladung läuft - Aktuelle Zeit: ${currentTime}, Zeitsteuerung aktiviert: ${schedule?.enabled}, Zeitfenster: ${schedule?.startTime}-${schedule?.endTime}`,
+      `Scheduler für zeitgesteuerte Ladung läuft - Aktuelle Zeit: ${currentTime}, Zeitsteuerung aktiviert: ${scheduleEnabled}, Zeitfenster: ${scheduleStartTime}-${scheduleEndTime}`,
     );
 
     // Wenn Scheduler deaktiviert wurde, aber Wallbox noch lädt -> stoppen
