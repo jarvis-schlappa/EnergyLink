@@ -216,6 +216,7 @@ export const chargingContextSchema = z.object({
   calculatedSurplus: z.number().optional(),
   remainingStartDelay: z.number().optional(), // Sekunden bis zum Start (nur für Überschuss-Strategien)
   remainingStopDelay: z.number().optional(), // Sekunden bis zum Stopp (nur für Überschuss-Strategien)
+  userCurrentLimitAmpere: z.number().optional(), // Vom User per UI-Regler gesetzter Stromlimit (Ampere)
 });
 
 export type ChargingContext = z.infer<typeof chargingContextSchema>;

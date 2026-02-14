@@ -5,7 +5,6 @@ import { useToast } from "@/hooks/use-toast";
 import type { LogEntry, LogSettings, LogLevel, Settings } from "@shared/schema";
 import { buildInfoSchema } from "@shared/schema";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import {
   Select,
   SelectContent,
@@ -13,44 +12,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Trash2, Filter, RefreshCw, Info } from "lucide-react";
+import { Filter } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-
-type LogCategory =
-  | "wallbox"
-  | "wallbox-mock"
-  | "e3dc"
-  | "e3dc-poller"
-  | "e3dc-mock"
-  | "fhem"
-  | "fhem-mock"
-  | "webhook"
-  | "system"
-  | "storage"
-  | "grid-frequency";
-
-const ALL_CATEGORIES: LogCategory[] = [
-  "wallbox",
-  "wallbox-mock",
-  "e3dc",
-  "e3dc-poller",
-  "e3dc-mock",
-  "fhem",
-  "fhem-mock",
-  "webhook",
-  "system",
-  "storage",
-  "grid-frequency",
-];
+import PageHeader from "@/components/PageHeader";
+import BuildInfoDialog from "@/components/BuildInfoDialog";
+import LogFilterCard, { type LogCategory } from "@/components/logs/LogFilterCard";
+import LogEntryItem from "@/components/logs/LogEntryItem";
 
 export default function LogsPage() {
   const { toast } = useToast();
@@ -164,114 +131,15 @@ export default function LogsPage() {
     );
   };
 
-  const getCategoryLabel = (category: LogCategory): string => {
-    switch (category) {
-      case "wallbox":
-        return "Wallbox";
-      case "wallbox-mock":
-        return "Wallbox Mock";
-      case "e3dc":
-        return "E3DC";
-      case "e3dc-poller":
-        return "E3DC Poller";
-      case "e3dc-mock":
-        return "E3DC Mock";
-      case "fhem":
-        return "FHEM";
-      case "fhem-mock":
-        return "FHEM Mock";
-      case "webhook":
-        return "Webhook";
-      case "system":
-        return "System";
-      case "storage":
-        return "Storage";
-      case "grid-frequency":
-        return "Netzfrequenz-Monitor";
-    }
-  };
-
-  const getLevelColor = (level: LogLevel) => {
-    switch (level) {
-      case "trace":
-        return "bg-gray-400 text-white dark:bg-gray-500";
-      case "debug":
-        return "bg-muted text-muted-foreground";
-      case "info":
-        return "bg-primary text-primary-foreground";
-      case "warning":
-        return "bg-yellow-500 text-white dark:bg-yellow-600";
-      case "error":
-        return "bg-destructive text-destructive-foreground";
-    }
-  };
-
-  const getCategoryColor = (category: string) => {
-    switch (category) {
-      case "wallbox":
-        return "bg-blue-500 text-white dark:bg-blue-600";
-      case "wallbox-mock":
-        return "bg-blue-400 text-white dark:bg-blue-500";
-      case "e3dc":
-        return "bg-orange-500 text-white dark:bg-orange-600";
-      case "e3dc-poller":
-        return "bg-orange-600 text-white dark:bg-orange-700";
-      case "e3dc-mock":
-        return "bg-orange-400 text-white dark:bg-orange-500";
-      case "fhem":
-        return "bg-teal-500 text-white dark:bg-teal-600";
-      case "fhem-mock":
-        return "bg-teal-400 text-white dark:bg-teal-500";
-      case "webhook":
-        return "bg-green-500 text-white dark:bg-green-600";
-      case "system":
-        return "bg-purple-500 text-white dark:bg-purple-600";
-      case "storage":
-        return "bg-gray-500 text-white dark:bg-gray-600";
-      case "grid-frequency":
-        return "bg-red-500 text-white dark:bg-red-600";
-      default:
-        return "bg-muted text-muted-foreground";
-    }
-  };
-
-  const formatTimestamp = (timestamp: string) => {
-    const date = new Date(timestamp);
-    return date.toLocaleTimeString("de-DE", {
-      hour: "2-digit",
-      minute: "2-digit",
-      second: "2-digit",
-    });
-  };
-
   return (
     <div className="flex flex-col h-full">
       <div className="flex-1 overflow-y-auto pb-24 pt-6">
         <div className="max-w-4xl mx-auto px-4 space-y-6">
-          <div className="flex items-center justify-between gap-3">
-            <button
-              onClick={() => setShowBuildInfoDialog(true)}
-              className="flex items-center gap-3 hover-elevate active-elevate-2 rounded-lg p-2 -m-2 transition-all"
-              aria-label="App-Informationen anzeigen"
-              data-testid="button-show-build-info"
-            >
-              <img
-                src="/apple-touch-icon.png"
-                alt="EnergyLink"
-                className="w-10 h-10 rounded-lg"
-              />
-              <h1 className="text-2xl font-bold mb-0">Logs</h1>
-            </button>
-            {settings?.demoMode && (
-              <Badge
-                variant="secondary"
-                className="text-xs shrink-0"
-                data-testid="badge-demo-mode"
-              >
-                Demo
-              </Badge>
-            )}
-          </div>
+          <PageHeader
+            title="Logs"
+            onLogoClick={() => setShowBuildInfoDialog(true)}
+            isDemoMode={settings?.demoMode}
+          />
 
           <Card>
             <CardHeader className="pb-3">
@@ -308,116 +176,18 @@ export default function LogsPage() {
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base flex items-center justify-between">
-                <span>Filter</span>
-                <div className="flex gap-2">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => refetch()}
-                    data-testid="button-refresh-logs"
-                  >
-                    <RefreshCw className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="destructive"
-                    onClick={() => clearLogsMutation.mutate()}
-                    disabled={clearLogsMutation.isPending}
-                    data-testid="button-clear-logs"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex flex-col gap-2">
-                <label className="text-sm text-muted-foreground">Level</label>
-                <Select
-                  value={filterLevel}
-                  onValueChange={(value) =>
-                    setFilterLevel(value as LogLevel | "all")
-                  }
-                  data-testid="select-filter-level"
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Alle</SelectItem>
-                    <SelectItem value="trace">Trace (und höher)</SelectItem>
-                    <SelectItem value="debug">Debug (und höher)</SelectItem>
-                    <SelectItem value="info">Info (und höher)</SelectItem>
-                    <SelectItem value="warning">Warning (und höher)</SelectItem>
-                    <SelectItem value="error">Nur Error</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="flex flex-col gap-2">
-                <label className="text-sm text-muted-foreground">Text-Suche</label>
-                <Input
-                  type="text"
-                  placeholder="Durchsuche Nachricht, Details und Kategorie..."
-                  value={textFilter}
-                  onChange={(e) => setTextFilter(e.target.value)}
-                  data-testid="input-text-filter"
-                />
-                <p className="text-xs text-muted-foreground">
-                  Filtere Logs nach beliebigem Text (Groß-/Kleinschreibung wird ignoriert)
-                </p>
-              </div>
-
-              <div className="flex flex-col gap-3">
-                <div className="flex items-center justify-between">
-                  <label className="text-sm text-muted-foreground">
-                    Kategorien (
-                    {selectedCategories.length > 0
-                      ? selectedCategories.length
-                      : "Alle"}
-                    )
-                  </label>
-                  {selectedCategories.length > 0 && (
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => setSelectedCategories([])}
-                      className="h-6 text-xs"
-                      data-testid="button-clear-category-filter"
-                    >
-                      Alle auswählen
-                    </Button>
-                  )}
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {ALL_CATEGORIES.map((category) => {
-                    const isSelected = selectedCategories.includes(category);
-                    return (
-                      <Badge
-                        key={category}
-                        className={`cursor-pointer transition-all ${
-                          isSelected
-                            ? getCategoryColor(category)
-                            : "bg-muted text-muted-foreground hover-elevate"
-                        }`}
-                        onClick={() => toggleCategory(category)}
-                        data-testid={`badge-filter-${category}`}
-                      >
-                        {getCategoryLabel(category)}
-                      </Badge>
-                    );
-                  })}
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  Klicke auf Kategorien um sie zu filtern. Ohne Auswahl werden
-                  alle angezeigt.
-                </p>
-              </div>
-            </CardContent>
-          </Card>
+          <LogFilterCard
+            filterLevel={filterLevel}
+            onFilterLevelChange={setFilterLevel}
+            textFilter={textFilter}
+            onTextFilterChange={setTextFilter}
+            selectedCategories={selectedCategories}
+            onToggleCategory={toggleCategory}
+            onClearCategories={() => setSelectedCategories([])}
+            onRefresh={() => refetch()}
+            onClearLogs={() => clearLogsMutation.mutate()}
+            isClearingLogs={clearLogsMutation.isPending}
+          />
 
           {filteredLogs.length === 0 && !logsLoading && (
             <Alert data-testid="alert-no-logs">
@@ -431,52 +201,7 @@ export default function LogsPage() {
 
           <div className="space-y-2">
             {filteredLogs.map((log) => (
-              <Card
-                key={log.id}
-                className="overflow-hidden"
-                data-testid={`log-entry-${log.id}`}
-              >
-                <CardContent className="p-4">
-                  <div className="flex items-start gap-3">
-                    <div className="flex flex-col gap-1 min-w-0 flex-1">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <Badge
-                          className={getLevelColor(log.level)}
-                          data-testid={`badge-level-${log.level}`}
-                        >
-                          {log.level.toUpperCase()}
-                        </Badge>
-                        <Badge
-                          className={getCategoryColor(log.category)}
-                          data-testid={`badge-category-${log.category}`}
-                        >
-                          {log.category}
-                        </Badge>
-                        <span
-                          className="text-xs text-muted-foreground"
-                          data-testid={`text-timestamp-${log.id}`}
-                        >
-                          {formatTimestamp(log.timestamp)}
-                        </span>
-                      </div>
-                      <p
-                        className="text-sm font-medium"
-                        data-testid={`text-message-${log.id}`}
-                      >
-                        {log.message}
-                      </p>
-                      {log.details && (
-                        <p
-                          className="text-xs text-muted-foreground font-mono break-all"
-                          data-testid={`text-details-${log.id}`}
-                        >
-                          {log.details}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
+              <LogEntryItem key={log.id} log={log} />
             ))}
           </div>
 
@@ -488,83 +213,11 @@ export default function LogsPage() {
         </div>
       </div>
 
-      <Dialog open={showBuildInfoDialog} onOpenChange={setShowBuildInfoDialog}>
-        <DialogContent className="max-w-md" data-testid="dialog-build-info">
-          <DialogHeader>
-            <div className="flex items-center gap-2">
-              <Info className="w-5 h-5 text-primary" />
-              <DialogTitle>EnergyLink App</DialogTitle>
-            </div>
-            <DialogDescription>
-              Smarte Steuerung von KEBA P20 Wallbox und E3DC S10 Hauskraftwerk
-            </DialogDescription>
-          </DialogHeader>
-
-          {buildInfo ? (
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <p className="text-xs font-medium text-muted-foreground">
-                    Version
-                  </p>
-                  <p
-                    className="text-sm font-mono"
-                    data-testid="text-build-version"
-                  >
-                    v{buildInfo.version}
-                  </p>
-                </div>
-                <div className="space-y-1">
-                  <p className="text-xs font-medium text-muted-foreground">
-                    Branch
-                  </p>
-                  <p
-                    className="text-sm font-mono"
-                    data-testid="text-build-branch"
-                  >
-                    {buildInfo.branch}
-                  </p>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <p className="text-xs font-medium text-muted-foreground">
-                    Commit
-                  </p>
-                  <p
-                    className="text-sm font-mono"
-                    data-testid="text-build-commit"
-                  >
-                    {buildInfo.commit}
-                  </p>
-                </div>
-                <div className="space-y-1">
-                  <p className="text-xs font-medium text-muted-foreground">
-                    Build
-                  </p>
-                  <p className="text-sm" data-testid="text-build-time">
-                    {new Date(buildInfo.buildTime).toLocaleDateString("de-DE", {
-                      year: "numeric",
-                      month: "2-digit",
-                      day: "2-digit",
-                    })}
-                    ,{" "}
-                    {new Date(buildInfo.buildTime).toLocaleTimeString("de-DE", {
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}
-                  </p>
-                </div>
-              </div>
-            </div>
-          ) : (
-            <p className="text-sm text-muted-foreground">
-              Build-Informationen konnten nicht geladen werden
-            </p>
-          )}
-        </DialogContent>
-      </Dialog>
+      <BuildInfoDialog
+        open={showBuildInfoDialog}
+        onOpenChange={setShowBuildInfoDialog}
+        buildInfo={buildInfo}
+      />
     </div>
   );
 }
