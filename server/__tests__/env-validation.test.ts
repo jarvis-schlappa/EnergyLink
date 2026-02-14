@@ -72,6 +72,6 @@ describe("validateEnvironment", () => {
     const result = validateEnvironment();
 
     const portWarning = result.warnings.find((w) => w.includes("PORT"));
-    expect(portWarning).toContain("Default: 5000");
+    expect(portWarning).toContain("Default: 3000");
   });
 });
