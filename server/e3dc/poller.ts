@@ -38,6 +38,11 @@ const IDLE_WALLBOX_POLL_INTERVAL_MS = 30_000;
 let lastWallboxPollTime = 0;
 let lastWallboxPower = 0;
 
+// E3DC Idle-Polling Throttle (Issue #102)
+// Wenn Strategie "off" → gesamtes E3DC-Polling auf 30s drosseln statt ~7-10s
+const IDLE_E3DC_POLL_INTERVAL_S = 30;
+let idleThrottleOverride = false;
+
 /**
  * Einzelner Poll-Durchlauf (mit Promise-Tracking und Exponential Backoff)
  * 
@@ -175,9 +180,24 @@ async function pollE3dcData(): Promise<boolean> {
  * damit das nächste Intervall basierend auf backoffLevel berechnet werden kann.
  */
 async function scheduleNextPoll(): Promise<void> {
-  // Berechne nächstes Intervall basierend auf Backoff-Level
-  const nextIntervalSeconds = BACKOFF_INTERVALS[backoffLevel];
+  // Issue #102: Im Idle (Strategie "off") gesamtes Polling auf 30s drosseln
+  const settings = storage.getSettings();
+  const isIdle = settings?.chargingStrategy?.activeStrategy === "off";
+  const wasIdle = idleThrottleOverride;
+  idleThrottleOverride = isIdle;
+  
+  // Berechne nächstes Intervall basierend auf Backoff-Level und Idle-Status
+  const backoffInterval = BACKOFF_INTERVALS[backoffLevel];
+  const nextIntervalSeconds = (isIdle && backoffLevel === 0) 
+    ? Math.max(backoffInterval, IDLE_E3DC_POLL_INTERVAL_S)
+    : backoffInterval;
   const nextIntervalMs = nextIntervalSeconds * 1000;
+  
+  if (isIdle && !wasIdle) {
+    log("info", "e3dc-poller", `Idle-Modus aktiv → E3DC-Polling gedrosselt auf ${nextIntervalSeconds}s`);
+  } else if (!isIdle && wasIdle) {
+    log("info", "e3dc-poller", `Idle-Modus beendet → E3DC-Polling zurück auf ${backoffInterval}s`);
+  }
 
   // Starte nächsten Poll nach Intervall
   initialPollerTimeout = setTimeout(async () => {
@@ -237,7 +257,8 @@ export function getE3dcBackoffLevel(): number {
 export function resetWallboxIdleThrottle(): void {
   lastWallboxPollTime = 0;
   lastWallboxPower = 0;
-  log("debug", "e3dc-poller", "Wallbox-Idle-Throttle zurückgesetzt (State-Änderung)");
+  idleThrottleOverride = false;  // Issue #102: Idle-Throttle sofort zurücksetzen
+  log("debug", "e3dc-poller", "Wallbox-Idle-Throttle zurückgesetzt (State-/Strategie-Änderung)");
 }
 
 /**
