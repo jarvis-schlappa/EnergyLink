@@ -85,11 +85,21 @@ export class ChargingStrategyController {
       const targetAmpere = maxCurrent; // 32A @ 1P oder 16A @ 3P
       const targetCurrentMa = targetAmpere * 1000;
       
-      log('debug', 'system', `[X1-Optimierung] Konfiguration: ${targetAmpere}A @ ${phases}P (physicalPhaseSwitch=${config?.physicalPhaseSwitch ?? 'default'})`);
+      // User-Limit aus ChargingContext berücksichtigen (Issue #101)
+      // Verhindert doppeltes ena 1: X1 startet direkt mit korrektem Strom
+      const userLimitAmpere = context.userCurrentLimitAmpere;
+      const effectiveAmpere = (userLimitAmpere && userLimitAmpere < targetAmpere) ? userLimitAmpere : targetAmpere;
+      const effectiveCurrentMa = effectiveAmpere * 1000;
+      
+      if (effectiveAmpere < targetAmpere) {
+        log('debug', 'system', `[X1-Optimierung] Konfiguration: ${effectiveAmpere}A @ ${phases}P (User-Limit: ${userLimitAmpere}A, Max: ${targetAmpere}A)`);
+      } else {
+        log('debug', 'system', `[X1-Optimierung] Konfiguration: ${effectiveAmpere}A @ ${phases}P (physicalPhaseSwitch=${config?.physicalPhaseSwitch ?? 'default'})`);
+      }
       
       // 1. Wallbox SOFORT starten - KEINE Verzögerung durch Battery Lock!
       await this.sendUdpCommand(wallboxIp, "ena 1");
-      await this.sendUdpCommand(wallboxIp, `curr ${targetCurrentMa}`);
+      await this.sendUdpCommand(wallboxIp, `curr ${effectiveCurrentMa}`);
       
       // 2. Context aktualisieren - OHNE strategy!
       // Strategie wird vom wallbox-broadcast-listener finally-Block gesetzt
@@ -97,15 +107,15 @@ export class ChargingStrategyController {
       const now = new Date();
       storage.updateChargingContext({
         isActive: true,
-        currentAmpere: targetAmpere,
-        targetAmpere: targetAmpere,
+        currentAmpere: effectiveAmpere,
+        targetAmpere: effectiveAmpere,
         lastAdjustment: now.toISOString(),
         lastStartedAt: now.toISOString(),
         belowThresholdSince: undefined,
       });
       
       const duration = Date.now() - startTime;
-      log('info', 'system', `Ladung gestartet mit ${targetAmpere}A @ ${phases}P - X1-Optimiert in ${duration}ms`);
+      log('info', 'system', `Ladung gestartet mit ${effectiveAmpere}A @ ${phases}P - X1-Optimiert in ${duration}ms`);
       
       // 3. Battery Lock DANACH aktivieren (sequentiell, blockiert UI nicht mehr)
       if (settings?.e3dc?.enabled) {
@@ -665,6 +675,17 @@ export class ChargingStrategyController {
       
       // Korrigiere Context wenn nötig
       if (context.isActive && !reallyCharging) {
+        // Issue #101: Grace Period nach recentem Start (z.B. X1-Trigger)
+        // Wallbox braucht physisch ein paar Sekunden bis State=3 und Power>0
+        const RECONCILE_GRACE_PERIOD_MS = 30000; // 30s Grace Period
+        if (context.lastStartedAt) {
+          const timeSinceStart = Date.now() - new Date(context.lastStartedAt).getTime();
+          if (timeSinceStart < RECONCILE_GRACE_PERIOD_MS) {
+            log("debug", "system", `[RECONCILE] Context sagt isActive=true, Wallbox noch nicht aktiv (State=${wallboxState}) - Grace Period: ${Math.ceil((RECONCILE_GRACE_PERIOD_MS - timeSinceStart) / 1000)}s verbleibend`);
+            return; // Nicht überschreiben - Wallbox startet gerade
+          }
+        }
+        
         log("info", "system", `[RECONCILE] Context sagt isActive=true, aber Wallbox lädt nicht (State=${wallboxState}, Power=${wallboxPower}mW) → setze isActive=false`);
         storage.updateChargingContext({
           isActive: false,
