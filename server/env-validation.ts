@@ -11,7 +11,7 @@ const ENV_VARS: EnvVarConfig[] = [
   {
     name: "PORT",
     required: false,
-    defaultValue: "5000",
+    defaultValue: "3000",
     description: "HTTP-Server-Port",
   },
   {

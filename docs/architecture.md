@@ -11,7 +11,7 @@ Technischer Überblick über den Aufbau von EnergyLink (v1.0.2).
 │  SettingsPage · BottomNav               │
 │  TanStack Query · shadcn/ui · Tailwind  │
 └──────────────────┬──────────────────────┘
-                   │ REST API (Port 5000)
+                   │ REST API (Port 3000)
 ┌──────────────────▼──────────────────────┐
 │           Backend (Express.js)          │
 │                                         │
@@ -91,7 +91,7 @@ File-basierte JSON-Persistenz (`data/*.json`) mit atomaren Schreibvorgängen. Ve
 | E3DC Modbus | Modbus TCP | 502 | 1s Polling |
 | E3DC Steuerung | CLI (`e3dcset`) | – | Bei Bedarf (5s Rate-Limit) |
 | FHEM | TCP Socket | 7072 | 10s Sync |
-| Frontend | REST/SSE | 5000 | 5s Auto-Refresh |
+| Frontend | REST/SSE | 3000 | 5s Auto-Refresh |
 
 ## Charging Strategy Controller
 
