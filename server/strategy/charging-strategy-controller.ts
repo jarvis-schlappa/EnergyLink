@@ -567,6 +567,12 @@ export class ChargingStrategyController {
     
     log("debug", "system", `shouldStartCharging: strategy=${strategy}, surplus=${surplus}W, plug=${this.lastPlugStatus}`);
     
+    // Issue #105: Strategie "off" darf NIEMALS Ladung starten
+    if (strategy === "off") {
+      log("debug", "system", `shouldStartCharging: strategy=off → return false`);
+      return false;
+    }
+    
     // Max Power Strategien starten sofort ohne Delay - ABER nur wenn Auto angeschlossen
     if (strategy === "max_with_battery" || strategy === "max_without_battery") {
       if (this.lastPlugStatus !== 7) {
