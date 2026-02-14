@@ -1,6 +1,6 @@
 # EnergyLink
 
-[![CI](https://github.com/jarvis-schlappa/EnergyLink/actions/workflows/ci.yml/badge.svg)](https://github.com/jarvis-schlappa/EnergyLink/actions)
+[![CI](https://github.com/mschlappa/EnergyLink/actions/workflows/ci.yml/badge.svg)](https://github.com/mschlappa/EnergyLink/actions)
 ![Version](https://img.shields.io/badge/version-1.0.2-blue)
 ![Lizenz](https://img.shields.io/badge/license-MIT-green)
 
@@ -24,7 +24,7 @@ Intelligente Wallbox-Steuerung für KEBA Ladestationen mit E3DC S10 Integration.
 ## Quick Start
 
 ```bash
-git clone https://github.com/jarvis-schlappa/EnergyLink.git && cd EnergyLink
+git clone https://github.com/mschlappa/EnergyLink.git && cd EnergyLink
 ```
 
 ### Docker
