@@ -45,7 +45,7 @@ Die App ist erreichbar unter `http://localhost:5000`.
 ### Option 2: Bare Metal
 
 ```bash
-git clone https://github.com/jarvis-schlappa/EnergyLink.git
+git clone https://github.com/mschlappa/EnergyLink.git
 cd EnergyLink
 npm install
 npm run build

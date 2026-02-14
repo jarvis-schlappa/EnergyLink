@@ -5,7 +5,7 @@ Vielen Dank für Ihr Interesse an EnergyLink! Hier erfahren Sie, wie Sie zum Pro
 ## Development Setup
 
 ```bash
-git clone https://github.com/jarvis-schlappa/EnergyLink.git
+git clone https://github.com/mschlappa/EnergyLink.git
 cd EnergyLink
 npm install
 npm run dev          # Startet Dev-Server (Frontend + Backend)
