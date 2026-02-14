@@ -47,6 +47,32 @@ vi.mock("../monitoring/prowl-notifier", () => ({
   extractTargetWh: vi.fn(),
 }));
 
+vi.mock("../wallbox/sse", () => ({
+  initSSEClient: vi.fn(),
+  broadcastWallboxStatus: vi.fn(),
+  broadcastPartialUpdate: vi.fn(),
+}));
+
+vi.mock("../routes/shared-state", () => ({
+  getOrCreateStrategyController: vi.fn(),
+}));
+
+vi.mock("@shared/schema", () => ({
+  chargingStrategySchema: { safeParse: vi.fn() },
+}));
+
+describe("Status Poll Throttle (Issue #93)", () => {
+  it("should export resetStatusPollThrottle function", async () => {
+    const { resetStatusPollThrottle } = await import("../routes/wallbox-routes");
+    expect(typeof resetStatusPollThrottle).toBe("function");
+  });
+
+  it("resetStatusPollThrottle should not throw", async () => {
+    const { resetStatusPollThrottle } = await import("../routes/wallbox-routes");
+    expect(() => resetStatusPollThrottle()).not.toThrow();
+  });
+});
+
 describe("Wallbox Idle Polling Throttle (Issue #80)", () => {
   beforeEach(() => {
     vi.useFakeTimers();
