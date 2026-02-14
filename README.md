@@ -23,6 +23,10 @@ Intelligente Wallbox-Steuerung für KEBA Ladestationen mit E3DC S10 Integration.
 
 ## Quick Start
 
+```bash
+git clone https://github.com/jarvis-schlappa/EnergyLink.git && cd EnergyLink
+```
+
 ### Docker
 
 ```bash
@@ -33,9 +37,9 @@ docker-compose up -d
 ### Bare Metal
 
 ```bash
-git clone https://github.com/jarvis-schlappa/EnergyLink.git && cd EnergyLink
 npm install && npm run build
 NODE_ENV=production node dist/index.js
+# App öffnen: http://localhost:5000
 ```
 
 ## Dokumentation
