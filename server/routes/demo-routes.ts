@@ -1,8 +1,8 @@
 import type { Express } from "express";
-import { storage } from "../storage";
-import { log } from "../logger";
+import { storage } from "../core/storage";
+import { log } from "../core/logger";
 import { z } from "zod";
-import { wallboxMockService } from "../wallbox-mock";
+import { wallboxMockService } from "../demo/wallbox-mock";
 
 /**
  * Demo-only Routes für Wallbox-Simulation.

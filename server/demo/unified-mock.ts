@@ -20,8 +20,8 @@ import { e3dcMockService } from './e3dc-mock';
 // @ts-ignore - modbus-serial has incomplete type definitions
 import ModbusRTU from 'modbus-serial';
 import type { ControlState, Settings } from '@shared/schema';
-import { log } from './logger';
-import { storage } from './storage';
+import { log } from '../core/logger';
+import { storage } from '../core/storage';
 
 // Port-Konfiguration
 const WALLBOX_UDP_PORT = 7090;
@@ -197,7 +197,7 @@ fhemServer.on('error', (err) => {
 // WALLBOX UDP HANDLER (verwendet zentralen UDP-Channel)
 // =============================================================================
 
-import { wallboxUdpChannel } from './wallbox-udp-channel';
+import { wallboxUdpChannel } from '../wallbox/udp-channel';
 
 // Command-Handler für KEBA-Befehle
 const handleWallboxCommand = (message: string, rinfo: any) => {

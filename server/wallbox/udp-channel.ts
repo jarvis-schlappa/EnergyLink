@@ -12,7 +12,7 @@
 import dgram from 'dgram';
 import type { Socket, RemoteInfo } from 'dgram';
 import { EventEmitter } from 'events';
-import { log } from './logger';
+import { log } from '../core/logger';
 
 const WALLBOX_UDP_PORT = 7090;
 

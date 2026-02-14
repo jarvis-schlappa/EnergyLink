@@ -1,9 +1,9 @@
 import type { E3dcConfig } from '@shared/schema';
-import { log } from './logger';
-import { getE3dcModbusService } from './e3dc-modbus';
-import { stopE3dcPoller, startE3dcPoller } from './e3dc-poller';
-import type { E3dcGateway } from './e3dc-gateway';
-import { RealE3dcGateway, MockE3dcGateway } from './e3dc-gateway';
+import { log } from '../core/logger';
+import { getE3dcModbusService } from './modbus';
+import { stopE3dcPoller, startE3dcPoller } from './poller';
+import type { E3dcGateway } from './gateway';
+import { RealE3dcGateway, MockE3dcGateway } from './gateway';
 
 /**
  * Prüft ob für einen e3dcset-Befehl eine Modbus-Pause nötig ist.

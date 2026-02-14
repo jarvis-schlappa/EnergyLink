@@ -1,8 +1,8 @@
 import type { E3dcLiveData } from "@shared/schema";
 import fs from 'fs/promises';
 import path from 'path';
-import { log } from './logger';
-import { storage } from './storage';
+import { log } from '../core/logger';
+import { storage } from '../core/storage';
 
 interface E3dcControlState {
   maxDischargePower: number;   // Maximale Entladeleistung in Watt (1W = gesperrt, 3000W = normal)

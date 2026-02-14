@@ -9,11 +9,11 @@
  * Tier 3: >±0.2 Hz Abweichung → Rotes Symbol, Warn-Log, Prowl-Benachrichtigung, Batterie auf 90% laden
  */
 
-import { log } from "./logger";
-import { storage } from "./storage";
-import { getE3dcLiveDataHub } from "./e3dc-modbus";
+import { log } from "../core/logger";
+import { storage } from "../core/storage";
+import { getE3dcLiveDataHub } from "../e3dc/modbus";
 import { triggerProwlEvent, getProwlNotifier } from "./prowl-notifier";
-import { e3dcClient } from "./e3dc-client";
+import { e3dcClient } from "../e3dc/client";
 import type { GridFrequencyStatus, E3dcLiveData } from "@shared/schema";
 
 const NOMINAL_FREQUENCY = 50.0;

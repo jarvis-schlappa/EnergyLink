@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 
 // Mock logger to avoid side effects
-vi.mock("../logger", () => ({
+vi.mock("../core/logger", () => ({
   log: vi.fn(),
 }));
 
@@ -27,7 +27,7 @@ describe("validateEnvironment", () => {
     delete process.env.BUILD_COMMIT;
     delete process.env.BUILD_TIME;
 
-    const { validateEnvironment } = await import("../env-validation");
+    const { validateEnvironment } = await import("../core/env-validation");
     const result = validateEnvironment();
 
     expect(result.valid).toBe(true);
@@ -44,7 +44,7 @@ describe("validateEnvironment", () => {
     process.env.BUILD_COMMIT = "abc123";
     process.env.BUILD_TIME = "2026-01-01";
 
-    const { validateEnvironment } = await import("../env-validation");
+    const { validateEnvironment } = await import("../core/env-validation");
     const result = validateEnvironment();
 
     expect(result.valid).toBe(true);
@@ -57,7 +57,7 @@ describe("validateEnvironment", () => {
     process.env.PORT = "5000";
     process.env.NODE_ENV = "production";
 
-    const { validateEnvironment } = await import("../env-validation");
+    const { validateEnvironment } = await import("../core/env-validation");
     const result = validateEnvironment();
 
     expect(result.valid).toBe(true);
@@ -68,7 +68,7 @@ describe("validateEnvironment", () => {
   it("should include default info in warnings", async () => {
     delete process.env.PORT;
 
-    const { validateEnvironment } = await import("../env-validation");
+    const { validateEnvironment } = await import("../core/env-validation");
     const result = validateEnvironment();
 
     const portWarning = result.warnings.find((w) => w.includes("PORT"));

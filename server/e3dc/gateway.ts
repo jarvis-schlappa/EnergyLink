@@ -1,7 +1,7 @@
 import { exec } from 'child_process';
 import { promisify } from 'util';
-import { log } from './logger';
-import { executeMockCommand } from './e3dcset-mock';
+import { log } from '../core/logger';
+import { executeMockCommand } from '../demo/e3dcset-mock';
 
 const execAsync = promisify(exec);
 

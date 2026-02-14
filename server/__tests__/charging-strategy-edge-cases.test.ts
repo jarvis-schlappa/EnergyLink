@@ -1,11 +1,11 @@
-import { DEFAULT_WALLBOX_IP } from "../defaults";
+import { DEFAULT_WALLBOX_IP } from "../core/defaults";
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { ChargingStrategyController } from "../charging-strategy-controller";
-import { RealPhaseProvider } from "../phase-provider";
+import { ChargingStrategyController } from "../strategy/charging-strategy-controller";
+import { RealPhaseProvider } from "../strategy/phase-provider";
 import type { E3dcLiveData } from "@shared/schema";
 
 // Reuse mocks from charging-strategy.test.ts
-vi.mock("../storage", () => {
+vi.mock("../core/storage", () => {
   const defaultContext = {
     strategy: "off" as const,
     isActive: false,
@@ -49,14 +49,14 @@ vi.mock("../storage", () => {
   };
 });
 
-vi.mock("../logger", () => ({ log: vi.fn() }));
-vi.mock("../e3dc-client", () => ({
+vi.mock("../core/logger", () => ({ log: vi.fn() }));
+vi.mock("../e3dc/client", () => ({
   e3dcClient: { isConfigured: vi.fn(() => false), configure: vi.fn(), lockDischarge: vi.fn(), unlockDischarge: vi.fn() },
 }));
-vi.mock("../e3dc-modbus", () => ({ getE3dcLiveDataHub: vi.fn(() => ({ subscribe: vi.fn(() => vi.fn()) })) }));
-vi.mock("../prowl-notifier", () => ({ triggerProwlEvent: vi.fn() }));
+vi.mock("../e3dc/modbus", () => ({ getE3dcLiveDataHub: vi.fn(() => ({ subscribe: vi.fn(() => vi.fn()) })) }));
+vi.mock("../monitoring/prowl-notifier", () => ({ triggerProwlEvent: vi.fn() }));
 
-import { storage } from "../storage";
+import { storage } from "../core/storage";
 
 function makeLiveData(overrides: Partial<E3dcLiveData> = {}): E3dcLiveData {
   return {

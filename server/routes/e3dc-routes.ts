@@ -1,11 +1,11 @@
 import type { Express } from "express";
-import { storage } from "../storage";
-import { log } from "../logger";
-import { e3dcClient } from "../e3dc-client";
-import { getE3dcModbusService } from "../e3dc-modbus";
-import { getE3dcBackoffLevel } from "../e3dc-poller";
-import { getGridFrequencyState } from "../grid-frequency-monitor";
-import { getProwlNotifier } from "../prowl-notifier";
+import { storage } from "../core/storage";
+import { log } from "../core/logger";
+import { e3dcClient } from "../e3dc/client";
+import { getE3dcModbusService } from "../e3dc/modbus";
+import { getE3dcBackoffLevel } from "../e3dc/poller";
+import { getGridFrequencyState } from "../monitoring/grid-frequency-monitor";
+import { getProwlNotifier } from "../monitoring/prowl-notifier";
 
 export function registerE3dcRoutes(app: Express): void {
   app.get("/api/e3dc/live-data", async (req, res) => {

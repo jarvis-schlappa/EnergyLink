@@ -1,4 +1,4 @@
-import { DEFAULT_WALLBOX_IP } from "../defaults";
+import { DEFAULT_WALLBOX_IP } from "../core/defaults";
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { existsSync, mkdirSync, writeFileSync, rmSync, readFileSync, renameSync, unlinkSync } from "fs";
 import { join } from "path";

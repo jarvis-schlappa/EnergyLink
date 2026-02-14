@@ -1,16 +1,16 @@
 import express, { type Request, Response, NextFunction } from "express";
-import { registerRoutes } from "./routes";
-import { storage } from "./storage";
-import { startUnifiedMock, stopUnifiedMock } from "./unified-mock";
-import { startBroadcastListener, stopBroadcastListener } from "./wallbox-broadcast-listener";
-import { sendUdpCommand } from "./wallbox-transport";
-import { log } from "./logger";
-import { initializeProwlNotifier, triggerProwlEvent } from "./prowl-notifier";
-import { requireApiKey } from "./auth";
-import { healthHandler } from "./health";
-import { validateEnvironment } from "./env-validation";
-import { e3dcClient } from "./e3dc-client";
-import { RealE3dcGateway, MockE3dcGateway } from "./e3dc-gateway";
+import { registerRoutes } from "./routes/index";
+import { storage } from "./core/storage";
+import { startUnifiedMock, stopUnifiedMock } from "./demo/unified-mock";
+import { startBroadcastListener, stopBroadcastListener } from "./wallbox/broadcast-listener";
+import { sendUdpCommand } from "./wallbox/transport";
+import { log } from "./core/logger";
+import { initializeProwlNotifier, triggerProwlEvent } from "./monitoring/prowl-notifier";
+import { requireApiKey } from "./core/auth";
+import { healthHandler } from "./core/health";
+import { validateEnvironment } from "./core/env-validation";
+import { e3dcClient } from "./e3dc/client";
+import { RealE3dcGateway, MockE3dcGateway } from "./e3dc/gateway";
 
 // Validate environment variables before anything else
 const envResult = validateEnvironment();
@@ -68,7 +68,7 @@ app.use((req, res, next) => {
 
 (async () => {
   // Import UDP-Channel
-  const { wallboxUdpChannel } = await import('./wallbox-udp-channel');
+  const { wallboxUdpChannel } = await import('./wallbox/udp-channel');
 
   // E3DC Gateway: Einmalig entscheiden ob Real oder Mock
   const shouldStartMock = process.env.DEMO_AUTOSTART === 'true' || storage.getSettings()?.demoMode;
@@ -139,11 +139,11 @@ app.use((req, res, next) => {
   // doesn't interfere with the other routes
   if (app.get("env") === "development") {
     // Dynamic import to prevent vite from being bundled into production build
-    const viteMod = "./vite";
+    const viteMod = "./core/vite";
     const { setupVite } = await import(/* @vite-ignore */ viteMod);
     await setupVite(app, server);
   } else {
-    const { serveStatic } = await import("./static");
+    const { serveStatic } = await import("./core/static");
     serveStatic(app);
   }
 

@@ -1,9 +1,9 @@
 import type { Express } from "express";
-import { storage } from "../storage";
+import { storage } from "../core/storage";
 import { chargingStrategySchema, type ChargingStrategy } from "@shared/schema";
-import { log } from "../logger";
-import { sendUdpCommand } from "../wallbox-transport";
-import { initSSEClient, broadcastWallboxStatus } from "../wallbox-sse";
+import { log } from "../core/logger";
+import { sendUdpCommand } from "../wallbox/transport";
+import { initSSEClient, broadcastWallboxStatus } from "../wallbox/sse";
 import { getOrCreateStrategyController } from "./shared-state";
 
 export function registerWallboxRoutes(app: Express): void {

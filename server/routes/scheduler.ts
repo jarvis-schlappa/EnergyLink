@@ -1,14 +1,14 @@
-import { storage } from "../storage";
+import { storage } from "../core/storage";
 import { chargingStrategyConfigSchema } from "@shared/schema";
-import { e3dcClient } from "../e3dc-client";
-import { getE3dcModbusService } from "../e3dc-modbus";
-import { log } from "../logger";
-import { DEFAULT_WALLBOX_IP } from "../defaults";
-import { sendUdpCommand } from "../wallbox-transport";
-import { startFhemSyncScheduler, stopFhemSyncScheduler } from "../fhem-e3dc-sync";
-import { startE3dcPoller, stopE3dcPoller, getE3dcBackoffLevel } from "../e3dc-poller";
-import { triggerProwlEvent, extractTargetWh } from "../prowl-notifier";
-import { startGridFrequencyMonitor, stopGridFrequencyMonitor } from "../grid-frequency-monitor";
+import { e3dcClient } from "../e3dc/client";
+import { getE3dcModbusService } from "../e3dc/modbus";
+import { log } from "../core/logger";
+import { DEFAULT_WALLBOX_IP } from "../core/defaults";
+import { sendUdpCommand } from "../wallbox/transport";
+import { startFhemSyncScheduler, stopFhemSyncScheduler } from "../fhem/e3dc-sync";
+import { startE3dcPoller, stopE3dcPoller, getE3dcBackoffLevel } from "../e3dc/poller";
+import { triggerProwlEvent, extractTargetWh } from "../monitoring/prowl-notifier";
+import { startGridFrequencyMonitor, stopGridFrequencyMonitor } from "../monitoring/grid-frequency-monitor";
 import { getCurrentTimeInTimezone, isTimeInRange } from "./helpers";
 import {
   chargingStrategyInterval,

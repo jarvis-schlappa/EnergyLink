@@ -1,10 +1,10 @@
 import type { ChargingStrategy, ChargingStrategyConfig, ChargingContext, E3dcLiveData } from "@shared/schema";
-import { storage } from "./storage";
-import { log } from "./logger";
-import { e3dcClient } from "./e3dc-client";
-import { getE3dcLiveDataHub } from "./e3dc-modbus";
-import { triggerProwlEvent } from "./prowl-notifier";
-import { DEFAULT_WALLBOX_IP } from "./defaults";
+import { storage } from "../core/storage";
+import { log } from "../core/logger";
+import { e3dcClient } from "../e3dc/client";
+import { getE3dcLiveDataHub } from "../e3dc/modbus";
+import { triggerProwlEvent } from "../monitoring/prowl-notifier";
+import { DEFAULT_WALLBOX_IP } from "../core/defaults";
 import type { PhaseProvider } from "./phase-provider";
 
 const PHASE_VOLTAGE_1P = 230;

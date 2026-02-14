@@ -6,7 +6,7 @@
  */
 
 import { Response } from "express";
-import { log } from "./logger";
+import { log } from "../core/logger";
 import type { WallboxStatus } from "@shared/schema";
 
 interface SSEClient {
