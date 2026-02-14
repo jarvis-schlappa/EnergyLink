@@ -316,4 +316,65 @@ describe("ChargingStrategyController", () => {
       expect(context.userCurrentLimitAmpere).toBe(8);
     });
   });
+
+  describe("Issue #99: Duplicate ena 0 prevention", () => {
+    it("should send ena 0 only once for concurrent stop calls", async () => {
+      // Setup: charging is active
+      (storage as any)._setContext({
+        isActive: true,
+        currentAmpere: 16,
+        targetAmpere: 16,
+        currentPhases: 1,
+        strategy: "surplus_battery_prio",
+      });
+
+      // Simulate slow UDP response (100ms)
+      mockSendUdp.mockImplementation(() => new Promise(resolve => setTimeout(() => resolve({}), 100)));
+
+      // Fire two concurrent stop calls (simulates broadcast-listener + strategy-controller race)
+      const stop1 = (controller as any).stopCharging(DEFAULT_WALLBOX_IP, "caller 1");
+      const stop2 = (controller as any).stopCharging(DEFAULT_WALLBOX_IP, "caller 2");
+      await Promise.all([stop1, stop2]);
+
+      // ena 0 should be sent exactly once
+      const ena0Calls = mockSendUdp.mock.calls.filter(
+        (call: any[]) => call[1] === "ena 0"
+      );
+      expect(ena0Calls).toHaveLength(1);
+    });
+
+    it("should block second stop within 5s deduplication window", async () => {
+      // Setup: charging is active
+      (storage as any)._setContext({
+        isActive: true,
+        currentAmpere: 16,
+        targetAmpere: 16,
+        currentPhases: 1,
+        strategy: "surplus_battery_prio",
+      });
+
+      mockSendUdp.mockResolvedValue({});
+
+      // First stop
+      await (controller as any).stopCharging(DEFAULT_WALLBOX_IP, "first stop");
+      expect(mockSendUdp).toHaveBeenCalledWith(DEFAULT_WALLBOX_IP, "ena 0");
+
+      // Reset context to simulate race where context hasn't propagated
+      (storage as any)._setContext({
+        isActive: true,
+        currentAmpere: 16,
+        targetAmpere: 16,
+        currentPhases: 1,
+        strategy: "surplus_battery_prio",
+      });
+
+      // Second stop within 5s window - should be blocked by timestamp guard
+      await (controller as any).stopCharging(DEFAULT_WALLBOX_IP, "second stop");
+
+      const ena0Calls = mockSendUdp.mock.calls.filter(
+        (call: any[]) => call[1] === "ena 0"
+      );
+      expect(ena0Calls).toHaveLength(1);
+    });
+  });
 });
