@@ -211,31 +211,22 @@ export class E3dcMockService {
     // 9. Autarkie & Eigenverbrauch berechnen
     const { autarky, selfConsumption } = this.calculateEfficiency(pvPower, totalConsumption, gridPower);
 
-    // 10. Mock Grid Frequency (Netzfrequenz) - mit Test-Simulation
-    // Testzyklus pro Minute für Hysterese-Test (2 aufeinanderfolgende Messungen bei 10s Polling):
-    // 0-20s Normal (Tier 1), 20-35s Tier 2 (Warnung), 35-55s Tier 3 (Kritisch), 55-60s Normal
-    // Jede Phase ist lang genug für mindestens 2 Messungen (Hysterese-Counter)
+    // 10. Mock Grid Frequency (Netzfrequenz) - realistische Simulation
+    // Normalbetrieb: 49.98–50.02 Hz (typische Schwankungen im europäischen Verbundnetz)
+    // Gelegentlich (5% Wahrscheinlichkeit): Tier 2 Werte (±0.05 Hz) zur Demo
+    // Keine Tier 3 Werte im normalen Demo-Betrieb
     let gridFrequency = 50.0;
-    const secondsInMinute = Math.floor((Date.now() / 1000) % 60);
+    const roll = Math.random();
     
-    if (secondsInMinute < 20) {
-      // Tier 1: Normal - Abweichung < 0.05 Hz (unter Tier 2 Schwelle)
-      // Kleines Rauschen ±0.02 Hz um 50.0 Hz → max Abweichung 0.02 Hz
+    if (roll < 0.95) {
+      // 95%: Normal (Tier 1) - 49.98–50.02 Hz
       const noise = (Math.random() - 0.5) * 0.04;
       gridFrequency = parseFloat((50.0 + noise).toFixed(2));
-    } else if (secondsInMinute < 35) {
-      // Tier 2: Warnung - Abweichung 0.05-0.1 Hz (zwischen Tier 2 und Tier 3 Schwelle)
-      // Stabil bei 50.07 Hz (Abweichung 0.07 Hz)
-      gridFrequency = 50.07;
-    } else if (secondsInMinute < 55) {
-      // Tier 3: KRITISCH - Abweichung > 0.1 Hz (über Tier 3 Schwelle)
-      // Stabil bei 50.15 Hz (Abweichung 0.15 Hz) - triggert Batterie-Notladung!
-      // 20 Sekunden = mindestens 2 Messungen für Hysterese
-      gridFrequency = 50.15;
     } else {
-      // Zurück zu Tier 1: Normal (um zu testen, dass Notladung weiterläuft bis 90% SOC)
-      const noise = (Math.random() - 0.5) * 0.04;
-      gridFrequency = parseFloat((50.0 + noise).toFixed(2));
+      // 5%: Tier 2 Demo - leichte Abweichung ±0.05 Hz
+      const sign = Math.random() < 0.5 ? -1 : 1;
+      const deviation = 0.05 + Math.random() * 0.02; // 0.05–0.07 Hz
+      gridFrequency = parseFloat((50.0 + sign * deviation).toFixed(2));
     }
 
     return {
