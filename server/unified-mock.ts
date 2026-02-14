@@ -189,11 +189,6 @@ const fhemServer = http.createServer((req, res) => {
   res.end('<html><body>FHEM Mock Server - OK</body></html>');
 });
 
-fhemServer.on('listening', () => {
-  log("info", "fhem-mock", `✅ [FHEM-HTTP] FHEM Mock läuft auf ${HOST}:${FHEM_HTTP_PORT}`);
-  log("info", "fhem-mock", `   Unterstützt FHEM-typische URLs für Status & Befehle`);
-});
-
 fhemServer.on('error', (err) => {
   log("error", "fhem-mock", `[FHEM-HTTP] Server Error:`, err instanceof Error ? err.message : String(err));
 });
