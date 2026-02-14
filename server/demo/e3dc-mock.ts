@@ -32,6 +32,11 @@ export class E3dcMockService {
   private currentSoc: number = 50; // Start bei 50%
   private lastUpdateTime: number = Date.now();
   
+  // SOC-Änderung verzögert bei Battery-Lock Wechsel
+  private lastBatteryLockState: boolean = false;
+  private batteryLockChangeTime: number = 0;
+  private readonly BATTERY_LOCK_SOC_DELAY_MS = 5000; // 5s Verzögerung bis SOC reagiert
+  
   constructor() {
     // Initialer SOC basierend auf Tageszeit (Berliner Zeit)
     const { hour } = this.getBerlinTime();
@@ -150,6 +155,18 @@ export class E3dcMockService {
     // 5. Batterie-Leistung berechnen - EXAKT WIE ECHTER E3DC!
     let batteryPower = 0;
     
+    // Track Battery Lock state changes for delayed SOC response
+    const currentBatteryLocked = maxDischargePower <= 1;
+    if (currentBatteryLocked !== this.lastBatteryLockState) {
+      this.batteryLockChangeTime = Date.now();
+      this.lastBatteryLockState = currentBatteryLocked;
+    }
+    
+    // SOC change is delayed after battery lock state change (like real E3DC)
+    const timeSinceLockChange = Date.now() - this.batteryLockChangeTime;
+    const socChangeAllowed = this.batteryLockChangeTime === 0 || 
+      timeSinceLockChange > this.BATTERY_LOCK_SOC_DELAY_MS;
+    
     // Grid Charging aktiv → Batterie lädt mit konfigurierter Leistung (erzwingt Netzbezug!)
     if (gridCharging && this.currentSoc < 95) {
       batteryPower = gridChargePower;
@@ -188,8 +205,10 @@ export class E3dcMockService {
     // SOC-Änderung = (Energieänderung / Kapazität) × 100
     const socChange = (energyChangeKwh / this.BATTERY_CAPACITY_KWH) * 100;
     
-    // SOC aktualisieren und auf 0-100% begrenzen
-    this.currentSoc = Math.max(0, Math.min(100, this.currentSoc + socChange));
+    // SOC aktualisieren - verzögert nach Battery-Lock-Wechsel (wie echter E3DC)
+    if (socChangeAllowed) {
+      this.currentSoc = Math.max(0, Math.min(100, this.currentSoc + socChange));
+    }
     this.lastUpdateTime = currentTime;
     
     // 9. housePower für Frontend (mit Wallbox für E3DC-Display)
