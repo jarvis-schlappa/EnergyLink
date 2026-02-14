@@ -4,6 +4,7 @@ import { log } from "../core/logger";
 import { e3dcClient } from "../e3dc/client";
 import { getE3dcLiveDataHub } from "../e3dc/modbus";
 import { triggerProwlEvent } from "../monitoring/prowl-notifier";
+import { broadcastPartialUpdate } from "../wallbox/sse";
 import { DEFAULT_WALLBOX_IP } from "../core/defaults";
 import type { PhaseProvider } from "./phase-provider";
 
@@ -798,6 +799,9 @@ export class ChargingStrategyController {
           `Ladung gestartet mit ${finalAmpere}A @ ${currentPhases}P (Strategie: ${config.activeStrategy})`
         );
         
+        // Sofortiges SSE-Update an GUI (kein Warten auf nächsten Poll-Zyklus)
+        broadcastPartialUpdate({ state: 3, enableSys: 1 });
+        
         // Prowl-Benachrichtigung (non-blocking, with initialization guard)
         triggerProwlEvent(settings, "chargingStarted", (notifier) =>
           notifier.sendChargingStarted(finalAmpere, currentPhases, config.activeStrategy)
@@ -905,6 +909,9 @@ export class ChargingStrategyController {
       this.batteryDischargeSince = null;
       
       log("info", "system", "Ladung gestoppt");
+      
+      // Sofortiges SSE-Update an GUI (kein Warten auf nächsten Poll-Zyklus)
+      broadcastPartialUpdate({ state: 5, enableSys: 0 });
       
       // Prowl-Benachrichtigung mit Deduplication (max 1x pro 5 Sekunden)
       const now = Date.now();
