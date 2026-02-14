@@ -6,6 +6,23 @@ import { sendUdpCommand } from "../wallbox/transport";
 import { initSSEClient, broadcastWallboxStatus } from "../wallbox/sse";
 import { getOrCreateStrategyController } from "./shared-state";
 
+// Issue #93: Status-Poll-Throttle im Idle
+// Wenn Strategie "off" + State 5 (unterbrochen) → gecachten Status zurückgeben statt 3 UDP-Requests
+const IDLE_STATUS_POLL_INTERVAL_MS = 30_000;
+let lastStatusPollTime = 0;
+let lastCachedStatus: any = null;
+
+/**
+ * Setzt den Status-Poll-Throttle zurück (Issue #93).
+ * Wird aufgerufen bei State-Änderung oder Strategiewechsel,
+ * damit der nächste API-Call sofort frische Daten liefert.
+ */
+export function resetStatusPollThrottle(): void {
+  lastStatusPollTime = 0;
+  lastCachedStatus = null;
+  log("debug", "wallbox", "Status-Poll-Throttle zurückgesetzt (State-/Strategie-Änderung)");
+}
+
 export function registerWallboxRoutes(app: Express): void {
   // SSE-Endpoint für Echtzeit-Status-Updates
   app.get("/api/wallbox/stream", (req, res) => {
@@ -18,6 +35,17 @@ export function registerWallboxRoutes(app: Express): void {
 
       if (!settings?.wallboxIp) {
         return res.status(400).json({ error: "Wallbox IP not configured" });
+      }
+
+      // Issue #93: Im Idle (Strategie "off" + State 5) gecachten Status zurückgeben
+      const activeStrategy = settings?.chargingStrategy?.activeStrategy;
+      const now = Date.now();
+      const isIdle = activeStrategy === "off" && lastCachedStatus?.state === 5;
+
+      if (isIdle && lastCachedStatus && (now - lastStatusPollTime < IDLE_STATUS_POLL_INTERVAL_MS)) {
+        log("debug", "wallbox", `Status-Polling gedrosselt (Idle) - verwende Cache`);
+        broadcastWallboxStatus(lastCachedStatus);
+        return res.json(lastCachedStatus);
       }
 
       const report1 = await sendUdpCommand(settings.wallboxIp, "report 1");
@@ -53,6 +81,10 @@ export function registerWallboxRoutes(app: Express): void {
         i3: i3 / 1000,
         lastUpdated: new Date().toISOString(),
       };
+
+      // Issue #93: Cache aktualisieren für Idle-Throttle
+      lastStatusPollTime = now;
+      lastCachedStatus = status;
 
       // Tracke Änderungen des Kabelstatus im Hintergrund (nur bei gültigen Werten)
       if (typeof status.plug === "number") {
@@ -132,6 +164,9 @@ export function registerWallboxRoutes(app: Express): void {
         storage.saveSettings(updatedSettings);
         log("info", "wallbox", `Ladestrategie aktiviert: ${strategyToActivate}`);
       }
+
+      // Issue #93: Throttle zurücksetzen bei Start
+      resetStatusPollThrottle();
 
       // Sofort antworten für schnelle UI-Reaktion
       res.json({ success: true });
@@ -232,6 +267,9 @@ export function registerWallboxRoutes(app: Express): void {
       storage.saveSettings(updatedSettings);
       log("info", "wallbox", `Ladestrategie deaktiviert (auf "off" gesetzt)`);
       
+      // Issue #93: Throttle zurücksetzen bei Stopp
+      resetStatusPollThrottle();
+
       // Sofort antworten für schnelle UI-Reaktion
       res.json({ success: true });
       
