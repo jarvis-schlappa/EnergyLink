@@ -76,18 +76,15 @@ WantedBy=multi-user.target
 sudo systemctl enable --now energylink
 ```
 
-### Option 3: Replit Autoscale (Demo)
+### Option 3: Demo-Modus (ohne Hardware)
 
-Für eine öffentliche Demo ohne eigene Hardware:
+EnergyLink hat einen eingebauten Demo-Modus, der Wallbox und E3DC simuliert:
 
-1. Repository auf Replit importieren
-2. Secrets setzen: `DEMO_AUTOSTART=true`, `NODE_ENV=production`
-3. **Publish** → Autoscale Deployment wählen
-4. App ist live unter `https://your-app.replit.app`
+```bash
+DEMO_AUTOSTART=true node dist/index.js
+```
 
-**Kosten:** ~$3-6/Monat (mit Core Credits meist kostenlos)
-
-> ⚠️ Autoscale hat keinen persistenten Storage – nur für Demo/Showcase geeignet.
+Ideal zum Testen aller Funktionen ohne echte Hardware.
 
 ---
 

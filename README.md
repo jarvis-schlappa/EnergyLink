@@ -6,8 +6,6 @@
 
 Intelligente Wallbox-Steuerung für KEBA Ladestationen mit E3DC S10 Integration. Optimiert das Laden Ihres Elektrofahrzeugs mit PV-Überschuss, zeitgesteuerten Ladefenstern und SmartHome-Anbindung – als Progressive Web App direkt vom Smartphone.
 
-👉 [**Live-Demo auf Replit**](https://energy-link-ypqwbwd8nv.replit.app) – keine Hardware nötig!
-
 ## Screenshots
 
 | Wallbox Status | E3DC Monitoring | Ladestrategien | Einstellungen |
