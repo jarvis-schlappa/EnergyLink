@@ -10,6 +10,8 @@ import { initializeProwlNotifier, triggerProwlEvent } from "./prowl-notifier";
 import { requireApiKey } from "./auth";
 import { healthHandler } from "./health";
 import { validateEnvironment } from "./env-validation";
+import { e3dcClient } from "./e3dc-client";
+import { RealE3dcGateway, MockE3dcGateway } from "./e3dc-gateway";
 
 // Validate environment variables before anything else
 const envResult = validateEnvironment();
@@ -68,10 +70,18 @@ app.use((req, res, next) => {
 (async () => {
   // Import UDP-Channel
   const { wallboxUdpChannel } = await import('./wallbox-udp-channel');
-  
-  // Auto-Start Mock-Server wenn DEMO_AUTOSTART=true oder demoMode aktiviert ist
+
+  // E3DC Gateway: Einmalig entscheiden ob Real oder Mock
   const shouldStartMock = process.env.DEMO_AUTOSTART === 'true' || storage.getSettings()?.demoMode;
-  
+
+  if (shouldStartMock) {
+    e3dcClient.setGateway(new MockE3dcGateway());
+    log('info', 'system', '🔧 E3DC Gateway: Mock-Modus aktiviert');
+  } else {
+    e3dcClient.setGateway(new RealE3dcGateway());
+    log('info', 'system', '🔧 E3DC Gateway: Production-Modus aktiviert');
+  }
+
   if (shouldStartMock) {
     try {
       // UDP-Channel wird automatisch vom Mock-Server gestartet
@@ -90,29 +100,29 @@ app.use((req, res, next) => {
       log('error', 'system', '⚠️ Fehler beim Starten des UDP-Channels', error instanceof Error ? error.message : String(error));
     }
   }
-  
+
   // Broadcast-Listener starten (verwendet UDP-Channel + ChargingStrategyController)
   try {
     await startBroadcastListener(sendUdpCommand);
   } catch (error) {
     log('error', 'system', '⚠️ Fehler beim Starten des Broadcast-Listeners', error instanceof Error ? error.message : String(error));
   }
-  
+
   // Prowl-Notifier initialisieren (VOR dem ersten triggerProwlEvent Aufruf!)
   const settings = storage.getSettings();
   initializeProwlNotifier(settings);
-  
+
   // Prowl-Benachrichtigung: App gestartet (nach erfolgreicher Initialisierung)
   triggerProwlEvent(settings, "appStarted", (notifier) =>
     notifier.sendAppStarted()
   );
-  
-  // Health-check endpoint (before auth — must be accessible by monitoring tools)
+
+  // Health-check endpoint (before auth - must be accessible by monitoring tools)
   app.get("/api/health", healthHandler);
 
   // API-Key-Authentifizierung für alle API-Routen (inkl. SSE)
   app.use("/api", requireApiKey);
-  
+
   const server = await registerRoutes(app);
 
   // SSE-Server ist bereits via /api/wallbox/stream in routes.ts konfiguriert
@@ -145,14 +155,14 @@ app.use((req, res, next) => {
   }, () => {
     viteLog(`serving on port ${port}`);
   });
-  
+
   // Graceful Shutdown für Mock-Server, Broadcast-Listener und Scheduler (falls aktiv)
   const shutdown = async () => {
     log('info', 'system', '🛑 Graceful Shutdown wird durchgeführt...');
     try {
       // Import shutdownSchedulers dynamisch, da routes.ts erst nach registerRoutes existiert
       const { shutdownSchedulers } = await import('./routes');
-      
+
       // Stoppe alle Dienste parallel
       await Promise.all([
         stopUnifiedMock(),
@@ -164,7 +174,7 @@ app.use((req, res, next) => {
     }
     process.exit(0);
   };
-  
+
   process.on('SIGINT', shutdown);
   process.on('SIGTERM', shutdown);
 })();
