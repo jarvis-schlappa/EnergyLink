@@ -32,7 +32,7 @@ describe("validateEnvironment", () => {
 
     expect(result.valid).toBe(true);
     expect(result.missing).toHaveLength(0);
-    expect(result.warnings.length).toBeGreaterThan(0);
+    expect(result.messages.length).toBeGreaterThan(0);
   });
 
   it("should produce no warnings when all vars are set", async () => {
@@ -65,13 +65,60 @@ describe("validateEnvironment", () => {
     expect(apiKeyWarning).toBeDefined();
   });
 
-  it("should include default info in warnings", async () => {
+  it("should include default info in messages for PORT", async () => {
     delete process.env.PORT;
 
     const { validateEnvironment } = await import("../core/env-validation");
     const result = validateEnvironment();
 
-    const portWarning = result.warnings.find((w) => w.includes("PORT"));
-    expect(portWarning).toContain("Default: 3000");
+    const portMsg = result.messages.find((m) => m.message.includes("PORT"));
+    expect(portMsg).toBeDefined();
+    expect(portMsg!.message).toContain("Default: 3000");
+  });
+
+  it("should log PORT as info level, not warning", async () => {
+    delete process.env.PORT;
+
+    const { validateEnvironment } = await import("../core/env-validation");
+    const result = validateEnvironment();
+
+    const portMsg = result.messages.find((m) => m.message.includes("PORT"));
+    expect(portMsg).toBeDefined();
+    expect(portMsg!.level).toBe("info");
+    // PORT should NOT appear in warnings array
+    expect(result.warnings.find((w) => w.includes("PORT"))).toBeUndefined();
+  });
+
+  it("should log BUILD_* and DEMO_AUTOSTART as debug level", async () => {
+    delete process.env.BUILD_BRANCH;
+    delete process.env.BUILD_COMMIT;
+    delete process.env.BUILD_TIME;
+    delete process.env.DEMO_AUTOSTART;
+
+    const { validateEnvironment } = await import("../core/env-validation");
+    const result = validateEnvironment();
+
+    const debugVars = ["BUILD_BRANCH", "BUILD_COMMIT", "BUILD_TIME", "DEMO_AUTOSTART"];
+    for (const varName of debugVars) {
+      const msg = result.messages.find((m) => m.message.includes(varName));
+      expect(msg).toBeDefined();
+      expect(msg!.level).toBe("debug");
+    }
+    // None should be in warnings
+    for (const varName of debugVars) {
+      expect(result.warnings.find((w) => w.includes(varName))).toBeUndefined();
+    }
+  });
+
+  it("should keep API_KEY as warning level", async () => {
+    delete process.env.API_KEY;
+
+    const { validateEnvironment } = await import("../core/env-validation");
+    const result = validateEnvironment();
+
+    const apiMsg = result.messages.find((m) => m.message.includes("API_KEY"));
+    expect(apiMsg).toBeDefined();
+    expect(apiMsg!.level).toBe("warning");
+    expect(result.warnings.find((w) => w.includes("API_KEY"))).toBeDefined();
   });
 });
