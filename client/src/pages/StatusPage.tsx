@@ -103,7 +103,7 @@ export default function StatusPage() {
         setShowError(true);
       }
     }
-  }, [status, error, waitingForConfirmation]);
+  }, [displayStatus, error, waitingForConfirmation]);
 
   useEffect(() => {
     if (previousNightChargingRef.current !== undefined) {
@@ -155,6 +155,8 @@ export default function StatusPage() {
     },
     onError: () => {
       setWaitingForConfirmation(false);
+      // Revert optimistic update
+      queryClient.invalidateQueries({ queryKey: ["/api/wallbox/status"] });
       toast({
         title: "Fehler",
         description: "Laden konnte nicht gestartet werden.",
@@ -170,6 +172,8 @@ export default function StatusPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/settings"] });
     },
     onError: () => {
+      // Revert optimistic update
+      queryClient.invalidateQueries({ queryKey: ["/api/wallbox/status"] });
       toast({
         title: "Fehler",
         description: "Laden konnte nicht gestoppt werden.",
@@ -223,10 +227,18 @@ export default function StatusPage() {
     setIsButtonLocked(true);
     setTimeout(() => setIsButtonLocked(false), 800);
     
-    const isCharging = status?.state === 3;
-    if (isCharging) {
+    const currentlyCharging = displayStatus?.state === 3;
+    if (currentlyCharging) {
+      // Optimistic update: Button sofort auf "Gestoppt" wechseln (Issue #94)
+      queryClient.setQueryData(["/api/wallbox/status"], (old: WallboxStatus | undefined) =>
+        old ? { ...old, state: 5, power: 0 } : old
+      );
       stopChargingMutation.mutate();
     } else {
+      // Optimistic update: Button sofort auf "Laden" wechseln (Issue #94)
+      queryClient.setQueryData(["/api/wallbox/status"], (old: WallboxStatus | undefined) =>
+        old ? { ...old, state: 3 } : old
+      );
       const targetStrategy = settings?.chargingStrategy?.inputX1Strategy || "max_without_battery";
       startChargingMutation.mutate(targetStrategy);
     }
@@ -338,13 +350,13 @@ export default function StatusPage() {
     return `${phases}-phasig`;
   };
 
-  const isCharging = status?.state === 3;
-  const isPluggedIn = (status?.plug || 0) >= 3;
-  const power = status?.power || 0;
-  const energySession = (status?.ePres || 0) / 1000;
-  const energyTotal = (status?.eTotal || 0) / 1000;
+  const isCharging = displayStatus?.state === 3;
+  const isPluggedIn = (displayStatus?.plug || 0) >= 3;
+  const power = displayStatus?.power || 0;
+  const energySession = (displayStatus?.ePres || 0) / 1000;
+  const energyTotal = (displayStatus?.eTotal || 0) / 1000;
   const energy = energySession;
-  const phases = status?.phases || 0;
+  const phases = displayStatus?.phases || 0;
 
   const getStrategyLabel = (strategy: string | undefined) => {
     const option = STRATEGY_OPTIONS.find(opt => opt.value === strategy);
