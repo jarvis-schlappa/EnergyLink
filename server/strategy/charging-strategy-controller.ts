@@ -909,6 +909,8 @@ export class ChargingStrategyController {
   }
 
   private lastStopNotificationTime: number = 0;
+  private lastStopCommandTime: number = 0;
+  private stopInProgress: boolean = false;
   
   private async stopCharging(wallboxIp: string, reason?: string): Promise<void> {
     const context = storage.getChargingContext();
@@ -916,6 +918,23 @@ export class ChargingStrategyController {
     if (!context.isActive) {
       return;
     }
+    
+    // Guard: Prevent concurrent stop calls (TOCTOU race condition)
+    // Two async callers can both read isActive=true before either sets it to false
+    if (this.stopInProgress) {
+      log("debug", "system", `stopCharging übersprungen - bereits in Ausführung (Grund: ${reason || 'unbekannt'})`);
+      return;
+    }
+    
+    // Timestamp-based deduplication as safety net (5s window)
+    const now = Date.now();
+    if (now - this.lastStopCommandTime < 5000) {
+      log("debug", "system", `stopCharging übersprungen - letzter Stopp vor ${now - this.lastStopCommandTime}ms (< 5s)`);
+      return;
+    }
+    
+    this.stopInProgress = true;
+    this.lastStopCommandTime = now;
     
     try {
       // Nur "ena 0" senden - KEBA akzeptiert kein "curr 0" (Minimum ist 6A)
@@ -939,12 +958,12 @@ export class ChargingStrategyController {
       broadcastPartialUpdate({ state: 5, enableSys: 0 });
       
       // Prowl-Benachrichtigung mit Deduplication (max 1x pro 5 Sekunden)
-      const now = Date.now();
-      const timeSinceLastNotification = now - this.lastStopNotificationTime;
+      const prowlNow = Date.now();
+      const timeSinceLastNotification = prowlNow - this.lastStopNotificationTime;
       const DEDUP_THRESHOLD_MS = 5000; // 5 Sekunden
       
       if (timeSinceLastNotification >= DEDUP_THRESHOLD_MS) {
-        this.lastStopNotificationTime = now;
+        this.lastStopNotificationTime = prowlNow;
         const settingsForProwl = storage.getSettings();
         const stopReason = reason || (context.strategy.includes('surplus') ? 'Überschuss zu gering' : 'Ladung manuell gestoppt');
         triggerProwlEvent(settingsForProwl, "chargingStopped", (notifier) =>
@@ -960,6 +979,8 @@ export class ChargingStrategyController {
         "Fehler beim Stoppen der Ladung",
         error instanceof Error ? error.message : String(error)
       );
+    } finally {
+      this.stopInProgress = false;
     }
   }
 
