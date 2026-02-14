@@ -217,6 +217,88 @@ describe("WallboxMockService - Realistic Mock Improvements (Issue #83)", () => {
     });
   });
 
+  describe("Spontaneous E pres Broadcasts (State=3)", () => {
+    it("should broadcast E pres periodically during charging", () => {
+      const broadcasts: any[] = [];
+      wallbox.setBroadcastCallback((data) => broadcasts.push({...data}));
+
+      wallbox.executeCommand("curr 10000");
+      wallbox.executeCommand("ena 1");
+      vi.advanceTimersByTime(3000); // State transition to 3
+
+      // Clear earlier state broadcasts
+      const countBefore = broadcasts.filter(b => b["E pres"] !== undefined).length;
+
+      // Advance 5 seconds - should get several E pres broadcasts
+      vi.advanceTimersByTime(5000);
+
+      const ePresMessages = broadcasts.filter(b => b["E pres"] !== undefined);
+      expect(ePresMessages.length).toBeGreaterThanOrEqual(2);
+      // Values should be in 0.1Wh units (numbers)
+      for (const msg of ePresMessages) {
+        expect(typeof msg["E pres"]).toBe("number");
+      }
+    });
+
+    it("should stop E pres broadcasts when charging stops (ena 0)", () => {
+      const broadcasts: any[] = [];
+      wallbox.setBroadcastCallback((data) => broadcasts.push({...data}));
+
+      wallbox.executeCommand("curr 10000");
+      wallbox.executeCommand("ena 1");
+      vi.advanceTimersByTime(3000); // Charging
+
+      // Stop charging
+      wallbox.executeCommand("ena 0");
+      broadcasts.length = 0; // Clear
+
+      // Advance time - should get NO E pres broadcasts
+      vi.advanceTimersByTime(5000);
+
+      const ePresMessages = broadcasts.filter(b => b["E pres"] !== undefined);
+      expect(ePresMessages.length).toBe(0);
+    });
+
+    it("should stop E pres broadcasts when cable is unplugged", () => {
+      const broadcasts: any[] = [];
+      wallbox.setBroadcastCallback((data) => broadcasts.push({...data}));
+
+      wallbox.executeCommand("curr 10000");
+      wallbox.executeCommand("ena 1");
+      vi.advanceTimersByTime(3000);
+
+      wallbox.plugCable(false);
+      broadcasts.length = 0;
+
+      vi.advanceTimersByTime(5000);
+
+      const ePresMessages = broadcasts.filter(b => b["E pres"] !== undefined);
+      expect(ePresMessages.length).toBe(0);
+    });
+
+    it("should have increasing E pres values in broadcasts", () => {
+      const broadcasts: any[] = [];
+      wallbox.setBroadcastCallback((data) => broadcasts.push({...data}));
+
+      wallbox.executeCommand("curr 16000");
+      wallbox.executeCommand("ena 1");
+      vi.advanceTimersByTime(35000); // Past ramp-up for meaningful energy
+
+      broadcasts.length = 0;
+      vi.advanceTimersByTime(5000);
+
+      const ePresValues = broadcasts
+        .filter(b => b["E pres"] !== undefined)
+        .map(b => b["E pres"]);
+      
+      expect(ePresValues.length).toBeGreaterThanOrEqual(2);
+      // Values should be non-decreasing
+      for (let i = 1; i < ePresValues.length; i++) {
+        expect(ePresValues[i]).toBeGreaterThanOrEqual(ePresValues[i - 1]);
+      }
+    });
+  });
+
   describe("Serial field in reports", () => {
     it("should include Serial in Report 2 and Report 3", () => {
       const r2 = wallbox.getReport2();
