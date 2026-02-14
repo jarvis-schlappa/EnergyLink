@@ -235,28 +235,11 @@ export function registerWallboxRoutes(app: Express): void {
       // Sofort antworten für schnelle UI-Reaktion
       res.json({ success: true });
       
-      // Background: Async-Operationen im Hintergrund ausführen (nicht warten)
+      // Background: Stopp + Battery Lock über den Controller (verhindert doppeltes ena 0)
       (async () => {
         try {
-          // WICHTIG: Battery Lock deaktivieren
           const controller = getOrCreateStrategyController();
-          await controller.handleStrategyChange("off");
-
-          const response = await sendUdpCommand(settings.wallboxIp, "ena 0");
-
-          if (
-            !response ||
-            (!response["TCH-OK"] && !JSON.stringify(response).includes("TCH-OK"))
-          ) {
-            log(
-              "error",
-              "wallbox",
-              `Laden stoppen fehlgeschlagen - keine Bestätigung`,
-              `Antwort: ${JSON.stringify(response)}`,
-            );
-          } else {
-            log("info", "wallbox", `Laden erfolgreich gestoppt`);
-          }
+          await controller.stopChargingForStrategyOff(settings.wallboxIp);
         } catch (bgError) {
           log(
             "error",
