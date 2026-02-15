@@ -12,6 +12,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
+import { Button } from "@/components/ui/button";
 import { Filter } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import PageHeader from "@/components/PageHeader";
@@ -176,19 +184,6 @@ export default function LogsPage() {
             </CardContent>
           </Card>
 
-          <LogFilterCard
-            filterLevel={filterLevel}
-            onFilterLevelChange={setFilterLevel}
-            textFilter={textFilter}
-            onTextFilterChange={setTextFilter}
-            selectedCategories={selectedCategories}
-            onToggleCategory={toggleCategory}
-            onClearCategories={() => setSelectedCategories([])}
-            onRefresh={() => refetch()}
-            onClearLogs={() => clearLogsMutation.mutate()}
-            isClearingLogs={clearLogsMutation.isPending}
-          />
-
           {filteredLogs.length === 0 && !logsLoading && (
             <Alert data-testid="alert-no-logs">
               <Filter className="h-4 w-4" />
@@ -199,7 +194,7 @@ export default function LogsPage() {
             </Alert>
           )}
 
-          <div className="space-y-2">
+          <div className="space-y-3">
             {filteredLogs.map((log) => (
               <LogEntryItem key={log.id} log={log} />
             ))}
@@ -218,6 +213,37 @@ export default function LogsPage() {
         onOpenChange={setShowBuildInfoDialog}
         buildInfo={buildInfo}
       />
+
+      <div className="fixed bottom-20 right-4 z-50">
+        <Sheet>
+          <SheetTrigger asChild>
+            <Button
+              size="lg"
+              className="rounded-full shadow-lg h-14 w-14"
+              data-testid="fab-filter"
+            >
+              <Filter className="w-5 h-5" />
+            </Button>
+          </SheetTrigger>
+          <SheetContent side="bottom" className="h-[80vh] overflow-y-auto">
+            <SheetHeader>
+              <SheetTitle>Filter</SheetTitle>
+            </SheetHeader>
+            <LogFilterCard
+              filterLevel={filterLevel}
+              onFilterLevelChange={setFilterLevel}
+              textFilter={textFilter}
+              onTextFilterChange={setTextFilter}
+              selectedCategories={selectedCategories}
+              onToggleCategory={toggleCategory}
+              onClearCategories={() => setSelectedCategories([])}
+              onRefresh={() => refetch()}
+              onClearLogs={() => clearLogsMutation.mutate()}
+              isClearingLogs={clearLogsMutation.isPending}
+            />
+          </SheetContent>
+        </Sheet>
+      </div>
     </div>
   );
 }
