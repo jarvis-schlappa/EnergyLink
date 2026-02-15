@@ -724,12 +724,12 @@ export class ChargingStrategyController {
         });
       }
       
-      // Sync User-Limit aus Wallbox Max curr (falls nicht bereits gesetzt)
-      const wallboxMaxCurrMa = report2["Max curr"] || 0;
-      if (wallboxMaxCurrMa > 0 && !context.userCurrentLimitAmpere) {
-        const userLimitAmpere = wallboxMaxCurrMa / 1000;
-        storage.updateChargingContext({ userCurrentLimitAmpere: userLimitAmpere });
-        log("debug", "system", `[RECONCILE] User-Limit aus Wallbox übernommen: ${userLimitAmpere}A`);
+      // User-Limit auf absolutes Hardware-Maximum setzen (32A @ 1P)
+      // Surplus-Strategien regeln 6-16A, Max-Modi brauchen bis 32A
+      const hardwareMaxAmpere = 32; // KEBA P20 Hardware-Limit @ 1P
+      if (context.userCurrentLimitAmpere !== hardwareMaxAmpere) {
+        storage.updateChargingContext({ userCurrentLimitAmpere: hardwareMaxAmpere });
+        log("debug", "system", `[RECONCILE] User-Limit auf Hardware-Maximum gesetzt: ${hardwareMaxAmpere}A`);
       }
     } catch (error) {
       log("warning", "system", "Fehler beim Abgleich des Charging Context", error instanceof Error ? error.message : String(error));
