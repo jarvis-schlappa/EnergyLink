@@ -1,9 +1,11 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { usePersistentFilter } from "@/hooks/use-persistent-filter";
 import type { LogEntry, LogSettings, LogLevel, Settings } from "@shared/schema";
 import { buildInfoSchema } from "@shared/schema";
+import { Virtuoso } from "react-virtuoso";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Select,
@@ -29,12 +31,17 @@ import LogEntryItem from "@/components/logs/LogEntryItem";
 
 export default function LogsPage() {
   const { toast } = useToast();
-  const [filterLevel, setFilterLevel] = useState<LogLevel | "all">("all");
-  const [selectedCategories, setSelectedCategories] = useState<LogCategory[]>(
-    [],
-  );
-  const [textFilter, setTextFilter] = useState("");
+  const {
+    filterLevel,
+    setFilterLevel,
+    selectedCategories,
+    textFilter,
+    setTextFilter,
+    toggleCategory,
+    clearCategories,
+  } = usePersistentFilter();
   const [showBuildInfoDialog, setShowBuildInfoDialog] = useState(false);
+  const [scrollParent, setScrollParent] = useState<HTMLElement | null>(null);
 
   // Lade Build-Info (nur einmal, keine Auto-Updates)
   const { data: buildInfoRaw } = useQuery({
@@ -131,17 +138,22 @@ export default function LogsPage() {
     })
     .reverse();
 
-  const toggleCategory = (category: LogCategory) => {
-    setSelectedCategories((prev) =>
-      prev.includes(category)
-        ? prev.filter((c) => c !== category)
-        : [...prev, category],
-    );
-  };
+  const renderLogItem = useCallback(
+    (_index: number, log: LogEntry) => (
+      <div className="pb-3">
+        <LogEntryItem log={log} />
+      </div>
+    ),
+    [],
+  );
 
   return (
     <div className="flex flex-col h-full">
-      <div className="flex-1 overflow-y-auto pb-24 pt-6">
+      <div
+        ref={setScrollParent}
+        className="flex-1 overflow-y-auto pb-24 pt-6"
+        data-testid="logs-scroll-container"
+      >
         <div className="max-w-4xl mx-auto px-4 space-y-6">
           <PageHeader
             title="Logs"
@@ -194,11 +206,16 @@ export default function LogsPage() {
             </Alert>
           )}
 
-          <div className="space-y-3">
-            {filteredLogs.map((log) => (
-              <LogEntryItem key={log.id} log={log} />
-            ))}
-          </div>
+          {filteredLogs.length > 0 && scrollParent && (
+            <div data-testid="virtuoso-log-list">
+              <Virtuoso
+                data={filteredLogs}
+                customScrollParent={scrollParent}
+                itemContent={renderLogItem}
+                overscan={200}
+              />
+            </div>
+          )}
 
           {logsLoading && filteredLogs.length === 0 && (
             <div className="text-center text-muted-foreground py-8">
@@ -236,7 +253,7 @@ export default function LogsPage() {
               onTextFilterChange={setTextFilter}
               selectedCategories={selectedCategories}
               onToggleCategory={toggleCategory}
-              onClearCategories={() => setSelectedCategories([])}
+              onClearCategories={clearCategories}
               onRefresh={() => refetch()}
               onClearLogs={() => clearLogsMutation.mutate()}
               isClearingLogs={clearLogsMutation.isPending}
