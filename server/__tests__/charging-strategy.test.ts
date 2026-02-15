@@ -315,6 +315,32 @@ describe("ChargingStrategyController", () => {
       const context = storage.getChargingContext();
       expect(context.userCurrentLimitAmpere).toBe(8);
     });
+
+  });
+
+  describe("reconcileChargingContext - User Limit Hardcode Fix (Issue #124)", () => {
+    it("sets userCurrentLimitAmpere to 32A ignoring wallbox 'Curr user' value", async () => {
+      const ip = DEFAULT_WALLBOX_IP;
+      mockSendUdp
+        .mockResolvedValueOnce({ State: 1, Plug: 1, "Curr user": 16000 })  // report 2: low user limit from wallbox
+        .mockResolvedValueOnce({ P: 0, I1: 0, I2: 0, I3: 0 });  // report 3
+      (storage as any)._setContext({ userCurrentLimitAmpere: 16 });
+      await (controller as any).reconcileChargingContext(ip);
+      expect(storage.updateChargingContext).toHaveBeenCalledWith(
+        expect.objectContaining({ userCurrentLimitAmpere: 32 })
+      );
+      expect(storage.getChargingContext().userCurrentLimitAmpere).toBe(32);
+    });
+
+    it("sets to 32A even if no 'Curr user' in report", async () => {
+      const ip = DEFAULT_WALLBOX_IP;
+      mockSendUdp
+        .mockResolvedValueOnce({ State: 1, Plug: 1 })  // report 2: no Curr user
+        .mockResolvedValueOnce({ P: 0, I1: 0, I2: 0, I3: 0 });
+      (storage as any)._setContext({ userCurrentLimitAmpere: undefined });
+      await (controller as any).reconcileChargingContext(ip);
+      expect(storage.getChargingContext().userCurrentLimitAmpere).toBe(32);
+    });
   });
 
   describe("Issue #99: Duplicate ena 0 prevention", () => {
