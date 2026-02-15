@@ -7,8 +7,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Trash2, RefreshCw } from "lucide-react";
 import type { LogLevel } from "@shared/schema";
 
@@ -66,6 +65,35 @@ function getCategoryLabel(category: LogCategory): string {
   }
 }
 
+function getCategoryDotColor(category: string): string {
+  switch (category) {
+    case "wallbox":
+      return "bg-blue-500";
+    case "wallbox-mock":
+      return "bg-blue-400";
+    case "e3dc":
+      return "bg-orange-500";
+    case "e3dc-poller":
+      return "bg-orange-600";
+    case "e3dc-mock":
+      return "bg-orange-400";
+    case "fhem":
+      return "bg-teal-500";
+    case "fhem-mock":
+      return "bg-teal-400";
+    case "webhook":
+      return "bg-green-500";
+    case "system":
+      return "bg-purple-500";
+    case "storage":
+      return "bg-gray-500";
+    case "grid-frequency":
+      return "bg-red-500";
+    default:
+      return "bg-muted";
+  }
+}
+
 function getCategoryColor(category: string) {
   switch (category) {
     case "wallbox":
@@ -95,7 +123,7 @@ function getCategoryColor(category: string) {
   }
 }
 
-export { ALL_CATEGORIES, getCategoryLabel, getCategoryColor };
+export { ALL_CATEGORIES, getCategoryLabel, getCategoryColor, getCategoryDotColor };
 export type { LogCategory };
 
 interface LogFilterCardProps {
@@ -124,115 +152,117 @@ export default function LogFilterCard({
   isClearingLogs,
 }: LogFilterCardProps) {
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-base flex items-center justify-between">
-          <span>Filter</span>
-          <div className="flex gap-2">
+    <div className="space-y-6 pt-4" data-testid="log-filter-card">
+      <div className="flex gap-2 justify-end">
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={onRefresh}
+          data-testid="button-refresh-logs"
+        >
+          <RefreshCw className="h-4 w-4 mr-2" />
+          Aktualisieren
+        </Button>
+        <Button
+          size="sm"
+          variant="destructive"
+          onClick={onClearLogs}
+          disabled={isClearingLogs}
+          data-testid="button-clear-logs"
+        >
+          <Trash2 className="h-4 w-4 mr-2" />
+          Löschen
+        </Button>
+      </div>
+
+      <div className="flex flex-col gap-2">
+        <label className="text-sm text-muted-foreground">Level</label>
+        <Select
+          value={filterLevel}
+          onValueChange={(value) =>
+            onFilterLevelChange(value as LogLevel | "all")
+          }
+          data-testid="select-filter-level"
+        >
+          <SelectTrigger>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Alle</SelectItem>
+            <SelectItem value="trace">Trace (und höher)</SelectItem>
+            <SelectItem value="debug">Debug (und höher)</SelectItem>
+            <SelectItem value="info">Info (und höher)</SelectItem>
+            <SelectItem value="warning">Warning (und höher)</SelectItem>
+            <SelectItem value="error">Nur Error</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div className="flex flex-col gap-2">
+        <label className="text-sm text-muted-foreground">Text-Suche</label>
+        <Input
+          type="text"
+          placeholder="Durchsuche Nachricht, Details und Kategorie..."
+          value={textFilter}
+          onChange={(e) => onTextFilterChange(e.target.value)}
+          data-testid="input-text-filter"
+        />
+        <p className="text-xs text-muted-foreground">
+          Filtere Logs nach beliebigem Text (Groß-/Kleinschreibung wird ignoriert)
+        </p>
+      </div>
+
+      <div className="flex flex-col gap-3">
+        <div className="flex items-center justify-between">
+          <label className="text-sm text-muted-foreground">
+            Kategorien (
+            {selectedCategories.length > 0
+              ? selectedCategories.length
+              : "Alle"}
+            )
+          </label>
+          {selectedCategories.length > 0 && (
             <Button
               size="sm"
-              variant="outline"
-              onClick={onRefresh}
-              data-testid="button-refresh-logs"
+              variant="ghost"
+              onClick={onClearCategories}
+              className="h-8 text-xs"
+              data-testid="button-clear-category-filter"
             >
-              <RefreshCw className="h-4 w-4" />
+              Alle auswählen
             </Button>
-            <Button
-              size="sm"
-              variant="destructive"
-              onClick={onClearLogs}
-              disabled={isClearingLogs}
-              data-testid="button-clear-logs"
-            >
-              <Trash2 className="h-4 w-4" />
-            </Button>
-          </div>
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="flex flex-col gap-2">
-          <label className="text-sm text-muted-foreground">Level</label>
-          <Select
-            value={filterLevel}
-            onValueChange={(value) =>
-              onFilterLevelChange(value as LogLevel | "all")
-            }
-            data-testid="select-filter-level"
-          >
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Alle</SelectItem>
-              <SelectItem value="trace">Trace (und höher)</SelectItem>
-              <SelectItem value="debug">Debug (und höher)</SelectItem>
-              <SelectItem value="info">Info (und höher)</SelectItem>
-              <SelectItem value="warning">Warning (und höher)</SelectItem>
-              <SelectItem value="error">Nur Error</SelectItem>
-            </SelectContent>
-          </Select>
+          )}
         </div>
-
-        <div className="flex flex-col gap-2">
-          <label className="text-sm text-muted-foreground">Text-Suche</label>
-          <Input
-            type="text"
-            placeholder="Durchsuche Nachricht, Details und Kategorie..."
-            value={textFilter}
-            onChange={(e) => onTextFilterChange(e.target.value)}
-            data-testid="input-text-filter"
-          />
-          <p className="text-xs text-muted-foreground">
-            Filtere Logs nach beliebigem Text (Groß-/Kleinschreibung wird ignoriert)
-          </p>
-        </div>
-
-        <div className="flex flex-col gap-3">
-          <div className="flex items-center justify-between">
-            <label className="text-sm text-muted-foreground">
-              Kategorien (
-              {selectedCategories.length > 0
-                ? selectedCategories.length
-                : "Alle"}
-              )
-            </label>
-            {selectedCategories.length > 0 && (
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={onClearCategories}
-                className="h-6 text-xs"
-                data-testid="button-clear-category-filter"
+        <div className="flex flex-col gap-1" data-testid="category-checkbox-list">
+          {ALL_CATEGORIES.map((category) => {
+            const isSelected = selectedCategories.includes(category);
+            return (
+              <label
+                key={category}
+                className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-accent cursor-pointer min-h-[44px]"
+                data-testid={`category-item-${category}`}
               >
-                Alle auswählen
-              </Button>
-            )}
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {ALL_CATEGORIES.map((category) => {
-              const isSelected = selectedCategories.includes(category);
-              return (
-                <Badge
-                  key={category}
-                  className={`cursor-pointer transition-all ${
-                    isSelected
-                      ? getCategoryColor(category)
-                      : "bg-muted text-muted-foreground hover-elevate"
-                  }`}
-                  onClick={() => onToggleCategory(category)}
-                  data-testid={`badge-filter-${category}`}
-                >
-                  {getCategoryLabel(category)}
-                </Badge>
-              );
-            })}
-          </div>
-          <p className="text-xs text-muted-foreground">
-            Klicke auf Kategorien um sie zu filtern. Ohne Auswahl werden
-            alle angezeigt.
-          </p>
+                <Checkbox
+                  checked={isSelected}
+                  onCheckedChange={() => onToggleCategory(category)}
+                  data-testid={`checkbox-filter-${category}`}
+                />
+                <div className="flex items-center gap-2 flex-1">
+                  <div
+                    className={`w-3 h-3 rounded-full shrink-0 ${getCategoryDotColor(category)}`}
+                  />
+                  <span className="text-sm font-medium">
+                    {getCategoryLabel(category)}
+                  </span>
+                </div>
+              </label>
+            );
+          })}
         </div>
-      </CardContent>
-    </Card>
+        <p className="text-xs text-muted-foreground">
+          Wähle Kategorien zum Filtern. Ohne Auswahl werden alle angezeigt.
+        </p>
+      </div>
+    </div>
   );
 }
