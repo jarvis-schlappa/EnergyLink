@@ -36,6 +36,12 @@ export default function StatusPage() {
   const [liveCountdown, setLiveCountdown] = useState<number | null>(null);
   const [liveStopCountdown, setLiveStopCountdown] = useState<number | null>(null);
   const [isButtonLocked, setIsButtonLocked] = useState(false);
+  const [loadingTimedOut, setLoadingTimedOut] = useState(false);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setLoadingTimedOut(true), 10000);
+    return () => clearTimeout(timer);
+  }, []);
 
   const { status: sseStatus, isConnected: sseConnected } = useWallboxSSE({
     onStatusUpdate: (newStatus) => {
@@ -428,7 +434,7 @@ export default function StatusPage() {
     return () => clearInterval(interval);
   }, [status?.lastUpdated]);
 
-  if (isLoading && !status) {
+  if (isLoading && !status && !loadingTimedOut) {
     return (
       <div className="flex flex-col items-center justify-center h-full">
         <div className="text-center space-y-4">
