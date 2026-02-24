@@ -23,7 +23,7 @@ const E3DC_REGISTERS = {
   BATTERY_SOC: 82,           // Holding Register 40083, UINT16, Prozent
   EMERGENCY_POWER: 83,       // Holding Register 40084, UINT16, Emergency Power Status (0-4)
   EMS_STATUS: 84,            // Holding Register 40085, UINT16, Bitflags für EMS-Status
-  GRID_FREQUENCY: 1025,      // Holding Register 41026 (0-basiert: 41026 - 40001 = 1025), UINT16, Hz × 100 (z.B. 5001 = 50.01 Hz)
+  GRID_FREQUENCY: 1023,      // Holding Register 41024 (0-basiert: 41024 - 40001 = 1023), UINT16, Hz × 100 (z.B. 5001 = 50.01 Hz)
 } as const;
 
 const MODBUS_PORT = 502;
@@ -290,9 +290,18 @@ export class E3dcModbusService {
       const autarky = (autarkySelfCons >> 8) & 0xFF;
       const selfConsumption = autarkySelfCons & 0xFF;
 
-      // Register 41026: Grid Frequency (Netzfrequenz) - 0-basiert: Offset 1025
+      // Register 41024: Grid Frequency (Netzfrequenz) - 0-basiert: Offset 1023
       // Rohwert: UINT16, Skalierung: ×0.01 → z.B. 5001 = 50.01 Hz
-      const gridFrequency = gridFrequencyRaw !== null ? (gridFrequencyRaw * 0.01) : undefined;
+      // Plausibilitäts-Check: Nur Werte zwischen 45-55 Hz (4500-5500 raw) akzeptieren
+      let gridFrequency: number | undefined;
+      if (gridFrequencyRaw !== null) {
+        if (gridFrequencyRaw >= 4500 && gridFrequencyRaw <= 5500) {
+          gridFrequency = gridFrequencyRaw * 0.01;
+        } else {
+          log("warning", "system", `E3DC Netzfrequenz außerhalb Plausibilitätsbereich: ${gridFrequencyRaw} (erwartet: 4500-5500, entspricht 45-55 Hz)`);
+          gridFrequency = undefined;
+        }
+      }
 
       // Register 40085: EMS-Status Bitflags dekodieren
       // WICHTIG: Bit-Nummerierung könnte je nach E3DC-Firmware variieren

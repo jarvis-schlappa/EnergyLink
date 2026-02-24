@@ -332,26 +332,26 @@ const modbusVector = {
   getHoldingRegister: (addr: number, unitID: number, callback: (err: Error | null, value: number) => void) => {
     // HINWEIS: modbus-serial nutzt 0-basierte Offsets!
     // Holding Register 40001-40085 sind Offsets 0-84
-    // Holding Register 41026 ist Offset 1025 (wurde bei Firmware 2025 zu Register 41026 verschoben)
+    // Holding Register 41024 ist Offset 1023 (korrigiert nach Firmware S10_2025_404)
     // 
     // WICHTIG: Register-Nummern → Offsets:
     // - 40001 → Offset 0
     // - 40067 → Offset 66 (PV Power LSW)
     // - 40085 → Offset 84 (EMS Status)
-    // - 41026 → Offset 1025 (Grid Frequency - für S10_2025_402 Firmware)
+    // - 41024 → Offset 1023 (Grid Frequency - korrigiert für S10_2025_404 Firmware)
     
     // DEBUG: Alle Register-Zugriffe mit Offset loggen
     log("debug", "e3dc-mock", `[Modbus] Register-Zugriff: Offset ${addr}, UnitID ${unitID}`);
     
-    // Schneller Path für Grid Frequency (Register 41026, Offset 1025)
-    if (addr === 1025) {
+    // Schneller Path für Grid Frequency (Register 41024, Offset 1023)
+    if (addr === 1023) {
       updateE3dcCache()
         .then(data => {
           try {
             const frequency = (data?.gridFrequency) ?? 50.0;
             const registerValue = Math.round(frequency * 100);
-            // DEBUG: Rohdaten für Register 41026 (Netzfrequenz)
-            log("debug", "e3dc-mock", `[Modbus-Register 41026] GridFrequency: ${frequency.toFixed(2)} Hz → Raw-Wert: ${registerValue} (dezimal) / 0x${registerValue.toString(16).padStart(4, '0')} (hex)`);
+            // DEBUG: Rohdaten für Register 41024 (Netzfrequenz)
+            log("debug", "e3dc-mock", `[Modbus-Register 41024] GridFrequency: ${frequency.toFixed(2)} Hz → Raw-Wert: ${registerValue} (dezimal) / 0x${registerValue.toString(16).padStart(4, '0')} (hex)`);
             callback(null, registerValue);
           } catch (err) {
             log("error", "e3dc-mock", `[E3DC-Modbus] Error getting frequency register:`, err instanceof Error ? err.message : String(err));
@@ -562,7 +562,7 @@ export async function startUnifiedMock(): Promise<void> {
     unitID: 1
   });
   
-  // Optional: Log info dass auch Register 41025 verfügbar ist
+  // Optional: Log info dass auch Register 41024 verfügbar ist
   // (wird nach initialized Event ausgegeben)
 
   // Modbus Server Event-Handler
@@ -572,7 +572,7 @@ export async function startUnifiedMock(): Promise<void> {
 
   modbusServer.on('initialized', () => {
     log("info", "e3dc-mock", `✅ [E3DC-Modbus] E3DC S10 Mock läuft auf ${HOST}:${E3DC_MODBUS_PORT}`);
-    log("info", "e3dc-mock", `   Register 40067-40085 + 41026 (Netzfrequenz) verfügbar`);
+    log("info", "e3dc-mock", `   Register 40067-40085 + 41024 (Netzfrequenz) verfügbar`);
   });
 
   // Demo-Modus: IPs auf Localhost setzen (Mock-Server laufen lokal)
