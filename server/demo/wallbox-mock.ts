@@ -623,18 +623,24 @@ export class WallboxMockService {
       this.sendBroadcast({ "Plug": value });
       
       if (value === 0) {
+        // Unplugged: stop everything
         this.state = 1;
         this.enabled = false;
         this.enableUser = false;
         this.targetPower = 0;
         this.currentPower = 0;
         this.actualCurrentFraction = 0;
+        this.rampStartTime = 0;
         this.stopEPresBroadcast();
+        if (this.stateTransitionTimer) {
+          clearTimeout(this.stateTransitionTimer);
+          this.stateTransitionTimer = null;
+        }
       } else if (value >= 3 && !this.enabled) {
         this.state = 2;
       }
       
-      // Broadcast State-Änderung separat (damit SSE-Clients den neuen State sehen)
+      // Broadcast state change if state actually changed
       if (oldState !== this.state) {
         this.sendBroadcast({ "State": this.state });
       }

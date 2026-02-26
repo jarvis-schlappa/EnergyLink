@@ -728,8 +728,11 @@ export async function stopUnifiedMock(): Promise<void> {
   wallboxUdpChannel.offCommand(handleWallboxCommand);
   wallboxUdpChannel.offBroadcast(handleWallboxBroadcast);
   
+  // WICHTIG: UDP-Channel NICHT stoppen — er ist shared infrastructure!
+  // Der Channel wird vom Haupt-Server-Lifecycle verwaltet (server/index.ts).
+  // Beim Runtime-Toggle (Demo on→off) muss er weiterlaufen für Production-Wallbox.
+  // Beim Shutdown wird er separat in server/index.ts gestoppt.
   const promises: Promise<void>[] = [
-    wallboxUdpChannel.stop(),
     new Promise<void>((resolve) => {
       fhemServer.close(() => {
         log("info", "fhem-mock", "   ✅ FHEM HTTP Server gestoppt");

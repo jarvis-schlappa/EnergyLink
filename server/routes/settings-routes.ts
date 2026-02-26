@@ -13,21 +13,20 @@ import { log } from "../core/logger";
 import { DEFAULT_WALLBOX_IP } from "../core/defaults";
 import { z } from "zod";
 import { wallboxMockService } from "../demo/wallbox-mock";
+import { startUnifiedMock, stopUnifiedMock } from "../demo/unified-mock";
+import { MockE3dcGateway, RealE3dcGateway } from "../e3dc/gateway";
 import { sendUdpCommand } from "../wallbox/transport";
 import { getBuildInfo } from "../core/build-info";
 import { triggerProwlEvent, getProwlNotifier } from "../monitoring/prowl-notifier";
 import {
   getOrCreateStrategyController,
   strategyController,
+  setStrategyController,
   lockBatteryDischarge,
   unlockBatteryDischarge,
   enableGridCharging,
   disableGridCharging,
 } from "./shared-state";
-import { startUnifiedMock, stopUnifiedMock } from "../demo/unified-mock";
-import { RealE3dcGateway, MockE3dcGateway } from "../e3dc/gateway";
-import { getE3dcModbusService } from "../e3dc/modbus";
-import { stopE3dcPoller, startE3dcPoller } from "../e3dc/poller";
 
 export function registerSettingsRoutes(app: Express): void {
   app.get("/api/build-info", (req, res) => {
@@ -80,6 +79,11 @@ export function registerSettingsRoutes(app: Express): void {
       const newE3dc = newSettings?.e3dc;
       const e3dcChanged = JSON.stringify(oldE3dc) !== JSON.stringify(newE3dc);
 
+      // Prüfe ob Demo-Modus sich geändert hat
+      const wasDemoMode = oldSettings?.demoMode || false;
+      const isDemoMode = newSettings.demoMode || false;
+      const demoModeChanged = wasDemoMode !== isDemoMode;
+
       storage.saveSettings(newSettings);
       
       // Aktualisiere Prowl-Notifier mit neuen Settings
@@ -89,43 +93,28 @@ export function registerSettingsRoutes(app: Express): void {
         log("warning", "system", "Prowl-Notifier konnte nicht aktualisiert werden", error instanceof Error ? error.message : String(error));
       }
 
-      // Demo-Modus Toggle: Mock-Server starten/stoppen und Poller neu verbinden
-      const oldDemoMode = oldSettings?.demoMode ?? false;
-      const newDemoMode = newSettings.demoMode ?? false;
-      const demoModeChanged = oldDemoMode !== newDemoMode;
-
+      // Demo-Modus zur Laufzeit aktivieren/deaktivieren (#18)
       if (demoModeChanged) {
-        try {
-          // E3DC-Poller stoppen (lief auf alter IP)
-          await stopE3dcPoller();
-          
-          // Bestehende Modbus-Verbindung trennen (war auf alter IP)
-          const modbusService = getE3dcModbusService();
-          await modbusService.disconnect();
-
-          if (newDemoMode) {
-            // Demo AKTIVIERT: Mock-Server starten, Gateway auf Mock umschalten
-            log("info", "system", "Demo-Modus wird aktiviert: Mock-Server startet...");
+        if (isDemoMode) {
+          try {
             e3dcClient.setGateway(new MockE3dcGateway());
             await startUnifiedMock();
-            log("info", "system", "✅ Demo-Modus aktiviert: Mock-Server läuft, Gateway=Mock");
-          } else {
-            // Demo DEAKTIVIERT: Mock-Server stoppen, Gateway auf Real umschalten
-            log("info", "system", "Demo-Modus wird deaktiviert: Mock-Server stoppt...");
+            // Reset cached strategy controller so it picks up MockPhaseProvider
+            setStrategyController(null);
+            log("info", "system", "Demo-Modus zur Laufzeit aktiviert: Mock-Server gestartet, E3DC auf Mock umgestellt");
+          } catch (error) {
+            log("error", "system", "Fehler beim Starten des Demo-Modus", error instanceof Error ? error.message : String(error));
+          }
+        } else {
+          try {
             await stopUnifiedMock();
             e3dcClient.setGateway(new RealE3dcGateway());
-            log("info", "system", "✅ Demo-Modus deaktiviert: Mock-Server gestoppt, Gateway=Real");
+            // Reset cached strategy controller so it picks up RealPhaseProvider
+            setStrategyController(null);
+            log("info", "system", "Demo-Modus zur Laufzeit deaktiviert: Mock-Server gestoppt, E3DC auf Production umgestellt");
+          } catch (error) {
+            log("error", "system", "Fehler beim Stoppen des Demo-Modus", error instanceof Error ? error.message : String(error));
           }
-
-          // E3DC-Poller mit neuer IP starten (storage hat bereits die neue IP)
-          startE3dcPoller();
-        } catch (error) {
-          log(
-            "error",
-            "system",
-            "Fehler beim Umschalten des Demo-Modus",
-            error instanceof Error ? error.message : String(error),
-          );
         }
       }
 
