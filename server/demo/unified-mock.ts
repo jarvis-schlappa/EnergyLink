@@ -67,6 +67,11 @@ const parseGridChargePower = (command: string | undefined): number => {
 const fhemDeviceStates = new Map<string, boolean>();
 fhemDeviceStates.set('autoWallboxPV', false); // Standard: PV-Überschuss aus
 
+// Garage Mock State
+let garageState: "open" | "closed" = "closed";
+let garageLastChanged: string = new Date().toISOString();
+let garageMovingTimer: NodeJS.Timeout | null = null;
+
 // =============================================================================
 // FHEM TCP SERVER (Port 7072) - Empfängt setreading-Befehle vom FHEM-Sync
 // =============================================================================
@@ -163,6 +168,55 @@ const fhemServer = http.createServer((req, res) => {
       newState = value.toLowerCase() === 'on';
     }
   });
+
+  // Garage: jsonlist2 garagentor → return mock state
+  if (params.has('cmd')) {
+    const cmd = params.get('cmd') || '';
+    
+    // Handle jsonlist2 garagentor
+    if (cmd.match(/jsonlist2\s+garagentor/i)) {
+      const jsonResponse = {
+        Results: [{
+          Name: "garagentor",
+          Readings: {
+            state: {
+              Value: garageState,
+              Time: garageLastChanged,
+            }
+          }
+        }]
+      };
+      log("debug", "fhem-mock", `[FHEM-HTTP] jsonlist2 garagentor → ${garageState}`);
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(jsonResponse));
+      return;
+    }
+
+    // Handle set aktor_garagentor on-for-timer 1
+    if (cmd.match(/set\s+aktor_garagentor\s+on-for-timer/i)) {
+      const previousState = garageState;
+      const targetState = garageState === "closed" ? "open" : "closed";
+      const delayMs = targetState === "open" ? 3000 : 15000;
+
+      log("info", "fhem-mock", `[FHEM-HTTP] Garagentor-Taster: ${previousState} → ${targetState} (in ${delayMs / 1000}s)`);
+
+      // Clear any pending timer
+      if (garageMovingTimer) {
+        clearTimeout(garageMovingTimer);
+      }
+
+      garageMovingTimer = setTimeout(() => {
+        garageState = targetState;
+        garageLastChanged = new Date().toISOString();
+        log("info", "fhem-mock", `[FHEM-HTTP] Garagentor jetzt: ${garageState}`);
+        garageMovingTimer = null;
+      }, delayMs);
+
+      res.writeHead(200, { 'Content-Type': 'text/plain' });
+      res.end('');
+      return;
+    }
+  }
 
   // Format 2: cmd=set autoWallboxPV on (URL-encoded)
   if (!deviceName && params.has('cmd')) {
@@ -589,6 +643,7 @@ export async function startUnifiedMock(): Promise<void> {
         enabled: currentSettings.fhemSync?.enabled ?? false,
         port: currentSettings.fhemSync?.port ?? 7072,
         host: '127.0.0.1',
+        autoCloseGarageOnPlug: currentSettings.fhemSync?.autoCloseGarageOnPlug ?? false,
       },
     };
     storage.saveSettings(updatedSettings);
@@ -657,6 +712,12 @@ export async function stopUnifiedMock(): Promise<void> {
     clearInterval(broadcastTimer);
     broadcastTimer = null;
     log("info", "system", "   ✅ Broadcast-Timer gestoppt");
+  }
+
+  // Garage-Timer stoppen
+  if (garageMovingTimer) {
+    clearTimeout(garageMovingTimer);
+    garageMovingTimer = null;
   }
   
   // Broadcast-Callback entfernen (verhindert doppelte Callbacks bei Restart)

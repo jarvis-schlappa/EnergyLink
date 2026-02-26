@@ -182,6 +182,7 @@ export class MemStorage implements IStorage {
         enabled: false,
         host: "192.168.40.11",
         port: 7072,
+        autoCloseGarageOnPlug: false,
       },
       mockWallboxPhases: 3,
       mockWallboxPlugStatus: 7,

@@ -9,6 +9,9 @@ import {
   e3dcLiveDataSchema,
   chargingContextSchema,
   logLevelSchema,
+  garageStateSchema,
+  garageStatusSchema,
+  fhemSyncSchema,
 } from "../schema";
 
 describe("Schema Validation", () => {
@@ -160,6 +163,61 @@ describe("Schema Validation", () => {
 
     it("rejects invalid level", () => {
       expect(() => logLevelSchema.parse("verbose")).toThrow();
+    });
+  });
+
+  describe("garageStateSchema", () => {
+    it("accepts all valid states", () => {
+      for (const state of ["open", "closed", "moving", "unknown"]) {
+        expect(garageStateSchema.parse(state)).toBe(state);
+      }
+    });
+
+    it("rejects invalid state", () => {
+      expect(() => garageStateSchema.parse("half-open")).toThrow();
+      expect(() => garageStateSchema.parse("")).toThrow();
+    });
+  });
+
+  describe("garageStatusSchema", () => {
+    it("accepts valid status with lastChanged", () => {
+      const result = garageStatusSchema.parse({
+        state: "open",
+        lastChanged: "2026-02-26T10:30:00.000Z",
+      });
+      expect(result.state).toBe("open");
+      expect(result.lastChanged).toBe("2026-02-26T10:30:00.000Z");
+    });
+
+    it("accepts status without lastChanged", () => {
+      const result = garageStatusSchema.parse({ state: "unknown" });
+      expect(result.state).toBe("unknown");
+      expect(result.lastChanged).toBeUndefined();
+    });
+
+    it("rejects invalid state in status", () => {
+      expect(() => garageStatusSchema.parse({ state: "invalid" })).toThrow();
+    });
+  });
+
+  describe("fhemSyncSchema", () => {
+    it("accepts valid config with autoCloseGarageOnPlug", () => {
+      const result = fhemSyncSchema.parse({
+        enabled: true,
+        host: "192.168.40.11",
+        port: 7072,
+        autoCloseGarageOnPlug: true,
+      });
+      expect(result.autoCloseGarageOnPlug).toBe(true);
+    });
+
+    it("defaults autoCloseGarageOnPlug to false", () => {
+      const result = fhemSyncSchema.parse({
+        enabled: false,
+        host: "192.168.40.11",
+        port: 7072,
+      });
+      expect(result.autoCloseGarageOnPlug).toBe(false);
     });
   });
 });

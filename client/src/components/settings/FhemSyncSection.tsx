@@ -78,6 +78,27 @@ export default function FhemSyncSection({ form }: FhemSyncSectionProps) {
               </p>
             </div>
 
+            <Separator />
+
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <Label htmlFor="auto-close-garage" className="text-sm font-medium">
+                  Garage Auto-Close
+                </Label>
+                <p className="text-xs text-muted-foreground">
+                  Garage automatisch schließen wenn Kabel eingesteckt wird
+                </p>
+              </div>
+              <Switch
+                id="auto-close-garage"
+                checked={form.watch("fhemSync.autoCloseGarageOnPlug")}
+                onCheckedChange={(checked) =>
+                  form.setValue("fhemSync.autoCloseGarageOnPlug", checked)
+                }
+                data-testid="switch-auto-close-garage"
+              />
+            </div>
+
             <div className="p-3 rounded-md bg-muted">
               <p className="text-xs text-muted-foreground">
                 <strong>ℹ️ Hinweis:</strong> Es werden 5 E3DC-Werte übertragen: sonne (PV-Leistung), haus (Hausverbrauch), soc (Batterie-Ladezustand), netz (Netzbezug/-einspeisung), speicher (Batterieleistung)

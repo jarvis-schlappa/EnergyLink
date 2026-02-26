@@ -89,7 +89,34 @@ Prowl
   → Push: "Kabel eingesteckt"
 ```
 
-## 5. Fehlerbehandlung
+## 5. Garagentor-Steuerung und Auto-Close
+
+**Szenario:** Garage öffnen, Kabel einstecken, Garage schließt automatisch.
+
+```
+User → App: Long-Press "Garage öffnen"
+  → FHEM HTTP: set aktor_garagentor on-for-timer 1
+  → Garage öffnet (~3s)
+  → lastManualToggleTime gesetzt (20s Cooldown für manuellen Toggle)
+
+User steckt Kabel ein (z.B. 40s später)
+  → KEBA Wallbox → Broadcast: {"Plug": 7}
+
+Broadcast Listener (<10ms)
+  → Plug-Änderung: 3 → 7 (Kabel eingesteckt)
+  → autoCloseGarageOnPlug aktiv?
+
+Auto-Close Logic
+  → Prüft: lastAutoCloseTime > 60s? ✓ (eigener Cooldown, unabhängig vom manuellen Toggle)
+  → Prüft: Garage offen? → FHEM: jsonlist2 garagentor → state: "open" ✓
+  → FHEM: set aktor_garagentor on-for-timer 1
+  → Garage schließt (~15s)
+  → lastAutoCloseTime gesetzt
+```
+
+**Wichtig:** Manueller Toggle und Auto-Close haben getrennte Cooldowns. Der manuelle Toggle (20s) blockiert nicht den Auto-Close (60s) und umgekehrt.
+
+## 6. Fehlerbehandlung
 
 ### Modbus-Verbindung unterbrochen
 

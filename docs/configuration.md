@@ -69,6 +69,15 @@ Lädt automatisch im Zeitfenster mit Maximalstrom. Ideal für günstige Nachtstr
 
 Ermöglicht externen SmartHome-Systemen, die Ladestrategie über den X1-Kontakt der Wallbox zu steuern.
 
+## Garagentor-Integration
+
+| Parameter | Beschreibung | Standard |
+|-----------|-------------|---------|
+| `fhemSync.host` | FHEM-Server IP (aktiviert Garage-Karte) | — |
+| `fhemSync.autoCloseGarageOnPlug` | Garage automatisch schließen wenn Kabel eingesteckt wird | `false` |
+
+Nutzt die bestehende FHEM HTTP-API (Port 8083) zur Steuerung. Details siehe [Garagentor-Integration](garage-integration.md).
+
 ## Demo-Modus
 
 | Parameter | Beschreibung |

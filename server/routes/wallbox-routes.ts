@@ -5,6 +5,7 @@ import { log } from "../core/logger";
 import { sendUdpCommand } from "../wallbox/transport";
 import { initSSEClient, broadcastWallboxStatus } from "../wallbox/sse";
 import { getOrCreateStrategyController } from "./shared-state";
+import { getAuthoritativePlugStatus } from "../wallbox/broadcast-listener";
 
 // Issue #93: Status-Poll-Throttle im Idle
 // Wenn Strategie "off" + State 5 (unterbrochen) → gecachten Status zurückgeben statt 3 UDP-Requests
@@ -26,7 +27,8 @@ export function resetStatusPollThrottle(): void {
 export function registerWallboxRoutes(app: Express): void {
   // SSE-Endpoint für Echtzeit-Status-Updates
   app.get("/api/wallbox/stream", (req, res) => {
-    initSSEClient(res);
+    // Send last known status on connect so reconnecting clients get current state immediately
+    initSSEClient(res, lastCachedStatus ?? undefined);
   });
 
   app.get("/api/wallbox/status", async (req, res) => {
@@ -66,9 +68,14 @@ export function registerWallboxRoutes(app: Express): void {
 
       const detectedPhases = activePhaseCount; // 0, 1, 2, or 3
 
+      // Plug-Status: Broadcast-Listener ist die autoritative Quelle (schneller als report 2).
+      // Fallback auf report2.Plug nur wenn noch kein Broadcast empfangen wurde.
+      // Verhindert Race Condition: report 2 kann kurzzeitig veraltete Plug-Werte liefern.
+      const authoritativePlug = getAuthoritativePlugStatus() ?? report2?.Plug ?? 0;
+
       const status = {
         state: report2?.State || 0,
-        plug: report2?.Plug || 0,
+        plug: authoritativePlug,
         input: report2?.Input, // Potenzialfreier Kontakt (optional)
         enableSys: report2["Enable sys"] || 0,
         maxCurr: (report2["Max curr"] || 0) / 1000,
@@ -86,25 +93,12 @@ export function registerWallboxRoutes(app: Express): void {
       lastStatusPollTime = now;
       lastCachedStatus = status;
 
-      // Tracke Änderungen des Kabelstatus im Hintergrund (nur bei gültigen Werten)
-      if (typeof status.plug === "number") {
+      // Plug-Tracking: NUR der Broadcast-Listener schreibt Plug-Änderungen in den Storage.
+      // Der HTTP-Poller initialisiert den Storage nur beim allerersten Aufruf
+      // (falls noch kein Broadcast empfangen wurde), um dem Frontend einen Startwert zu geben.
+      if (getAuthoritativePlugStatus() === null && typeof status.plug === "number") {
         const tracking = storage.getPlugStatusTracking();
-        if (
-          tracking.lastPlugStatus !== undefined &&
-          tracking.lastPlugStatus !== status.plug
-        ) {
-          // Status hat sich geändert - speichere Zeitstempel
-          storage.savePlugStatusTracking({
-            lastPlugStatus: status.plug,
-            lastPlugChange: new Date().toISOString(),
-          });
-          log(
-            "info",
-            "wallbox",
-            `Kabelstatus geändert: ${tracking.lastPlugStatus} -> ${status.plug}`,
-          );
-        } else if (tracking.lastPlugStatus === undefined) {
-          // Erster Aufruf - initialisiere ohne Zeitstempel
+        if (tracking.lastPlugStatus === undefined) {
           storage.savePlugStatusTracking({
             lastPlugStatus: status.plug,
           });

@@ -6,6 +6,7 @@ import { registerE3dcRoutes } from "./e3dc-routes";
 import { registerSettingsRoutes } from "./settings-routes";
 import { registerStatusRoutes } from "./status-routes";
 import { registerDemoRoutes } from "./demo-routes";
+import { registerGarageRoutes } from "./garage-routes";
 import { startSchedulers, shutdownSchedulers } from "./scheduler";
 import { storage } from "../core/storage";
 
@@ -22,6 +23,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   registerE3dcRoutes(app);
   registerSettingsRoutes(app);
   registerStatusRoutes(app);
+  registerGarageRoutes(app);
 
   // Demo-Routes nur im Demo-Modus registrieren
   const isDemoMode = process.env.DEMO_AUTOSTART === 'true' || storage.getSettings()?.demoMode;

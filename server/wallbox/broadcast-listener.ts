@@ -19,6 +19,7 @@ import { getProwlNotifier, triggerProwlEvent } from "../monitoring/prowl-notifie
 import { broadcastWallboxStatus, broadcastPartialUpdate } from "./sse";
 import { resetWallboxIdleThrottle } from "../e3dc/poller";
 import { resetStatusPollThrottle } from "../routes/wallbox-routes";
+import { autoCloseGarageIfNeeded } from "../routes/garage-routes";
 
 let lastInputStatus: number | null = null;
 let lastPlugStatus: number | null = null;
@@ -58,6 +59,11 @@ const handleBroadcast = async (data: any, rinfo: any) => {
               lastPlugChange: new Date().toISOString(),
             });
             
+            // Auto-Close Garage: Plug wechselt von <5 auf ≥5 (Kabel eingesteckt)
+            if (savedStatus < 5 && plugStatus >= 5) {
+              autoCloseGarageIfNeeded().catch(() => {});
+            }
+
             // Prowl-Benachrichtigung senden
             const settingsForProwl = storage.getSettings();
             if (settingsForProwl?.prowl?.enabled) {
@@ -112,6 +118,11 @@ const handleBroadcast = async (data: any, rinfo: any) => {
           );
         }
         
+        // Auto-Close Garage: Plug wechselt von <5 auf ≥5 (Kabel eingesteckt)
+        if (lastPlugStatus < 5 && plugStatus >= 5) {
+          autoCloseGarageIfNeeded().catch(() => {});
+        }
+
         // Prowl-Benachrichtigung (non-blocking, with initialization guard)
         try {
           const settingsForProwl = storage.getSettings();
@@ -137,12 +148,17 @@ const handleBroadcast = async (data: any, rinfo: any) => {
           log("debug", "system", "Prowl-Notifier nicht initialisiert - überspringe Benachrichtigung");
         }
         
+        // WICHTIG: In-Memory-Tracker ZUERST aktualisieren, DANN broadcasten!
+        // fetchAndBroadcastStatus() liest lastPlugStatus als autoritative Quelle.
+        // Wenn wir erst broadcasten, geht der alte Plug-Wert per SSE raus → Flicker.
+        lastPlugStatus = plugStatus;
+
         // WebSocket-Broadcast: Hol aktuellen Status und push zu Clients
         void fetchAndBroadcastStatus("Plug-Änderung");
+      } else {
+        // Kein Wechsel – nur In-Memory aktualisieren (redundant aber sicher)
+        lastPlugStatus = plugStatus;
       }
-
-      // Update In-Memory-Tracker für nächsten Broadcast
-      lastPlugStatus = plugStatus;
     }
 
     // Verarbeite State-Broadcasts
@@ -172,7 +188,8 @@ const handleBroadcast = async (data: any, rinfo: any) => {
         resetStatusPollThrottle();
         
         // Sofortiges partial SSE update (ohne 3 UDP-Requests)
-        broadcastPartialUpdate({ state });
+        // Include lastPlugStatus to prevent frontend from losing plug value
+        broadcastPartialUpdate({ state, ...(lastPlugStatus !== null ? { plug: lastPlugStatus } : {}) });
         
         // Vollständigen Status im Hintergrund holen für alle Felder
         void fetchAndBroadcastStatus("State-Änderung");
@@ -189,7 +206,8 @@ const handleBroadcast = async (data: any, rinfo: any) => {
       if (epresRaw !== lastEpres) {
         lastEpres = epresRaw;
         // Broadcast partial SSE update (Wh = raw / 10)
-        broadcastPartialUpdate({ ePres: epresRaw / 10 });
+        // Include lastPlugStatus to prevent frontend from losing plug value
+        broadcastPartialUpdate({ ePres: epresRaw / 10, ...(lastPlugStatus !== null ? { plug: lastPlugStatus } : {}) });
       }
     }
 
@@ -477,9 +495,13 @@ async function fetchAndBroadcastStatus(reason: string): Promise<void> {
     if (i2 > CURRENT_THRESHOLD) activePhaseCount++;
     if (i3 > CURRENT_THRESHOLD) activePhaseCount++;
 
+    // Plug-Status: In-Memory-Wert ist autoritativ (Broadcast ist schneller als report 2)
+    // Fallback auf report2.Plug nur wenn noch kein Broadcast empfangen wurde
+    const authoritativePlug = lastPlugStatus ?? report2?.Plug ?? 0;
+
     const status = {
       state: report2?.State || 0,
-      plug: report2?.Plug || 0,
+      plug: authoritativePlug,
       input: report2?.Input,
       enableSys: report2["Enable sys"] || 0,
       maxCurr: (report2["Max curr"] || 0) / 1000,
@@ -556,4 +578,15 @@ export async function stopBroadcastListener(): Promise<void> {
 
 export function isBroadcastListenerEnabled(): boolean {
   return isEnabled;
+}
+
+/**
+ * Gibt den autoritativen Plug-Status aus dem In-Memory-State zurück.
+ * Der Broadcast-Listener empfängt Plug-Änderungen direkt per UDP-Push
+ * und ist daher schneller und zuverlässiger als report-2-Abfragen.
+ *
+ * @returns Aktueller Plug-Status (number) oder null wenn noch kein Broadcast empfangen wurde.
+ */
+export function getAuthoritativePlugStatus(): number | null {
+  return lastPlugStatus;
 }

@@ -5,6 +5,7 @@ import { e3dcClient } from "../e3dc/client";
 import { getE3dcLiveDataHub } from "../e3dc/modbus";
 import { triggerProwlEvent } from "../monitoring/prowl-notifier";
 import { broadcastPartialUpdate } from "../wallbox/sse";
+import { getAuthoritativePlugStatus } from "../wallbox/broadcast-listener";
 import { DEFAULT_WALLBOX_IP } from "../core/defaults";
 import type { PhaseProvider } from "./phase-provider";
 
@@ -859,7 +860,8 @@ export class ChargingStrategyController {
         );
         
         // Sofortiges SSE-Update an GUI (kein Warten auf nächsten Poll-Zyklus)
-        broadcastPartialUpdate({ state: 3, enableSys: 1 });
+        const plug = getAuthoritativePlugStatus();
+        broadcastPartialUpdate({ state: 3, enableSys: 1, ...(plug !== null ? { plug } : {}) });
         
         // Prowl-Benachrichtigung (non-blocking, with initialization guard)
         triggerProwlEvent(settings, "chargingStarted", (notifier) =>
@@ -989,7 +991,8 @@ export class ChargingStrategyController {
       log("info", "system", "Ladung gestoppt");
       
       // Sofortiges SSE-Update an GUI (kein Warten auf nächsten Poll-Zyklus)
-      broadcastPartialUpdate({ state: 5, enableSys: 0 });
+      const plug = getAuthoritativePlugStatus();
+      broadcastPartialUpdate({ state: 5, enableSys: 0, ...(plug !== null ? { plug } : {}) });
       
       // Prowl-Benachrichtigung mit Deduplication (max 1x pro 5 Sekunden)
       const prowlNow = Date.now();

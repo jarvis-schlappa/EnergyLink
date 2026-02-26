@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from "react";
-import { Battery, Plug, Zap, AlertCircle, Gauge, Sparkles, Clock } from "lucide-react";
+import { Battery, Plug, Zap, AlertCircle, Gauge, Sparkles, Clock, Warehouse, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Slider } from "@/components/ui/slider";
@@ -8,11 +8,12 @@ import PageHeader from "@/components/PageHeader";
 import BuildInfoDialog from "@/components/BuildInfoDialog";
 import CableDetailDrawer from "@/components/status/CableDetailDrawer";
 import EnergyDetailDrawer from "@/components/status/EnergyDetailDrawer";
+import GarageDetailDrawer from "@/components/status/GarageDetailDrawer";
 import ChargingControlDrawer, { STRATEGY_OPTIONS } from "@/components/status/ChargingControlDrawer";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import type { WallboxStatus, ControlState, Settings, PlugStatusTracking, ChargingContext, ChargingStrategy, BuildInfo } from "@shared/schema";
+import type { WallboxStatus, ControlState, Settings, PlugStatusTracking, ChargingContext, ChargingStrategy, BuildInfo, GarageStatus } from "@shared/schema";
 import { useWallboxSSE } from "@/hooks/use-wallbox-sse";
 import { useStatus } from "@/hooks/use-status";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -30,8 +31,11 @@ export default function StatusPage() {
   const [waitingForConfirmation, setWaitingForConfirmation] = useState(false);
   const [showCableDrawer, setShowCableDrawer] = useState(false);
   const [showEnergyDrawer, setShowEnergyDrawer] = useState(false);
+  const [showGarageDrawer, setShowGarageDrawer] = useState(false);
   const [showChargingControlDrawer, setShowChargingControlDrawer] = useState(false);
   const [showBuildInfoDialog, setShowBuildInfoDialog] = useState(false);
+  const [garageMovingState, setGarageMovingState] = useState<"moving" | null>(null);
+  const garageMovingTimerRef = useRef<NodeJS.Timeout | null>(null);
   const [relativeUpdateTime, setRelativeUpdateTime] = useState<string>("");
   const [liveCountdown, setLiveCountdown] = useState<number | null>(null);
   const [liveStopCountdown, setLiveStopCountdown] = useState<number | null>(null);
@@ -51,7 +55,7 @@ export default function StatusPage() {
 
   const { data: status, isLoading, error } = useQuery<WallboxStatus>({
     queryKey: ["/api/wallbox/status"],
-    refetchInterval: 5000,
+    refetchInterval: sseConnected ? 30_000 : 5000, // SSE connected → slow fallback poll; disconnected → fast poll
   });
 
   const displayStatus = sseStatus || status;
@@ -64,6 +68,78 @@ export default function StatusPage() {
   const plugTracking = consolidatedStatus?.plugTracking;
   const chargingContext = consolidatedStatus?.chargingContext;
   const buildInfo = consolidatedStatus?.buildInfo;
+
+  // Garage: Check if FHEM host is configured
+  const hasFhemHost = !!settings?.fhemSync?.host;
+
+  // Garage status polling (only when FHEM is configured)
+  const { data: garageStatusRaw } = useQuery<GarageStatus>({
+    queryKey: ["/api/garage/status"],
+    refetchInterval: 5000,
+    enabled: hasFhemHost,
+  });
+
+  // Merge optimistic "moving" state with server state
+  const garageStatus: GarageStatus | null = garageMovingState
+    ? { state: "moving", lastChanged: garageStatusRaw?.lastChanged }
+    : garageStatusRaw ?? null;
+
+  // When server confirms state change, clear moving state
+  useEffect(() => {
+    if (garageMovingState && garageStatusRaw?.state !== undefined) {
+      // Server state changed from what triggered the toggle → movement complete
+      // The moving timer will handle timeout; here we just clear if state actually changed
+    }
+  }, [garageStatusRaw?.state, garageMovingState]);
+
+  const garageToggleMutation = useMutation({
+    mutationFn: () => apiRequest("POST", "/api/garage/toggle"),
+    onSuccess: () => {
+      // Optimistic: show "moving" for up to 20s
+      setGarageMovingState("moving");
+      const previousState = garageStatusRaw?.state;
+
+      if (garageMovingTimerRef.current) clearTimeout(garageMovingTimerRef.current);
+      garageMovingTimerRef.current = setTimeout(() => {
+        setGarageMovingState(null);
+        garageMovingTimerRef.current = null;
+      }, 20000);
+
+      // Poll faster during movement
+      const pollInterval = setInterval(() => {
+        queryClient.invalidateQueries({ queryKey: ["/api/garage/status"] });
+      }, 2000);
+
+      // Stop fast polling after 20s
+      setTimeout(() => clearInterval(pollInterval), 20000);
+
+      // Watch for state change to clear moving state early
+      const unsubscribe = queryClient.getQueryCache().subscribe((event) => {
+        if (event?.query?.queryKey?.[0] === "/api/garage/status") {
+          const data = event.query.state.data as GarageStatus | undefined;
+          if (data?.state && data.state !== "unknown" && data.state !== previousState) {
+            setGarageMovingState(null);
+            if (garageMovingTimerRef.current) {
+              clearTimeout(garageMovingTimerRef.current);
+              garageMovingTimerRef.current = null;
+            }
+            clearInterval(pollInterval);
+            unsubscribe();
+          }
+        }
+      });
+
+      // Cleanup subscription after 20s
+      setTimeout(() => unsubscribe(), 20000);
+    },
+    onError: () => {
+      toast({
+        title: "Fehler",
+        description: "Garagentor konnte nicht betätigt werden.",
+        variant: "destructive",
+      });
+    },
+  });
 
   useEffect(() => {
     if (displayStatus) {
@@ -582,14 +658,38 @@ export default function StatusPage() {
               onClick={() => setShowEnergyDrawer(true)}
             />
 
-            <StatusCard
-              icon={Plug}
-              title="Kabelverbindung"
-              value={isLoading ? "..." : getPlugStatus(status?.plug || 0)}
-              status={isCharging ? "charging" : isPluggedIn ? "ready" : "stopped"}
-              compact={true}
-              onClick={() => setShowCableDrawer(true)}
-            />
+            {/* Side-by-Side Grid: Kabel + Garage */}
+            <div className={`grid gap-3 ${hasFhemHost ? "grid-cols-2" : "grid-cols-1"}`}>
+              <StatusCard
+                icon={Plug}
+                title="Kabel"
+                value={isLoading ? "..." : (status?.plug || 0) >= 5 ? "Verbunden" : "Getrennt"}
+                status={(status?.plug || 0) >= 5 ? "charging" : "ready"}
+                compact={true}
+                onClick={() => setShowCableDrawer(true)}
+              />
+
+              {hasFhemHost && (
+                <StatusCard
+                  icon={Warehouse}
+                  title="Garage"
+                  value={
+                    garageStatus?.state === "open" ? "Offen" :
+                    garageStatus?.state === "closed" ? "Geschlossen" :
+                    garageStatus?.state === "moving" ? "Fährt..." :
+                    "Unbekannt"
+                  }
+                  status={
+                    garageStatus?.state === "closed" ? "charging" :
+                    garageStatus?.state === "open" ? "ready" :
+                    garageStatus?.state === "moving" ? "charging" :
+                    "stopped"
+                  }
+                  compact={true}
+                  onClick={() => setShowGarageDrawer(true)}
+                />
+              )}
+            </div>
 
             <Button
               onClick={handleToggleCharging}
@@ -630,6 +730,14 @@ export default function StatusPage() {
         onOpenChange={setShowEnergyDrawer}
         energySession={energySession}
         energyTotal={energyTotal}
+      />
+
+      <GarageDetailDrawer
+        open={showGarageDrawer}
+        onOpenChange={setShowGarageDrawer}
+        garageStatus={garageStatus}
+        onToggle={() => garageToggleMutation.mutate()}
+        isToggling={garageToggleMutation.isPending}
       />
 
       <ChargingControlDrawer

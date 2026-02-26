@@ -77,9 +77,22 @@ export const fhemSyncSchema = z.object({
   enabled: z.boolean(),
   host: z.string(),
   port: z.number(),
+  autoCloseGarageOnPlug: z.boolean().default(false),
 });
 
 export type FhemSync = z.infer<typeof fhemSyncSchema>;
+
+// FHEM liefert nur "open"/"closed". "moving" ist ein clientseitiger Zustand
+// (optimistisches Update nach Toggle, bis FHEM den neuen State bestätigt).
+// "unknown" bei FHEM-Verbindungsfehler.
+export const garageStateSchema = z.enum(["open", "closed", "moving", "unknown"]);
+export type GarageState = z.infer<typeof garageStateSchema>;
+
+export const garageStatusSchema = z.object({
+  state: garageStateSchema,
+  lastChanged: z.string().optional(),
+});
+export type GarageStatus = z.infer<typeof garageStatusSchema>;
 
 export const prowlEventsSchema = z.object({
   appStarted: z.boolean(),
@@ -164,7 +177,7 @@ export const logEntrySchema = z.object({
   id: z.string(),
   timestamp: z.string(),
   level: logLevelSchema,
-  category: z.enum(["wallbox", "wallbox-mock", "e3dc", "e3dc-mock", "e3dc-poller", "e3dc-hub", "fhem", "fhem-mock", "webhook", "system", "storage", "strategy", "grid-frequency"]),
+  category: z.enum(["wallbox", "wallbox-mock", "e3dc", "e3dc-mock", "e3dc-poller", "e3dc-hub", "fhem", "fhem-mock", "webhook", "system", "storage", "strategy", "grid-frequency", "garage"]),
   message: z.string(),
   details: z.string().optional(),
 });

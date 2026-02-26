@@ -21,7 +21,7 @@ let pingInterval: NodeJS.Timeout | null = null;
 /**
  * Initialisiert einen SSE-Client
  */
-export function initSSEClient(res: Response): string {
+export function initSSEClient(res: Response, initialStatus?: WallboxStatus): string {
   const clientId = Math.random().toString(36).slice(2, 9);
   
   // SSE Headers setzen
@@ -46,6 +46,20 @@ export function initSSEClient(res: Response): string {
   
   // Initiales Keep-Alive senden
   res.write(`:ok\n\n`);
+  
+  // Send initial status if available (so reconnecting clients get current state immediately)
+  if (initialStatus) {
+    try {
+      const data = JSON.stringify({
+        type: "wallbox-status",
+        data: initialStatus,
+        timestamp: Date.now(),
+      });
+      res.write(`data: ${data}\n\n`);
+    } catch {
+      // Client may have disconnected already
+    }
+  }
   
   // Ping-System starten (falls noch nicht aktiv)
   if (!pingInterval && connectedClients.size > 0) {

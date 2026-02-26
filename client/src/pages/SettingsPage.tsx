@@ -112,6 +112,7 @@ export default function SettingsPage() {
         enabled: false,
         host: "192.168.1.100",
         port: 7072,
+        autoCloseGarageOnPlug: false,
       },
       demoMode: false,
       mockWallboxPhases: 3,
@@ -184,6 +185,7 @@ export default function SettingsPage() {
         enabled: false,
         host: "192.168.1.100",
         port: 7072,
+        autoCloseGarageOnPlug: false,
       };
 
       form.reset({
