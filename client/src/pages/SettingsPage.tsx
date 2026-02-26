@@ -1,253 +1,165 @@
-import { useEffect, useRef, useState } from "react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Separator } from "@/components/ui/separator";
-import { useToast } from "@/hooks/use-toast";
-import { useQuery, useMutation } from "@tanstack/react-query";
-import { queryClient, apiRequest } from "@/lib/queryClient";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
+import { useState, useCallback } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { PlugZap, Home, Terminal, Settings } from "lucide-react";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
-  settingsSchema,
-  controlStateSchema,
-  buildInfoSchema,
-} from "@shared/schema";
-import type { Settings, ControlState } from "@shared/schema";
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { settingsSchema } from "@shared/schema";
+import type { Settings as SettingsType } from "@shared/schema";
 import PageHeader from "@/components/PageHeader";
 import BuildInfoDialog from "@/components/BuildInfoDialog";
-import DemoModeSection from "@/components/settings/DemoModeSection";
-import E3dcIntegrationSection from "@/components/settings/E3dcIntegrationSection";
-import FhemSyncSection from "@/components/settings/FhemSyncSection";
-import ProwlNotificationSection from "@/components/settings/ProwlNotificationSection";
-import ChargingStrategySection from "@/components/settings/ChargingStrategySection";
+import { buildInfoSchema } from "@shared/schema";
+import WallboxTab from "@/components/settings/WallboxTab";
+import E3dcTab from "@/components/settings/E3dcTab";
+import FhemTab from "@/components/settings/FhemTab";
+import SystemTab from "@/components/settings/SystemTab";
+
+const TAB_CONFIG = [
+  { value: "wallbox", label: "Wallbox", icon: PlugZap },
+  { value: "e3dc", label: "E3DC", icon: Home },
+  { value: "fhem", label: "FHEM", icon: Terminal },
+  { value: "system", label: "System", icon: Settings },
+] as const;
+
+// Default settings for form initialization before server data arrives
+const DEFAULT_SETTINGS: SettingsType = {
+  wallboxIp: "192.168.40.16",
+  e3dcIp: "",
+  pvSurplusOnUrl: "",
+  pvSurplusOffUrl: "",
+  nightChargingSchedule: {
+    enabled: false,
+    startTime: "00:00",
+    endTime: "05:00",
+  },
+  e3dc: {
+    enabled: false,
+    dischargeLockEnableCommand: "",
+    dischargeLockDisableCommand: "",
+    gridChargeEnableCommand: "",
+    gridChargeDisableCommand: "",
+    gridChargeDuringNightCharging: false,
+    modbusPauseSeconds: 3,
+    pollingIntervalSeconds: 10,
+  },
+  chargingStrategy: {
+    activeStrategy: "off",
+    minStartPowerWatt: 1400,
+    stopThresholdWatt: 1000,
+    startDelaySeconds: 120,
+    stopDelaySeconds: 300,
+    minCurrentChangeAmpere: 1,
+    minChangeIntervalSeconds: 60,
+    physicalPhaseSwitch: 3,
+    inputX1Strategy: "max_without_battery",
+  },
+  prowl: {
+    enabled: false,
+    apiKey: "",
+    events: {
+      appStarted: false,
+      chargingStarted: true,
+      chargingStopped: true,
+      currentAdjusted: false,
+      plugConnected: false,
+      plugDisconnected: false,
+      batteryLockActivated: false,
+      batteryLockDeactivated: false,
+      gridChargingActivated: false,
+      gridChargingDeactivated: false,
+      gridFrequencyWarning: true,
+      gridFrequencyCritical: true,
+      strategyChanged: false,
+      errors: false,
+    },
+  },
+  gridFrequencyMonitor: {
+    enabled: false,
+    tier2Threshold: 0.15,
+    tier3Threshold: 0.2,
+    enableEmergencyCharging: true,
+  },
+  fhemSync: {
+    enabled: false,
+    host: "192.168.1.100",
+    port: 7072,
+    autoCloseGarageOnPlug: false,
+  },
+  demoMode: false,
+  mockWallboxPhases: 3,
+  mockWallboxPlugStatus: 7,
+};
 
 export default function SettingsPage() {
-  const { toast } = useToast();
-  const formHydratedRef = useRef(false);
+  const [activeTab, setActiveTab] = useState("wallbox");
+  const [dirtyTabs, setDirtyTabs] = useState<Record<string, boolean>>({});
+  const [pendingTab, setPendingTab] = useState<string | null>(null);
   const [showBuildInfoDialog, setShowBuildInfoDialog] = useState(false);
 
-  // Lade Build-Info (nur einmal, keine Auto-Updates)
+  const {
+    data: rawSettings,
+    isSuccess: settingsLoaded,
+  } = useQuery<SettingsType>({
+    queryKey: ["/api/settings"],
+  });
+
+  // Merge server settings with defaults
+  const settings: SettingsType = rawSettings
+    ? {
+        ...DEFAULT_SETTINGS,
+        ...rawSettings,
+        e3dc: { ...DEFAULT_SETTINGS.e3dc!, ...rawSettings.e3dc },
+        chargingStrategy: { ...DEFAULT_SETTINGS.chargingStrategy!, ...rawSettings.chargingStrategy },
+        prowl: {
+          ...DEFAULT_SETTINGS.prowl!,
+          ...rawSettings.prowl,
+          events: { ...DEFAULT_SETTINGS.prowl!.events, ...rawSettings.prowl?.events },
+        },
+        gridFrequencyMonitor: { ...DEFAULT_SETTINGS.gridFrequencyMonitor!, ...rawSettings.gridFrequencyMonitor },
+        fhemSync: { ...DEFAULT_SETTINGS.fhemSync!, ...rawSettings.fhemSync },
+      }
+    : DEFAULT_SETTINGS;
+
+  // Build info for the dialog
   const { data: buildInfoRaw } = useQuery({
     queryKey: ["/api/build-info"],
     staleTime: Infinity,
   });
-  const buildInfoResult = buildInfoRaw
-    ? buildInfoSchema.safeParse(buildInfoRaw)
-    : null;
+  const buildInfoResult = buildInfoRaw ? buildInfoSchema.safeParse(buildInfoRaw) : null;
   const buildInfo = buildInfoResult?.success ? buildInfoResult.data : undefined;
 
-  const {
-    data: settings,
-    isLoading: isLoadingSettings,
-    isSuccess: settingsLoaded,
-  } = useQuery<Settings>({
-    queryKey: ["/api/settings"],
-  });
-
-  const { data: controlState, isLoading: isLoadingControls } =
-    useQuery<ControlState>({
-      queryKey: ["/api/controls"],
+  const handleDirtyChange = useCallback((tab: string) => (dirty: boolean) => {
+    setDirtyTabs((prev) => {
+      if (prev[tab] === dirty) return prev;
+      return { ...prev, [tab]: dirty };
     });
+  }, []);
 
-  const form = useForm<Settings>({
-    resolver: zodResolver(settingsSchema),
-    defaultValues: {
-      wallboxIp: "192.168.40.16",
-      e3dcIp: "",
-      pvSurplusOnUrl: "",
-      pvSurplusOffUrl: "",
-      nightChargingSchedule: {
-        enabled: false,
-        startTime: "00:00",
-        endTime: "05:00",
-      },
-      e3dc: {
-        enabled: false,
-        dischargeLockEnableCommand: "",
-        dischargeLockDisableCommand: "",
-        gridChargeEnableCommand: "",
-        gridChargeDisableCommand: "",
-        gridChargeDuringNightCharging: false,
-        modbusPauseSeconds: 3,
-        pollingIntervalSeconds: 10,
-      },
-      chargingStrategy: {
-        activeStrategy: "off",
-        minStartPowerWatt: 1400,
-        stopThresholdWatt: 1000,
-        startDelaySeconds: 120,
-        stopDelaySeconds: 300,
-        minCurrentChangeAmpere: 1,
-        minChangeIntervalSeconds: 60,
-        inputX1Strategy: "max_without_battery",
-      },
-      prowl: {
-        enabled: false,
-        apiKey: "",
-        events: {
-          appStarted: false,
-          chargingStarted: true,
-          chargingStopped: true,
-          currentAdjusted: false,
-          plugConnected: false,
-          plugDisconnected: false,
-          batteryLockActivated: false,
-          batteryLockDeactivated: false,
-          gridChargingActivated: false,
-          gridChargingDeactivated: false,
-          gridFrequencyWarning: true,
-          gridFrequencyCritical: true,
-          strategyChanged: false,
-          errors: false,
-        },
-      },
-      gridFrequencyMonitor: {
-        enabled: false,
-        tier2Threshold: 0.1,
-        tier3Threshold: 0.2,
-        enableEmergencyCharging: true,
-      },
-      fhemSync: {
-        enabled: false,
-        host: "192.168.1.100",
-        port: 7072,
-        autoCloseGarageOnPlug: false,
-      },
-      demoMode: false,
-      mockWallboxPhases: 3,
-      mockWallboxPlugStatus: 7,
-    },
-  });
-
-  const controlForm = useForm<ControlState>({
-    resolver: zodResolver(controlStateSchema),
-    defaultValues: {
-      pvSurplus: false,
-      nightCharging: false,
-      batteryLock: false,
-      gridCharging: false,
-    },
-  });
-
-  useEffect(() => {
-    if (settings) {
-      const strategyDefaults = {
-        activeStrategy: "off" as const,
-        minStartPowerWatt: 1400,
-        stopThresholdWatt: 1000,
-        startDelaySeconds: 120,
-        stopDelaySeconds: 300,
-        minCurrentChangeAmpere: 1,
-        minChangeIntervalSeconds: 60,
-        inputX1Strategy: "max_without_battery" as const,
-      };
-
-      const prowlDefaults = {
-        enabled: false,
-        apiKey: "",
-        events: {
-          appStarted: false,
-          chargingStarted: true,
-          chargingStopped: true,
-          currentAdjusted: false,
-          plugConnected: false,
-          plugDisconnected: false,
-          batteryLockActivated: false,
-          batteryLockDeactivated: false,
-          gridChargingActivated: false,
-          gridChargingDeactivated: false,
-          gridFrequencyWarning: true,
-          gridFrequencyCritical: true,
-          strategyChanged: false,
-          errors: false,
-        },
-      };
-
-      const gridFrequencyMonitorDefaults = {
-        enabled: false,
-        tier2Threshold: 0.1,
-        tier3Threshold: 0.2,
-        enableEmergencyCharging: true,
-      };
-
-      const e3dcDefaults = {
-        enabled: false,
-        pollingIntervalSeconds: 10,
-        prefix: "",
-        dischargeLockEnableCommand: "",
-        dischargeLockDisableCommand: "",
-        gridChargeEnableCommand: "",
-        gridChargeDisableCommand: "",
-      };
-
-      const fhemSyncDefaults = {
-        enabled: false,
-        host: "192.168.1.100",
-        port: 7072,
-        autoCloseGarageOnPlug: false,
-      };
-
-      form.reset({
-        ...settings,
-        e3dc: {
-          ...e3dcDefaults,
-          ...settings.e3dc,
-        },
-        fhemSync: {
-          ...fhemSyncDefaults,
-          ...settings.fhemSync,
-        },
-        chargingStrategy: {
-          ...strategyDefaults,
-          ...settings.chargingStrategy,
-        },
-        prowl: {
-          ...prowlDefaults,
-          ...settings.prowl,
-          events: {
-            ...prowlDefaults.events,
-            ...settings.prowl?.events,
-          },
-        },
-        gridFrequencyMonitor: {
-          ...gridFrequencyMonitorDefaults,
-          ...settings.gridFrequencyMonitor,
-        },
-      });
-      formHydratedRef.current = true;
+  const handleTabChange = useCallback((newTab: string) => {
+    if (dirtyTabs[activeTab]) {
+      setPendingTab(newTab);
+    } else {
+      setActiveTab(newTab);
     }
-  }, [settings, form]);
+  }, [activeTab, dirtyTabs]);
 
-  useEffect(() => {
-    if (controlState) {
-      controlForm.reset(controlState);
+  const confirmTabSwitch = useCallback(() => {
+    if (pendingTab) {
+      setActiveTab(pendingTab);
+      setPendingTab(null);
     }
-  }, [controlState, controlForm]);
+  }, [pendingTab]);
 
-  const saveSettingsMutation = useMutation({
-    mutationFn: (data: Settings) => apiRequest("POST", "/api/settings", data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/settings"] });
-      toast({
-        title: "Einstellungen gespeichert",
-        description: "Ihre Konfiguration wurde erfolgreich gespeichert.",
-      });
-    },
-    onError: () => {
-      // Bei Fehler: Settings neu laden um UI-Zustand zu synchronisieren
-      queryClient.invalidateQueries({ queryKey: ["/api/settings"] });
-      toast({
-        title: "Fehler",
-        description: "Die Einstellungen konnten nicht gespeichert werden.",
-        variant: "destructive",
-      });
-    },
-  });
-
-  const handleSave = (data: Settings) => {
-    saveSettingsMutation.mutate(data);
-  };
+  const cancelTabSwitch = useCallback(() => {
+    setPendingTab(null);
+  }, []);
 
   return (
     <div className="flex flex-col h-full">
@@ -256,89 +168,76 @@ export default function SettingsPage() {
           <PageHeader
             title="Einstellungen"
             onLogoClick={() => setShowBuildInfoDialog(true)}
-            isDemoMode={settings?.demoMode}
+            isDemoMode={settings.demoMode}
           />
 
-          <form onSubmit={form.handleSubmit(handleSave)} className="space-y-6">
-            <DemoModeSection
-              form={form}
-              settingsLoaded={settingsLoaded}
-              formHydrated={formHydratedRef.current}
-              saveSettingsMutation={saveSettingsMutation}
-              isLoadingSettings={isLoadingSettings}
-            />
+          <Tabs value={activeTab} onValueChange={handleTabChange}>
+            <TabsList data-testid="settings-tabs-list">
+              {TAB_CONFIG.map(({ value, label, icon: Icon }) => (
+                <TabsTrigger key={value} value={value} data-testid={`tab-${value}`}>
+                  <Icon className="w-4 h-4 mr-1.5" />
+                  <span>{label}</span>
+                  {dirtyTabs[value] && (
+                    <span
+                      className="ml-1.5 w-2 h-2 rounded-full bg-orange-500 inline-block"
+                      data-testid={`dirty-indicator-${value}`}
+                    />
+                  )}
+                </TabsTrigger>
+              ))}
+            </TabsList>
 
-            <Separator />
-
-            <div className="space-y-2">
-              <Label htmlFor="wallbox-ip" className="text-base font-medium">
-                IP-Adresse Wallbox
-              </Label>
-              <Input
-                id="wallbox-ip"
-                type="text"
-                placeholder="192.168.40.16"
-                {...form.register("wallboxIp")}
-                className="h-12"
-                data-testid="input-wallbox-ip"
-                disabled={form.watch("demoMode") ?? false}
+            <TabsContent value="wallbox">
+              <WallboxTab
+                settings={settings}
+                onDirtyChange={handleDirtyChange("wallbox")}
               />
-              <p className="text-xs text-muted-foreground">
-                IP-Adresse Ihrer KEBA P20 Wallbox im lokalen Netzwerk
-              </p>
-            </div>
+            </TabsContent>
 
-            <div className="space-y-2">
-              <Label htmlFor="e3dc-ip" className="text-base font-medium">
-                IP-Adresse Hauskraftwerk
-              </Label>
-              <Input
-                id="e3dc-ip"
-                type="text"
-                placeholder="192.168.40.17"
-                {...form.register("e3dcIp")}
-                className="h-12"
-                data-testid="input-e3dc-ip"
-                disabled={form.watch("demoMode") ?? false}
+            <TabsContent value="e3dc">
+              <E3dcTab
+                settings={settings}
+                onDirtyChange={handleDirtyChange("e3dc")}
               />
-              <p className="text-xs text-muted-foreground">
-                IP-Adresse Ihres E3DC S10 für Modbus TCP-Zugriff (Port 502)
-              </p>
-            </div>
+            </TabsContent>
 
-            <Separator />
+            <TabsContent value="fhem">
+              <FhemTab
+                settings={settings}
+                onDirtyChange={handleDirtyChange("fhem")}
+              />
+            </TabsContent>
 
-            <E3dcIntegrationSection form={form} />
-
-            <Separator />
-
-            <FhemSyncSection form={form} />
-
-            <Separator />
-
-            <ProwlNotificationSection
-              form={form}
-              saveSettingsMutation={saveSettingsMutation}
-            />
-
-            <Separator />
-
-            <ChargingStrategySection form={form} />
-
-            <Button
-              type="submit"
-              size="lg"
-              className="w-full h-12 text-base font-medium"
-              data-testid="button-save-settings"
-              disabled={isLoadingSettings || saveSettingsMutation.isPending}
-            >
-              {saveSettingsMutation.isPending
-                ? "Wird gespeichert..."
-                : "Einstellungen speichern"}
-            </Button>
-          </form>
+            <TabsContent value="system">
+              <SystemTab
+                settings={settings}
+                settingsLoaded={settingsLoaded}
+                onDirtyChange={handleDirtyChange("system")}
+              />
+            </TabsContent>
+          </Tabs>
         </div>
       </div>
+
+      {/* Tab-Wechsel-Guard Dialog */}
+      <Dialog open={pendingTab !== null} onOpenChange={(open) => !open && cancelTabSwitch()}>
+        <DialogContent data-testid="dialog-unsaved-changes">
+          <DialogHeader>
+            <DialogTitle>Ungespeicherte Änderungen</DialogTitle>
+            <DialogDescription>
+              Du hast ungespeicherte Änderungen in diesem Tab. Möchtest du diese verwerfen?
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={cancelTabSwitch} data-testid="button-cancel-tab-switch">
+              Abbrechen
+            </Button>
+            <Button variant="destructive" onClick={confirmTabSwitch} data-testid="button-confirm-tab-switch">
+              Verwerfen
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <BuildInfoDialog
         open={showBuildInfoDialog}

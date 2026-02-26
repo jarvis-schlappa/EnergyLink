@@ -1,0 +1,926 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>EnergyLink – Settings Mock v2</title>
+<style>
+  :root {
+    --background: hsl(0 0% 100%);
+    --foreground: hsl(0 0% 9%);
+    --card: hsl(0 0% 98%);
+    --card-foreground: hsl(0 0% 9%);
+    --card-border: hsl(0 0% 94%);
+    --border: hsl(0 0% 89%);
+    --muted: hsl(0 0% 93%);
+    --muted-foreground: hsl(0 0% 45%);
+    --primary: hsl(142 76% 36%);
+    --primary-foreground: hsl(144 80% 97%);
+    --accent: hsl(142 20% 92%);
+    --accent-foreground: hsl(142 18% 15%);
+    --input: hsl(0 0% 78%);
+    --ring: hsl(142 76% 36%);
+    --radius: 0.5rem;
+    --destructive: hsl(0 84% 42%);
+    --warning: hsl(35 92% 47%);
+    --warning-bg: hsl(35 80% 95%);
+    --warning-border: hsl(35 60% 80%);
+    --info-bg: hsl(201 60% 95%);
+    --info-border: hsl(201 70% 72%);
+    --info-text: hsl(201 60% 35%);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: Roboto, -apple-system, sans-serif;
+    background: var(--background);
+    color: var(--foreground);
+    -webkit-font-smoothing: antialiased;
+    min-height: 100dvh;
+    overflow-x: hidden;
+  }
+
+  /* --- Demo Badge --- */
+  .demo-badge {
+    display: none;
+    background: var(--muted);
+    color: var(--muted-foreground);
+    font-size: 12px;
+    font-weight: 500;
+    padding: 3px 10px;
+    border-radius: 9999px;
+    flex-shrink: 0;
+  }
+  .demo-badge.visible { display: inline-block; }
+
+  /* --- Top Header --- */
+  .page-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 16px 8px;
+  }
+  .page-header .header-left {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .page-header h1 {
+    font-size: 20px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    color: var(--foreground);
+  }
+  .page-header .app-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+  }
+
+  /* --- Tab Bar --- */
+  .tab-bar {
+    display: flex;
+    gap: 4px;
+    padding: 0 12px 12px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .tab-bar::-webkit-scrollbar { display: none; }
+
+  .tab {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 8px 14px;
+    border-radius: 9999px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--muted-foreground);
+    background: transparent;
+    border: 1px solid var(--border);
+    cursor: pointer;
+    transition: all 0.15s;
+    white-space: nowrap;
+    -webkit-tap-highlight-color: transparent;
+    user-select: none;
+    position: relative;
+  }
+  .tab.active {
+    background: var(--primary);
+    color: var(--primary-foreground);
+    border-color: var(--primary);
+  }
+  .tab.active svg { stroke: var(--primary-foreground); }
+  .tab:not(.active):active { background: var(--muted); }
+
+  .tab svg {
+    width: 14px;
+    height: 14px;
+    stroke: var(--muted-foreground);
+    stroke-width: 2;
+    fill: none;
+  }
+
+  .tab .dirty-dot {
+    display: none;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--warning);
+    position: absolute;
+    top: 4px;
+    right: 4px;
+  }
+
+  /* --- Content Area --- */
+  .content { padding: 0 16px 120px; }
+  .tab-content { display: none; }
+  .tab-content.active {
+    display: block;
+    animation: fadeIn 0.15s ease;
+  }
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(4px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  /* --- Cards --- */
+  .card {
+    background: var(--card);
+    border: 1px solid var(--card-border);
+    border-radius: var(--radius);
+    padding: 16px;
+    margin-bottom: 12px;
+  }
+  .card-title {
+    font-size: 14px;
+    font-weight: 500;
+    margin-bottom: 2px;
+    color: var(--foreground);
+  }
+  .card-desc {
+    font-size: 12px;
+    color: var(--muted-foreground);
+  }
+
+  /* --- Form Elements --- */
+  .form-group { margin-top: 14px; }
+  .form-group label {
+    display: block;
+    font-size: 13px;
+    font-weight: 500;
+    margin-bottom: 6px;
+    color: var(--foreground);
+  }
+  .form-group .hint {
+    font-size: 11px;
+    color: var(--muted-foreground);
+    margin-top: 4px;
+  }
+
+  input[type="text"],
+  input[type="number"],
+  input[type="password"],
+  input[type="time"],
+  select {
+    width: 100%;
+    height: 48px;
+    padding: 0 12px;
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    background: var(--background);
+    color: var(--foreground);
+    font-size: 14px;
+    font-family: inherit;
+    outline: none;
+    -webkit-appearance: none;
+  }
+  input:focus, select:focus {
+    border-color: var(--ring);
+    box-shadow: 0 0 0 2px hsla(142, 76%, 36%, 0.15);
+  }
+  input::placeholder { color: var(--muted-foreground); }
+  select {
+    cursor: pointer;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='%23737373'%3E%3Cpath d='M4 6l4 4 4-4'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+    padding-right: 36px;
+  }
+  input.mono {
+    font-family: Menlo, monospace;
+    font-size: 13px;
+  }
+
+  /* --- Switch --- */
+  .switch-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  .switch-row .left { flex: 1; min-width: 0; }
+  .switch-row .switch-label {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--foreground);
+  }
+  .switch-row .switch-desc {
+    font-size: 11px;
+    color: var(--muted-foreground);
+    margin-top: 1px;
+  }
+
+  .switch {
+    flex-shrink: 0;
+    width: 44px;
+    height: 24px;
+    border-radius: 12px;
+    background: var(--input);
+    position: relative;
+    cursor: pointer;
+    transition: background 0.2s;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .switch.on { background: var(--primary); }
+  .switch::after {
+    content: '';
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: white;
+    transition: transform 0.2s;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+  }
+  .switch.on::after { transform: translateX(20px); }
+
+  /* --- Separator --- */
+  .separator {
+    height: 1px;
+    background: var(--border);
+    margin: 14px 0;
+  }
+
+  /* --- Info Box --- */
+  .info-box {
+    background: var(--muted);
+    border-radius: var(--radius);
+    padding: 12px;
+    margin-top: 12px;
+  }
+  .info-box p {
+    font-size: 12px;
+    color: var(--muted-foreground);
+  }
+  .info-box strong { color: var(--foreground); }
+
+  /* Cross-tab reference */
+  .cross-ref {
+    background: var(--info-bg);
+    border-left: 3px solid var(--info-border);
+    border-radius: 0 var(--radius) var(--radius) 0;
+    padding: 10px 14px;
+    margin: 12px 0;
+  }
+  .cross-ref p {
+    font-size: 11px;
+    color: var(--info-text);
+    margin: 0;
+  }
+
+  /* --- Event Group --- */
+  .event-group { margin-top: 12px; }
+  .event-group-title {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--muted-foreground);
+    margin-bottom: 8px;
+  }
+  .event-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 0;
+  }
+  .event-item + .event-item {
+    border-top: 1px solid var(--card-border);
+  }
+  .event-item .event-label {
+    font-size: 12px;
+    color: var(--foreground);
+  }
+  .event-item .switch {
+    width: 36px;
+    height: 20px;
+    border-radius: 10px;
+  }
+  .event-item .switch::after {
+    width: 16px;
+    height: 16px;
+    top: 2px;
+    left: 2px;
+  }
+  .event-item .switch.on::after { transform: translateX(16px); }
+
+  /* --- Buttons --- */
+  .btn {
+    width: 100%;
+    height: 48px;
+    border-radius: var(--radius);
+    font-size: 14px;
+    font-weight: 500;
+    font-family: inherit;
+    cursor: pointer;
+    border: none;
+    transition: all 0.15s;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .btn:active { opacity: 0.8; }
+  .btn-primary {
+    background: var(--primary);
+    color: var(--primary-foreground);
+  }
+  .btn-outline {
+    background: transparent;
+    color: var(--foreground);
+    border: 1px solid var(--border);
+  }
+  .btn + .btn { margin-top: 8px; }
+  .btn-save {
+    background: var(--primary);
+    color: var(--primary-foreground);
+    margin-top: 16px;
+    display: none;
+  }
+  .btn-save.visible { display: block; }
+
+  /* --- Collapsible --- */
+  .collapsible-trigger {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    user-select: none;
+    padding: 4px 0;
+  }
+  .collapsible-trigger .arrow {
+    font-size: 12px;
+    color: var(--muted-foreground);
+    transition: transform 0.2s;
+  }
+  .collapsible-trigger.open .arrow { transform: rotate(180deg); }
+  .collapsible-body { display: none; padding-top: 12px; }
+  .collapsible-body.open { display: block; }
+
+  /* --- Sub-section indent --- */
+  .sub-section {
+    padding-left: 14px;
+    border-left: 2px solid var(--muted);
+    margin-top: 12px;
+  }
+
+  /* --- Conditional sections --- */
+  .conditional { display: none; }
+  .conditional.visible { display: block; }
+</style>
+</head>
+<body>
+
+<div class="page-header">
+  <div class="header-left">
+    <img class="app-icon" src="apple-touch-icon.png" alt="EnergyLink">
+    <h1>Einstellungen</h1>
+  </div>
+  <span class="demo-badge visible" id="demoBadge">Demo</span>
+</div>
+
+<!-- Tab Bar: 4 Tabs with Lucide-style SVG icons -->
+<div class="tab-bar">
+  <div class="tab active" data-tab="wallbox">
+    <!-- PlugZap icon (Lucide) -->
+    <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M6.3 20.3a2.4 2.4 0 0 0 3.4 0L12 18l-6-6-2.3 2.3a2.4 2.4 0 0 0 0 3.4Z"/><path d="m2 22 3-3"/><path d="M7.5 13.5 10 11"/><path d="M10.5 16.5 13 14"/><path d="m18 3-4 4h6l-4 4"/></svg>
+    Wallbox
+    <span class="dirty-dot"></span>
+  </div>
+  <div class="tab" data-tab="e3dc">
+    <!-- Home icon (Hauskraftwerk) -->
+    <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"/><path d="M3 10a2 2 0 0 1 .709-1.528l7-5.999a2 2 0 0 1 2.582 0l7 5.999A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+    E3DC
+    <span class="dirty-dot"></span>
+  </div>
+  <div class="tab" data-tab="fhem">
+    <!-- Terminal icon (FHEM Telnet) -->
+    <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
+    FHEM
+    <span class="dirty-dot"></span>
+  </div>
+  <div class="tab" data-tab="system">
+    <!-- Settings icon -->
+    <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
+    System
+    <span class="dirty-dot"></span>
+  </div>
+</div>
+
+<div class="content">
+
+<!-- ==================== WALLBOX TAB ==================== -->
+<div class="tab-content active" id="tab-wallbox">
+
+  <div class="card">
+    <label class="card-title">Verbindung</label>
+    <div class="form-group">
+      <label>IP-Adresse Wallbox</label>
+      <input type="text" value="192.168.40.16" placeholder="192.168.40.16" oninput="showSave('wallbox')">
+      <div class="hint">KEBA P20 im lokalen Netzwerk</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <label class="card-title">Standard-Ladestrategie</label>
+    <p class="card-desc">Wird aktiviert bei „Laden starten" und bei geschlossenem X1-Kontakt</p>
+    <div class="form-group">
+      <select oninput="showSave('wallbox')">
+        <option>Aus</option>
+        <option>PV-Überschuss (Batterie-Priorität)</option>
+        <option>PV-Überschuss (Fahrzeug-Priorität)</option>
+        <option>Max Power (mit Batterie)</option>
+        <option selected>Max Power (ohne Batterie)</option>
+      </select>
+    </div>
+  </div>
+
+  <!-- Feintuning Collapsible -->
+  <div class="card">
+    <div class="collapsible-trigger" onclick="toggleCollapsible(this)">
+      <div>
+        <div class="card-title">Feintuning</div>
+        <div class="card-desc">Schwellwerte, Verzögerungen, Intervalle</div>
+      </div>
+      <span class="arrow">▼</span>
+    </div>
+    <div class="collapsible-body">
+      <div class="separator"></div>
+
+      <div class="form-group">
+        <label>Mindest-Startleistung (W)</label>
+        <input type="number" value="1400" min="500" max="5000" oninput="showSave('wallbox')">
+        <div class="hint">Mindest-Überschuss zum Starten (500–5000 W)</div>
+      </div>
+
+      <div class="form-group">
+        <label>Stopp-Schwellwert (W)</label>
+        <input type="number" value="1000" min="300" max="3000" oninput="showSave('wallbox')">
+        <div class="hint">Unter diesem Wert wird die Ladung gestoppt</div>
+      </div>
+
+      <div class="form-group">
+        <label>Start-Verzögerung (s)</label>
+        <input type="number" value="120" min="30" max="600" oninput="showSave('wallbox')">
+      </div>
+
+      <div class="form-group">
+        <label>Stopp-Verzögerung (s)</label>
+        <input type="number" value="300" min="60" max="900" oninput="showSave('wallbox')">
+      </div>
+
+      <div class="form-group">
+        <label>Mindest-Regelschritt (A)</label>
+        <input type="number" value="1" min="0.1" max="5" step="0.1" oninput="showSave('wallbox')">
+        <div class="hint">Stromänderung nur wenn Differenz ≥ diesem Wert</div>
+      </div>
+
+      <div class="form-group">
+        <label>Regelintervall (s)</label>
+        <input type="number" value="60" min="10" max="300" oninput="showSave('wallbox')">
+        <div class="hint">Mindestabstand zwischen Stromanpassungen</div>
+      </div>
+    </div>
+  </div>
+
+  <button class="btn btn-save" id="save-wallbox" onclick="saveDone('wallbox')">Wallbox-Einstellungen speichern</button>
+
+</div>
+
+<!-- ==================== E3DC TAB ==================== -->
+<div class="tab-content" id="tab-e3dc">
+
+  <div class="card">
+    <div class="switch-row">
+      <div class="left">
+        <div class="switch-label">E3DC-Integration</div>
+        <div class="switch-desc">Steuerung über e3dcset CLI-Tool</div>
+      </div>
+      <div class="switch on" onclick="toggleSwitch(this)" id="e3dcToggle"></div>
+    </div>
+  </div>
+
+  <div class="conditional visible" id="e3dcSettings">
+
+    <div class="card">
+      <label class="card-title">Verbindung</label>
+      <div class="form-group">
+        <label>IP-Adresse Hauskraftwerk</label>
+        <input type="text" value="192.168.40.17" placeholder="192.168.40.17" oninput="showSave('e3dc')">
+        <div class="hint">E3DC S10 – Modbus TCP (Port 502)</div>
+      </div>
+      <div class="form-group">
+        <label>Polling-Intervall (s)</label>
+        <input type="number" value="10" min="5" max="60" oninput="showSave('e3dc')">
+        <div class="hint">Wie oft Modbus-Register ausgelesen werden</div>
+      </div>
+    </div>
+
+    <!-- Netzfrequenz -->
+    <div class="card">
+      <div class="switch-row">
+        <div class="left">
+          <div class="switch-label">Netzfrequenz-Überwachung</div>
+          <div class="switch-desc">Reagiere auf Frequenzabweichungen</div>
+        </div>
+        <div class="switch on" onclick="toggleSwitch(this)" id="gridFreqToggle"></div>
+      </div>
+
+      <div class="conditional visible" id="gridFreqSettings">
+        <div class="sub-section">
+          <div class="form-group" style="margin-top:8px">
+            <label>Warnschwelle (Hz)</label>
+            <input type="number" value="0.15" step="0.01" min="0.01" max="0.5" inputmode="decimal" oninput="showSave('e3dc')">
+            <div class="hint">Abweichung von 50 Hz. Werte bis 0,10 Hz sind im Normalbetrieb häufig.</div>
+          </div>
+          <div class="form-group">
+            <label>Alarmschwelle (Hz)</label>
+            <input type="number" value="0.20" step="0.01" min="0.1" max="1.0" inputmode="decimal" oninput="showSave('e3dc')">
+          </div>
+          <div style="margin-top: 12px;">
+            <div class="switch-row">
+              <div class="left">
+                <div class="switch-label" style="font-size:12px; font-weight:normal;">Notladung aktivieren</div>
+                <div class="switch-desc">Batterie auf 90% bei kritischer Frequenz. Nutzt Netzstrom.</div>
+              </div>
+              <div class="switch on" onclick="toggleSwitch(this)"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="cross-ref" style="margin-top:14px">
+          <p>⚙️ Benachrichtigungen für Frequenz-Events konfigurieren → Tab System</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- e3dcset Config Collapsible -->
+    <div class="card">
+      <div class="collapsible-trigger" onclick="toggleCollapsible(this)">
+        <div>
+          <div class="card-title">e3dcset Konfiguration</div>
+          <div class="card-desc">CLI-Pfad und Befehle</div>
+        </div>
+        <span class="arrow">▼</span>
+      </div>
+      <div class="collapsible-body">
+        <div class="info-box" style="margin-top:0">
+          <p><strong>Hinweis:</strong> Der Prefix wird automatisch vor jeden Parameter gesetzt.</p>
+        </div>
+
+        <div class="form-group">
+          <label>CLI-Tool & Config (Prefix)</label>
+          <input type="text" class="mono" placeholder="/opt/keba-wallbox/e3dcset -p ..." oninput="showSave('e3dc')">
+        </div>
+        <div class="form-group">
+          <label>Entladesperre aktivieren</label>
+          <input type="text" class="mono" placeholder="-d 1" oninput="showSave('e3dc')">
+        </div>
+        <div class="form-group">
+          <label>Entladesperre deaktivieren</label>
+          <input type="text" class="mono" placeholder="-a" oninput="showSave('e3dc')">
+        </div>
+        <div class="separator"></div>
+        <div class="form-group">
+          <label>Batterie-Netzladung aktivieren</label>
+          <input type="text" class="mono" placeholder="-c 2500 -e 6000" oninput="showSave('e3dc')">
+        </div>
+        <div class="form-group">
+          <label>Batterie-Netzladung deaktivieren</label>
+          <input type="text" class="mono" placeholder="-e 0" oninput="showSave('e3dc')">
+        </div>
+
+      </div>
+    </div>
+
+  </div><!-- /e3dcSettings -->
+
+  <button class="btn btn-save" id="save-e3dc" onclick="saveDone('e3dc')">E3DC-Einstellungen speichern</button>
+
+</div>
+
+<!-- ==================== FHEM TAB ==================== -->
+<div class="tab-content" id="tab-fhem">
+
+  <div class="card">
+    <div class="switch-row">
+      <div class="left">
+        <div class="switch-label">FHEM E3DC Sync</div>
+        <div class="switch-desc">Sendet E3DC-Daten alle 10s an FHEM Device ‚S10'</div>
+      </div>
+      <div class="switch on" onclick="toggleSwitch(this)" id="fhemToggle"></div>
+    </div>
+  </div>
+
+  <div class="conditional visible" id="fhemSettings">
+
+    <div class="cross-ref" style="margin-bottom:12px">
+      <p>🔋 Erfordert aktivierte E3DC-Integration → Tab E3DC</p>
+    </div>
+
+    <div class="card">
+      <label class="card-title">Verbindung</label>
+      <div class="form-group">
+        <label>FHEM Server IP</label>
+        <input type="text" placeholder="192.168.40.11" oninput="showSave('fhem')">
+      </div>
+      <div class="form-group">
+        <label>Telnet Port</label>
+        <input type="number" value="7072" min="1" max="65535" oninput="showSave('fhem')">
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="switch-row">
+        <div class="left">
+          <div class="switch-label">Garage Auto-Close</div>
+          <div class="switch-desc">Garagentor schließen wenn Kabel eingesteckt wird (aktor_garagentor)</div>
+        </div>
+        <div class="switch" onclick="toggleSwitch(this)"></div>
+      </div>
+    </div>
+
+    <div class="info-box">
+      <p><strong>ℹ️ Übertragene Werte:</strong> sonne (PV), haus (Verbrauch), soc (Batterie-%), netz (Bezug/Einspeisung), speicher (Batterieleistung)</p>
+    </div>
+
+  </div><!-- /fhemSettings -->
+
+  <button class="btn btn-save" id="save-fhem" onclick="saveDone('fhem')">FHEM-Einstellungen speichern</button>
+
+</div>
+
+<!-- ==================== SYSTEM TAB ==================== -->
+<div class="tab-content" id="tab-system">
+
+  <!-- Demo Mode -->
+  <div class="card" style="background: var(--warning-bg); border-color: var(--warning-border);">
+    <div class="switch-row">
+      <div class="left">
+        <div class="switch-label">Demo-Modus</div>
+        <div class="switch-desc">Simulierte Daten ohne echte Hardware</div>
+      </div>
+      <div class="switch on" onclick="toggleSwitch(this); toggleDemoBadge(this)" id="demoToggle"></div>
+    </div>
+  </div>
+
+  <div class="conditional visible" id="demoSettings">
+    <div class="card">
+      <div class="card-title">Mock-Wallbox</div>
+      <div class="card-desc">Simulierte Hardware-Zustände</div>
+
+      <div class="form-group">
+        <label>Phasenanzahl</label>
+        <select>
+          <option>1 Phase (einphasig)</option>
+          <option selected>3 Phasen (dreiphasig)</option>
+        </select>
+      </div>
+
+      <div style="margin-top: 14px;">
+        <div class="switch-row">
+          <div class="left">
+            <div class="switch-label" style="font-size:13px">Potenzialfreier Kontakt (X1)</div>
+            <div class="switch-desc">Enable-Eingang: Ausgeschaltet</div>
+          </div>
+          <div class="switch" onclick="toggleSwitch(this)"></div>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>Kabel-Status (Plug)</label>
+        <select>
+          <option>0 – Getrennt</option>
+          <option>1 – In Buchse</option>
+          <option>3 – Verriegelt</option>
+          <option>5 – Bereit</option>
+          <option selected>7 – Laden / Verriegelt</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="switch-row">
+        <div class="left">
+          <div class="switch-label">Simulierte Tageszeit</div>
+          <div class="switch-desc">Datum steuert Jahreszeit, Uhrzeit die PV-Kurve</div>
+        </div>
+        <div class="switch" onclick="toggleSwitch(this)"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="separator"></div>
+
+  <!-- Prowl / Benachrichtigungen -->
+  <div class="card">
+    <div class="switch-row">
+      <div class="left">
+        <div class="switch-label">Push-Benachrichtigungen (Prowl)</div>
+        <div class="switch-desc">iOS/Android Benachrichtigungen über Ladeereignisse</div>
+      </div>
+      <div class="switch on" onclick="toggleSwitch(this)" id="prowlToggle"></div>
+    </div>
+
+    <div class="conditional visible" id="prowlSettings">
+      <div class="separator"></div>
+
+      <div class="form-group" style="margin-top:0">
+        <label>API Key</label>
+        <input type="password" placeholder="40 Zeichen API Key" value="••••••••••••••••••••" oninput="showSave('system')">
+        <div class="hint">Von <u>prowlapp.com</u></div>
+      </div>
+
+      <div class="separator"></div>
+
+      <div class="card-title" style="margin-bottom:4px">Ereignis-Benachrichtigungen</div>
+
+      <!-- 3 Gruppen -->
+      <div class="event-group">
+        <div class="event-group-title">⚡ Laden & Verbindung</div>
+        <div class="event-item">
+          <span class="event-label">Ladung gestartet</span>
+          <div class="switch on" onclick="toggleSwitch(this)"></div>
+        </div>
+        <div class="event-item">
+          <span class="event-label">Ladung gestoppt</span>
+          <div class="switch on" onclick="toggleSwitch(this)"></div>
+        </div>
+        <div class="event-item">
+          <span class="event-label">Ladestrom angepasst</span>
+          <div class="switch" onclick="toggleSwitch(this)"></div>
+        </div>
+        <div class="event-item">
+          <span class="event-label">Auto angesteckt</span>
+          <div class="switch" onclick="toggleSwitch(this)"></div>
+        </div>
+        <div class="event-item">
+          <span class="event-label">Auto abgesteckt</span>
+          <div class="switch" onclick="toggleSwitch(this)"></div>
+        </div>
+      </div>
+
+      <div class="event-group">
+        <div class="event-group-title">🔋 Batterie & Netz</div>
+        <div class="event-item">
+          <span class="event-label">Entladesperre aktiviert</span>
+          <div class="switch" onclick="toggleSwitch(this)"></div>
+        </div>
+        <div class="event-item">
+          <span class="event-label">Entladesperre deaktiviert</span>
+          <div class="switch" onclick="toggleSwitch(this)"></div>
+        </div>
+        <div class="event-item">
+          <span class="event-label">Batterie-Netzladung aktiviert</span>
+          <div class="switch" onclick="toggleSwitch(this)"></div>
+        </div>
+        <div class="event-item">
+          <span class="event-label">Batterie-Netzladung deaktiviert</span>
+          <div class="switch" onclick="toggleSwitch(this)"></div>
+        </div>
+        <div class="event-item">
+          <span class="event-label">Frequenz Warnung</span>
+          <div class="switch on" onclick="toggleSwitch(this)"></div>
+        </div>
+        <div class="event-item">
+          <span class="event-label">Frequenz Kritisch</span>
+          <div class="switch on" onclick="toggleSwitch(this)"></div>
+        </div>
+      </div>
+
+      <div class="event-group">
+        <div class="event-group-title">⚙️ System & Fehler</div>
+        <div class="event-item">
+          <span class="event-label">Strategie gewechselt</span>
+          <div class="switch" onclick="toggleSwitch(this)"></div>
+        </div>
+        <div class="event-item">
+          <span class="event-label">App gestartet</span>
+          <div class="switch" onclick="toggleSwitch(this)"></div>
+        </div>
+        <div class="event-item">
+          <span class="event-label">Fehler aufgetreten</span>
+          <div class="switch" onclick="toggleSwitch(this)"></div>
+        </div>
+      </div>
+
+      <div style="margin-top:14px">
+        <button class="btn btn-outline">🔔 Test-Benachrichtigung senden</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Build Info -->
+  <div class="card" style="text-align: center; margin-top: 12px;">
+    <div class="card-desc" style="font-size: 11px;">
+      EnergyLink v1.0.0 · Build 2026-02-26
+    </div>
+  </div>
+
+  <button class="btn btn-save" id="save-system" onclick="saveDone('system')">System-Einstellungen speichern</button>
+
+</div>
+
+</div><!-- /content -->
+
+<script>
+  // Tab switching
+  document.querySelectorAll('.tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      const activeTab = document.querySelector('.tab.active');
+      const activeId = activeTab?.dataset.tab;
+      const saveBtn = document.getElementById('save-' + activeId);
+      if (saveBtn && saveBtn.classList.contains('visible')) {
+        if (!confirm('Ungespeicherte Änderungen verwerfen?')) return;
+        saveBtn.classList.remove('visible');
+        activeTab.querySelector('.dirty-dot').style.display = 'none';
+      }
+      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+      tab.classList.add('active');
+      document.getElementById('tab-' + tab.dataset.tab).classList.add('active');
+      window.scrollTo(0, 0);
+    });
+  });
+
+  function switchToTab(tabName) {
+    document.querySelectorAll('.tab').forEach(t => {
+      t.classList.remove('active');
+      if (t.dataset.tab === tabName) t.classList.add('active');
+    });
+    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+    document.getElementById('tab-' + tabName).classList.add('active');
+    window.scrollTo(0, 0);
+  }
+
+  function toggleSwitch(el) {
+    el.classList.toggle('on');
+    if (el.id === 'e3dcToggle') document.getElementById('e3dcSettings').classList.toggle('visible');
+    if (el.id === 'gridFreqToggle') document.getElementById('gridFreqSettings').classList.toggle('visible');
+    if (el.id === 'fhemToggle') document.getElementById('fhemSettings').classList.toggle('visible');
+    if (el.id === 'prowlToggle') document.getElementById('prowlSettings').classList.toggle('visible');
+    if (el.id === 'demoToggle') document.getElementById('demoSettings').classList.toggle('visible');
+  }
+
+  function toggleDemoBadge(el) {
+    document.getElementById('demoBadge').classList.toggle('visible');
+  }
+
+  function toggleCollapsible(trigger) {
+    trigger.classList.toggle('open');
+    trigger.nextElementSibling.classList.toggle('open');
+  }
+
+  function showSave(tabName) {
+    const btn = document.getElementById('save-' + tabName);
+    if (btn) btn.classList.add('visible');
+    const tab = document.querySelector('[data-tab="' + tabName + '"]');
+    if (tab) tab.querySelector('.dirty-dot').style.display = 'block';
+  }
+
+  function saveDone(tabName) {
+    const btn = document.getElementById('save-' + tabName);
+    if (btn) {
+      btn.textContent = '✓ Gespeichert';
+      btn.style.opacity = '0.7';
+      setTimeout(() => {
+        btn.classList.remove('visible');
+        btn.textContent = btn.dataset.originalText || btn.textContent;
+        btn.style.opacity = '1';
+      }, 1500);
+    }
+    const tab = document.querySelector('[data-tab="' + tabName + '"]');
+    if (tab) tab.querySelector('.dirty-dot').style.display = 'none';
+  }
+
+  document.querySelectorAll('.btn-save').forEach(btn => {
+    btn.dataset.originalText = btn.textContent;
+  });
+</script>
+
+</body>
+</html>
