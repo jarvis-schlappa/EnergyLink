@@ -87,7 +87,6 @@ describe("Schema Validation", () => {
     it("accepts minimal config", () => {
       const result = e3dcConfigSchema.parse({ enabled: true });
       expect(result.pollingIntervalSeconds).toBe(10); // default
-      expect(result.modbusPauseSeconds).toBe(3); // default
     });
 
     it("rejects pollingIntervalSeconds below 5", () => {

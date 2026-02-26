@@ -54,7 +54,6 @@ const mockSettings = {
     gridChargeEnableCommand: "",
     gridChargeDisableCommand: "",
     gridChargeDuringNightCharging: false,
-    modbusPauseSeconds: 3,
     pollingIntervalSeconds: 10,
   },
   chargingStrategy: {

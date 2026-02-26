@@ -43,7 +43,6 @@ export const e3dcConfigSchema = z.object({
   gridChargeEnableCommand: z.string().optional(),
   gridChargeDisableCommand: z.string().optional(),
   gridChargeDuringNightCharging: z.boolean().optional(),
-  modbusPauseSeconds: z.number().min(0).max(30).optional().default(3),
   pollingIntervalSeconds: z.number().min(5).max(60).optional().default(10),
 });
 

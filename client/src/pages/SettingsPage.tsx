@@ -44,7 +44,6 @@ const DEFAULT_SETTINGS: SettingsType = {
     gridChargeEnableCommand: "",
     gridChargeDisableCommand: "",
     gridChargeDuringNightCharging: false,
-    modbusPauseSeconds: 3,
     pollingIntervalSeconds: 10,
   },
   chargingStrategy: {

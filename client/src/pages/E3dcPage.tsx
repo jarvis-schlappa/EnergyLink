@@ -142,12 +142,10 @@ export default function E3dcPage() {
     if (!controlState) return;
     
     if (field === 'batteryLock' || field === 'gridCharging') {
-      const modbusPauseSeconds = settings?.e3dc?.modbusPauseSeconds ?? 3;
-      const totalLockDuration = modbusPauseSeconds * 2 * 1000;
       setE3dcOperationLocks(prev => ({ ...prev, [field]: true }));
       setTimeout(() => {
         setE3dcOperationLocks(prev => ({ ...prev, [field]: false }));
-      }, totalLockDuration);
+      }, 5000);
     }
     
     const fullState: ControlState = {
@@ -174,7 +172,6 @@ export default function E3dcPage() {
       ...settings,
       e3dc: {
         enabled: settings.e3dc?.enabled || false,
-        modbusPauseSeconds: settings.e3dc?.modbusPauseSeconds ?? 3,
         pollingIntervalSeconds: settings.e3dc?.pollingIntervalSeconds ?? 10,
         prefix: settings.e3dc?.prefix,
         dischargeLockEnableCommand: settings.e3dc?.dischargeLockEnableCommand,
