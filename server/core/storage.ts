@@ -171,8 +171,6 @@ export class MemStorage implements IStorage {
     // Default-Einstellungen
     const defaults: Settings = {
       wallboxIp: DEFAULT_WALLBOX_IP,
-      pvSurplusOnUrl: "http://192.168.40.11:8083/fhem?detail=autoWallboxPV&cmd.autoWallboxPV=set%20autoWallboxPV%20on",
-      pvSurplusOffUrl: "http://192.168.40.11:8083/fhem?detail=autoWallboxPV&cmd.autoWallboxPV=set%20autoWallboxPV%20off",
       nightChargingSchedule: {
         enabled: false,
         startTime: "00:00",
@@ -329,18 +327,6 @@ export class MemStorage implements IStorage {
         logStorage("debug", `Demo-Modus aktiviert - E3DC Backup: ${settings.e3dcIpBackup} → 127.0.0.1:5502`);
       }
       settings.e3dcIp = "127.0.0.1:5502";
-      
-      // FHEM URLs: Backup erstellen und auf Mock-Server setzen
-      if (settings.pvSurplusOnUrl) {
-        settings.pvSurplusOnUrlBackup = settings.pvSurplusOnUrl;
-        settings.pvSurplusOnUrl = "http://127.0.0.1:8083/fhem?cmd.autoWallboxPV=on";
-        logStorage("debug", "Demo-Modus aktiviert - FHEM ON URL → Mock-Server");
-      }
-      if (settings.pvSurplusOffUrl) {
-        settings.pvSurplusOffUrlBackup = settings.pvSurplusOffUrl;
-        settings.pvSurplusOffUrl = "http://127.0.0.1:8083/fhem?cmd.autoWallboxPV=off";
-        logStorage("debug", "Demo-Modus aktiviert - FHEM OFF URL → Mock-Server");
-      }
     }
     // Demo-Modus deaktiviert: IPs aus previousSettings-Backup wiederherstellen
     else if (!isDemoMode && wasDemoMode) {
@@ -367,19 +353,6 @@ export class MemStorage implements IStorage {
         delete settings.e3dcIp;
         logStorage("warning", "Demo-Modus deaktiviert ohne E3DC Backup - E3DC IP entfernt");
       }
-      
-      // FHEM URLs wiederherstellen
-      if (previousSettings?.pvSurplusOnUrlBackup) {
-        settings.pvSurplusOnUrl = previousSettings.pvSurplusOnUrlBackup;
-        logStorage("debug", "Demo-Modus deaktiviert - FHEM ON URL wiederhergestellt");
-      }
-      delete settings.pvSurplusOnUrlBackup;
-      
-      if (previousSettings?.pvSurplusOffUrlBackup) {
-        settings.pvSurplusOffUrl = previousSettings.pvSurplusOffUrlBackup;
-        logStorage("debug", "Demo-Modus deaktiviert - FHEM OFF URL wiederhergestellt");
-      }
-      delete settings.pvSurplusOffUrlBackup;
     }
     // Demo-Modus bleibt aktiv: IPs auf Mock-Server behalten, Backups erhalten
     else if (isDemoMode && wasDemoMode) {
@@ -410,16 +383,6 @@ export class MemStorage implements IStorage {
         // User hat E3DC gelöscht (undefined/null) UND previous war ECHTE IP → Respektiere Löschung
         delete settings.e3dcIpBackup;
         logStorage("debug", "Demo-Modus aktiv - E3DC IP gelöscht (User-Request)");
-      }
-      
-      // FHEM URLs: Force Mock-URLs, erhalte Backups
-      settings.pvSurplusOnUrl = "http://127.0.0.1:8083/fhem?cmd.autoWallboxPV=on";
-      settings.pvSurplusOffUrl = "http://127.0.0.1:8083/fhem?cmd.autoWallboxPV=off";
-      if (!settings.pvSurplusOnUrlBackup && previousSettings?.pvSurplusOnUrlBackup) {
-        settings.pvSurplusOnUrlBackup = previousSettings.pvSurplusOnUrlBackup;
-      }
-      if (!settings.pvSurplusOffUrlBackup && previousSettings?.pvSurplusOffUrlBackup) {
-        settings.pvSurplusOffUrlBackup = previousSettings.pvSurplusOffUrlBackup;
       }
     }
     

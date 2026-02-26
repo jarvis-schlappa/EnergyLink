@@ -45,8 +45,6 @@ global.fetch = mockFetch;
 const mockSettings = {
   wallboxIp: "192.168.40.16",
   e3dcIp: "192.168.40.17",
-  pvSurplusOnUrl: "",
-  pvSurplusOffUrl: "",
   nightChargingSchedule: { enabled: false, startTime: "00:00", endTime: "05:00" },
   e3dc: {
     enabled: true,

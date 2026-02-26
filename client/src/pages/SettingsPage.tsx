@@ -32,8 +32,6 @@ const TAB_CONFIG = [
 const DEFAULT_SETTINGS: SettingsType = {
   wallboxIp: "192.168.40.16",
   e3dcIp: "",
-  pvSurplusOnUrl: "",
-  pvSurplusOffUrl: "",
   nightChargingSchedule: {
     enabled: false,
     startTime: "00:00",

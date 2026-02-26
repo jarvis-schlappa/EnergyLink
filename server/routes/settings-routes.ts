@@ -16,7 +16,6 @@ import { wallboxMockService } from "../demo/wallbox-mock";
 import { sendUdpCommand } from "../wallbox/transport";
 import { getBuildInfo } from "../core/build-info";
 import { triggerProwlEvent, getProwlNotifier } from "../monitoring/prowl-notifier";
-import { callSmartHomeUrl } from "./helpers";
 import {
   getOrCreateStrategyController,
   strategyController,
@@ -47,12 +46,6 @@ export function registerSettingsRoutes(app: Express): void {
     if (!settings) {
       return res.json({
         wallboxIp: "",
-        pvSurplusOnUrl: "",
-        pvSurplusOffUrl: "",
-        nightChargingOnUrl: "",
-        nightChargingOffUrl: "",
-        batteryLockOnUrl: "",
-        batteryLockOffUrl: "",
       });
     }
     res.json(settings);
@@ -256,12 +249,6 @@ export function registerSettingsRoutes(app: Express): void {
           }
         }
 
-        // SmartHome-URL aufrufen (nur wenn konfiguriert)
-        await callSmartHomeUrl(
-          state.pvSurplus
-            ? settings?.pvSurplusOnUrl
-            : settings?.pvSurplusOffUrl,
-        );
       }
 
       if (changedFields.batteryLock) {
