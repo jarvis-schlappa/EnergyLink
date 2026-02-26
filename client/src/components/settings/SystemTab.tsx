@@ -145,6 +145,11 @@ export default function SystemTab({ settings, settingsLoaded, onDirtyChange }: S
     mutationFn: (data: Settings) => apiRequest("POST", "/api/settings", data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/settings"] });
+      // Invalidiere alle Daten-Queries damit nach Demo-Toggle sofort Mock-/Realdaten angezeigt werden
+      queryClient.invalidateQueries({ queryKey: ["/api/wallbox/status"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/status"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/e3dc/live-data"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/controls"] });
       toast({
         title: "System-Einstellungen gespeichert",
         description: "Die Konfiguration wurde erfolgreich aktualisiert.",

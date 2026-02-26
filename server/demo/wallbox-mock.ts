@@ -618,6 +618,7 @@ export class WallboxMockService {
     if (value < 0 || value > 7) return;
     
     if (this.plug !== value) {
+      const oldState = this.state;
       this.plug = value;
       this.sendBroadcast({ "Plug": value });
       
@@ -625,8 +626,17 @@ export class WallboxMockService {
         this.state = 1;
         this.enabled = false;
         this.enableUser = false;
+        this.targetPower = 0;
+        this.currentPower = 0;
+        this.actualCurrentFraction = 0;
+        this.stopEPresBroadcast();
       } else if (value >= 3 && !this.enabled) {
         this.state = 2;
+      }
+      
+      // Broadcast State-Änderung separat (damit SSE-Clients den neuen State sehen)
+      if (oldState !== this.state) {
+        this.sendBroadcast({ "State": this.state });
       }
     }
   }

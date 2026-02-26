@@ -24,6 +24,10 @@ import {
   enableGridCharging,
   disableGridCharging,
 } from "./shared-state";
+import { startUnifiedMock, stopUnifiedMock } from "../demo/unified-mock";
+import { RealE3dcGateway, MockE3dcGateway } from "../e3dc/gateway";
+import { getE3dcModbusService } from "../e3dc/modbus";
+import { stopE3dcPoller, startE3dcPoller } from "../e3dc/poller";
 
 export function registerSettingsRoutes(app: Express): void {
   app.get("/api/build-info", (req, res) => {
@@ -83,6 +87,46 @@ export function registerSettingsRoutes(app: Express): void {
         getProwlNotifier().updateSettings(newSettings);
       } catch (error) {
         log("warning", "system", "Prowl-Notifier konnte nicht aktualisiert werden", error instanceof Error ? error.message : String(error));
+      }
+
+      // Demo-Modus Toggle: Mock-Server starten/stoppen und Poller neu verbinden
+      const oldDemoMode = oldSettings?.demoMode ?? false;
+      const newDemoMode = newSettings.demoMode ?? false;
+      const demoModeChanged = oldDemoMode !== newDemoMode;
+
+      if (demoModeChanged) {
+        try {
+          // E3DC-Poller stoppen (lief auf alter IP)
+          await stopE3dcPoller();
+          
+          // Bestehende Modbus-Verbindung trennen (war auf alter IP)
+          const modbusService = getE3dcModbusService();
+          await modbusService.disconnect();
+
+          if (newDemoMode) {
+            // Demo AKTIVIERT: Mock-Server starten, Gateway auf Mock umschalten
+            log("info", "system", "Demo-Modus wird aktiviert: Mock-Server startet...");
+            e3dcClient.setGateway(new MockE3dcGateway());
+            await startUnifiedMock();
+            log("info", "system", "✅ Demo-Modus aktiviert: Mock-Server läuft, Gateway=Mock");
+          } else {
+            // Demo DEAKTIVIERT: Mock-Server stoppen, Gateway auf Real umschalten
+            log("info", "system", "Demo-Modus wird deaktiviert: Mock-Server stoppt...");
+            await stopUnifiedMock();
+            e3dcClient.setGateway(new RealE3dcGateway());
+            log("info", "system", "✅ Demo-Modus deaktiviert: Mock-Server gestoppt, Gateway=Real");
+          }
+
+          // E3DC-Poller mit neuer IP starten (storage hat bereits die neue IP)
+          startE3dcPoller();
+        } catch (error) {
+          log(
+            "error",
+            "system",
+            "Fehler beim Umschalten des Demo-Modus",
+            error instanceof Error ? error.message : String(error),
+          );
+        }
       }
 
       // Demo-Modus: Aktualisiere Mock-Wallbox-Phasen ohne Neustart

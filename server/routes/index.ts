@@ -25,12 +25,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   registerStatusRoutes(app);
   registerGarageRoutes(app);
 
-  // Demo-Routes nur im Demo-Modus registrieren
-  const isDemoMode = process.env.DEMO_AUTOSTART === 'true' || storage.getSettings()?.demoMode;
-  if (isDemoMode) {
-    registerDemoRoutes(app);
-    log("info", "system", "Demo-Routes registriert (/api/wallbox/demo-input, /api/wallbox/demo-plug)");
-  }
+  // Demo-Routes immer registrieren (Runtime-Check auf demoMode erfolgt in den Routes selbst)
+  // Dies ermöglicht Demo-Modus-Toggle zur Laufzeit ohne Server-Neustart
+  registerDemoRoutes(app);
+  log("debug", "system", "Demo-Routes registriert (/api/wallbox/demo-input, /api/wallbox/demo-plug)");
 
   // Start all schedulers (night charging, charging strategy, E3DC poller, FHEM sync, grid frequency)
   await startSchedulers();
