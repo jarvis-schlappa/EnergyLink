@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { PlugZap, Home, Terminal, Settings } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -107,8 +107,8 @@ export default function SettingsPage() {
     queryKey: ["/api/settings"],
   });
 
-  // Merge server settings with defaults
-  const settings: SettingsType = rawSettings
+  // Merge server settings with defaults (memoized to keep stable reference)
+  const settings: SettingsType = useMemo(() => rawSettings
     ? {
         ...DEFAULT_SETTINGS,
         ...rawSettings,
@@ -122,7 +122,7 @@ export default function SettingsPage() {
         gridFrequencyMonitor: { ...DEFAULT_SETTINGS.gridFrequencyMonitor!, ...rawSettings.gridFrequencyMonitor },
         fhemSync: { ...DEFAULT_SETTINGS.fhemSync!, ...rawSettings.fhemSync },
       }
-    : DEFAULT_SETTINGS;
+    : DEFAULT_SETTINGS, [rawSettings]);
 
   // Build info for the dialog
   const { data: buildInfoRaw } = useQuery({

@@ -314,6 +314,51 @@ describe("Settings Tabs", () => {
     expect(screen.getByTestId("prowl-group-system").textContent).toContain("System & Fehler");
   });
 
+  it("preserves user input across rerenders (regression: useMemo settings)", async () => {
+    const SettingsPage = await importSettingsPage();
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false, staleTime: Infinity },
+        mutations: { retry: false },
+      },
+    });
+
+    // Pre-populate cache
+    queryClient.setQueryData(["/api/settings"], mockSettings);
+    queryClient.setQueryData(["/api/build-info"], mockBuildInfo);
+
+    function Wrapper({ children }: { children: React.ReactNode }) {
+      return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
+    }
+
+    const user = userEvent.setup();
+
+    await act(async () => {
+      render(<SettingsPage />, { wrapper: Wrapper });
+    });
+
+    // Type into wallbox IP field
+    const ipInput = screen.getByTestId("input-wallbox-ip") as HTMLInputElement;
+    await user.clear(ipInput);
+    await user.type(ipInput, "10.0.0.1");
+
+    // Verify typed value is there
+    expect(ipInput.value).toBe("10.0.0.1");
+
+    // Simulate a React-Query cache re-set (same data) which triggers rerender
+    await act(async () => {
+      queryClient.setQueryData(["/api/settings"], { ...mockSettings });
+    });
+
+    // Wait for potential useEffect to fire
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 100));
+    });
+
+    // Input should STILL have user's typed value, not be reset
+    expect(ipInput.value).toBe("10.0.0.1");
+  });
+
   it("shows save button only when form is dirty (WallboxTab direct)", async () => {
     const { default: WallboxTab } = await import("@/components/settings/WallboxTab");
     const onDirtyChange = vi.fn();
