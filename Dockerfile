@@ -12,6 +12,15 @@ RUN npm ci
 # Copy source code
 COPY . .
 
+# Accept build-time version info (set by CI or docker build --build-arg)
+ARG BUILD_VERSION
+ARG BUILD_BRANCH=unknown
+ARG BUILD_COMMIT=unknown
+ENV BUILD_VERSION=${BUILD_VERSION}
+ENV BUILD_BRANCH=${BUILD_BRANCH}
+ENV BUILD_COMMIT=${BUILD_COMMIT}
+ENV BUILD_TIME=${BUILD_TIME:-}
+
 # Build the application
 RUN npm run build
 
