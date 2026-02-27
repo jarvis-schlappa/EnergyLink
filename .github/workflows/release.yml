@@ -43,7 +43,7 @@ jobs:
           npm test
           npm run build
 
-      - name: Commit version bump
+      - name: Commit version bump and move tag
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
@@ -51,3 +51,9 @@ jobs:
           git diff --cached --quiet && echo "No changes to commit" && exit 0
           git commit -m "chore: bump version to ${{ steps.version.outputs.version }}"
           git push origin main
+
+          # Move the release tag to include the version bump commit
+          # so build-info.ts resolves the clean version (not -dev+hash)
+          TAG="${{ github.event.release.tag_name }}"
+          git tag -f "$TAG"
+          git push origin "$TAG" --force
