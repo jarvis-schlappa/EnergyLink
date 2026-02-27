@@ -138,9 +138,8 @@ const checkNightChargingSchedule = async () => {
           // Stoppe die Wallbox (kann fehlschlagen)
           if (settings?.wallboxIp) {
             try {
-              log("debug", "system", `Zeitgesteuerte Ladung: Sende Wallbox-Befehl 'ena 0' an ${settings.wallboxIp}`);
-              await sendUdpCommand(settings.wallboxIp, "ena 0");
-              log("debug", "system", `Zeitgesteuerte Ladung: Wallbox-Befehl 'ena 0' erfolgreich gesendet`);
+              const controller = getOrCreateStrategyController();
+              await controller.stopNightCharging(settings.wallboxIp);
             
             // Prowl-Benachrichtigung: Ladung gestoppt (non-blocking)
             triggerProwlEvent(settings, "chargingStopped", (notifier) =>
@@ -302,9 +301,8 @@ const checkNightChargingSchedule = async () => {
         // Dann starte die Wallbox (kann fehlschlagen, aber Batterie-Sperre ist bereits aktiv)
         if (settings?.wallboxIp) {
           try {
-            log("debug", "system", `Zeitgesteuerte Ladung: Sende Wallbox-Befehl 'ena 1' an ${settings.wallboxIp}`);
-            await sendUdpCommand(settings.wallboxIp, "ena 1");
-            log("debug", "system", `Zeitgesteuerte Ladung: Wallbox-Befehl 'ena 1' erfolgreich gesendet`);
+            const controller = getOrCreateStrategyController();
+            await controller.startNightCharging(settings.wallboxIp);
             
             // Prowl-Benachrichtigung: Ladung gestartet (non-blocking)
             const context = storage.getChargingContext();
@@ -350,9 +348,8 @@ const checkNightChargingSchedule = async () => {
         // Stoppe die Wallbox (kann fehlschlagen)
         if (settings?.wallboxIp) {
           try {
-            log("debug", "system", `Zeitgesteuerte Ladung: Sende Wallbox-Befehl 'ena 0' an ${settings.wallboxIp}`);
-            await sendUdpCommand(settings.wallboxIp, "ena 0");
-            log("debug", "system", `Zeitgesteuerte Ladung: Wallbox-Befehl 'ena 0' erfolgreich gesendet`);
+            const controller = getOrCreateStrategyController();
+            await controller.stopNightCharging(settings.wallboxIp);
             
             // Prowl-Benachrichtigung: Ladung gestoppt (non-blocking)
             triggerProwlEvent(settings, "chargingStopped", (notifier) =>

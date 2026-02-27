@@ -93,6 +93,14 @@ vi.mock("../routes/helpers", async () => {
   };
 });
 
+const mockStrategyController = {
+  startEventListener: vi.fn(),
+  stopEventListener: vi.fn(),
+  stopChargingForStrategyOff: vi.fn(),
+  startNightCharging: vi.fn().mockResolvedValue(undefined),
+  stopNightCharging: vi.fn().mockResolvedValue(undefined),
+};
+
 vi.mock("../routes/shared-state", () => ({
   chargingStrategyInterval: null,
   nightChargingSchedulerInterval: null,
@@ -103,16 +111,11 @@ vi.mock("../routes/shared-state", () => ({
   setNightChargingSchedulerInterval: vi.fn(),
   setFhemSyncInterval: vi.fn(),
   setE3dcPollerInterval: vi.fn(),
-  getOrCreateStrategyController: vi.fn(() => ({
-    startEventListener: vi.fn(),
-    stopEventListener: vi.fn(),
-    stopChargingForStrategyOff: vi.fn(),
-  })),
+  getOrCreateStrategyController: vi.fn(() => mockStrategyController),
 }));
 
 // Need dynamic import after mocks
 import { storage } from "../core/storage";
-import { sendUdpCommand } from "../wallbox/transport";
 import { getCurrentTimeInTimezone } from "../routes/helpers";
 
 // We can't easily call checkNightChargingSchedule directly since it's a module-level const.
@@ -149,14 +152,8 @@ describe("Scheduler Logging (Issue #107)", () => {
     );
     expect(infoCalls.length).toBeGreaterThanOrEqual(1);
     
-    // Check that DEBUG log was emitted for ena 1 command
-    const debugCalls = mockLog.mock.calls.filter(
-      (call: any[]) => call[0] === "debug" && call[2]?.includes("ena 1")
-    );
-    expect(debugCalls.length).toBeGreaterThanOrEqual(1);
-    
-    // Verify sendUdpCommand was called with ena 1
-    expect(sendUdpCommand).toHaveBeenCalledWith("192.168.40.16", "ena 1");
+    // Verify controller.startNightCharging was called (routes through strategy controller)
+    expect(mockStrategyController.startNightCharging).toHaveBeenCalledWith("192.168.40.16");
     
     await scheduler.shutdownSchedulers();
   });
@@ -175,13 +172,8 @@ describe("Scheduler Logging (Issue #107)", () => {
     );
     expect(infoCalls.length).toBeGreaterThanOrEqual(1);
 
-    // Check DEBUG log for ena 0
-    const debugCalls = mockLog.mock.calls.filter(
-      (call: any[]) => call[0] === "debug" && call[2]?.includes("ena 0")
-    );
-    expect(debugCalls.length).toBeGreaterThanOrEqual(1);
-
-    expect(sendUdpCommand).toHaveBeenCalledWith("192.168.40.16", "ena 0");
+    // Verify controller.stopNightCharging was called (routes through strategy controller)
+    expect(mockStrategyController.stopNightCharging).toHaveBeenCalledWith("192.168.40.16");
 
     await scheduler.shutdownSchedulers();
   });
@@ -193,11 +185,8 @@ describe("Scheduler Logging (Issue #107)", () => {
     await scheduler.startSchedulers();
     await new Promise(r => setTimeout(r, 100));
 
-    // Check that the debug log includes the wallbox IP
-    const debugCalls = mockLog.mock.calls.filter(
-      (call: any[]) => call[0] === "debug" && call[2]?.includes("192.168.40.16")
-    );
-    expect(debugCalls.length).toBeGreaterThanOrEqual(1);
+    // Verify controller was called with the correct wallbox IP
+    expect(mockStrategyController.startNightCharging).toHaveBeenCalledWith("192.168.40.16");
 
     await scheduler.shutdownSchedulers();
   });

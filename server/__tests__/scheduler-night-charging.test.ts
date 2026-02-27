@@ -84,6 +84,14 @@ vi.mock("../routes/helpers", async () => {
   };
 });
 
+const mockStrategyController = {
+  startEventListener: vi.fn(),
+  stopEventListener: vi.fn(),
+  stopChargingForStrategyOff: vi.fn(),
+  startNightCharging: vi.fn().mockResolvedValue(undefined),
+  stopNightCharging: vi.fn().mockResolvedValue(undefined),
+};
+
 vi.mock("../routes/shared-state", () => ({
   chargingStrategyInterval: null,
   nightChargingSchedulerInterval: null,
@@ -94,14 +102,12 @@ vi.mock("../routes/shared-state", () => ({
   setNightChargingSchedulerInterval: vi.fn(),
   setFhemSyncInterval: vi.fn(),
   setE3dcPollerInterval: vi.fn(),
-  getOrCreateStrategyController: vi.fn(() => ({
-    startEventListener: vi.fn(),
-    stopEventListener: vi.fn(),
-    stopChargingForStrategyOff: vi.fn(),
-  })),
+  getOrCreateStrategyController: vi.fn(() => mockStrategyController),
 }));
 
 function resetState() {
+  mockStrategyController.startNightCharging.mockClear();
+  mockStrategyController.stopNightCharging.mockClear();
   mockSettings = {
     wallboxIp: "192.168.40.16",
     nightChargingSchedule: {
@@ -135,7 +141,7 @@ describe("Night Charging Scheduler", () => {
       await scheduler.startSchedulers();
       await new Promise(r => setTimeout(r, 50));
 
-      expect(mockSendUdpCommand).toHaveBeenCalledWith("192.168.40.16", "ena 1");
+      expect(mockStrategyController.startNightCharging).toHaveBeenCalledWith("192.168.40.16");
     });
 
     it("does NOT start charging when outside time window", async () => {
@@ -143,7 +149,7 @@ describe("Night Charging Scheduler", () => {
       await scheduler.startSchedulers();
       await new Promise(r => setTimeout(r, 50));
 
-      expect(mockSendUdpCommand).not.toHaveBeenCalledWith("192.168.40.16", "ena 1");
+      expect(mockStrategyController.startNightCharging).not.toHaveBeenCalled();
     });
 
     it("handles overnight time window (23:00-05:00)", async () => {
@@ -154,7 +160,7 @@ describe("Night Charging Scheduler", () => {
       await scheduler.startSchedulers();
       await new Promise(r => setTimeout(r, 50));
 
-      expect(mockSendUdpCommand).toHaveBeenCalledWith("192.168.40.16", "ena 1");
+      expect(mockStrategyController.startNightCharging).toHaveBeenCalledWith("192.168.40.16");
     });
 
     it("handles overnight window - after midnight", async () => {
@@ -165,7 +171,7 @@ describe("Night Charging Scheduler", () => {
       await scheduler.startSchedulers();
       await new Promise(r => setTimeout(r, 50));
 
-      expect(mockSendUdpCommand).toHaveBeenCalledWith("192.168.40.16", "ena 1");
+      expect(mockStrategyController.startNightCharging).toHaveBeenCalledWith("192.168.40.16");
     });
   });
 
@@ -178,7 +184,7 @@ describe("Night Charging Scheduler", () => {
       await new Promise(r => setTimeout(r, 50));
 
       // ena 1 should NOT be sent because nightCharging is already true
-      expect(mockSendUdpCommand).not.toHaveBeenCalledWith("192.168.40.16", "ena 1");
+      expect(mockStrategyController.startNightCharging).not.toHaveBeenCalled();
     });
   });
 
@@ -190,7 +196,7 @@ describe("Night Charging Scheduler", () => {
       await scheduler.startSchedulers();
       await new Promise(r => setTimeout(r, 50));
 
-      expect(mockSendUdpCommand).toHaveBeenCalledWith("192.168.40.16", "ena 0");
+      expect(mockStrategyController.stopNightCharging).toHaveBeenCalledWith("192.168.40.16");
     });
 
     it("sets nightCharging=false when stopping", async () => {
@@ -213,7 +219,8 @@ describe("Night Charging Scheduler", () => {
       await scheduler.startSchedulers();
       await new Promise(r => setTimeout(r, 50));
 
-      expect(mockSendUdpCommand).not.toHaveBeenCalled();
+      expect(mockStrategyController.startNightCharging).not.toHaveBeenCalled();
+      expect(mockStrategyController.stopNightCharging).not.toHaveBeenCalled();
     });
   });
 
@@ -226,7 +233,7 @@ describe("Night Charging Scheduler", () => {
       await scheduler.startSchedulers();
       await new Promise(r => setTimeout(r, 50));
 
-      expect(mockSendUdpCommand).toHaveBeenCalledWith("192.168.40.16", "ena 0");
+      expect(mockStrategyController.stopNightCharging).toHaveBeenCalledWith("192.168.40.16");
     });
 
     it("does nothing when schedule is disabled and nightCharging=false", async () => {
@@ -237,7 +244,8 @@ describe("Night Charging Scheduler", () => {
       await scheduler.startSchedulers();
       await new Promise(r => setTimeout(r, 50));
 
-      expect(mockSendUdpCommand).not.toHaveBeenCalled();
+      expect(mockStrategyController.startNightCharging).not.toHaveBeenCalled();
+      expect(mockStrategyController.stopNightCharging).not.toHaveBeenCalled();
     });
   });
 });

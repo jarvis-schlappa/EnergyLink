@@ -1053,6 +1053,28 @@ async processStrategy(liveData: E3dcLiveData, wallboxIp: string): Promise<void> 
   }
 
   /**
+   * Startet die Wallbox-Ladung für den Night-Charging-Scheduler.
+   * Sendet nur den UDP-Befehl über den zentralen sendUdpCommand-Pfad.
+   * Der Scheduler verwaltet ControlState, E3DC und Prowl selbst.
+   */
+  async startNightCharging(wallboxIp: string): Promise<void> {
+    log("debug", "system", `[NightCharging] Sende Wallbox-Befehl 'ena 1' an ${wallboxIp}`);
+    await this.sendUdpCommand(wallboxIp, "ena 1");
+    log("debug", "system", `[NightCharging] Wallbox-Befehl 'ena 1' erfolgreich gesendet`);
+  }
+
+  /**
+   * Stoppt die Wallbox-Ladung für den Night-Charging-Scheduler.
+   * Sendet nur den UDP-Befehl über den zentralen sendUdpCommand-Pfad.
+   * Der Scheduler verwaltet ControlState, E3DC und Prowl selbst.
+   */
+  async stopNightCharging(wallboxIp: string): Promise<void> {
+    log("debug", "system", `[NightCharging] Sende Wallbox-Befehl 'ena 0' an ${wallboxIp}`);
+    await this.sendUdpCommand(wallboxIp, "ena 0");
+    log("debug", "system", `[NightCharging] Wallbox-Befehl 'ena 0' erfolgreich gesendet`);
+  }
+
+  /**
    * Startet Event-Listener für E3DC-Daten
    * Strategie: Event-driven (primär) + 15s-Timer (Fallback/Health-Check)
    * Guards: Stoppt vorherige Subscription bei Hot-Reloads (verhindert Listener-Leaks)
