@@ -4,75 +4,50 @@ import { describe, it, expect, beforeEach, vi, type Mock } from "vitest";
  * Tests for the night charging scheduler logic.
  * Covers: time window detection, double-start prevention,
  * stop outside time window, and runtime settings changes.
+ *
+ * Mock analysis (Issue #45):
+ *   HARDWARE/EXTERNAL (must be mocked - no real devices in tests):
+ *     wallbox/transport       → UDP to physical wallbox
+ *     e3dc/client             → Modbus/RSCP to physical E3DC inverter
+ *     e3dc/modbus             → Modbus service for live data
+ *     e3dc/poller             → Background polling scheduler
+ *     monitoring/prowl-notifier → External push notification service
+ *     monitoring/grid-frequency-monitor → External network monitoring
+ *     fhem/e3dc-sync          → FHEM hardware bridge
+ *     wallbox/sse             → SSE broadcast (side effects)
+ *
+ *   INTERNAL (mocked for justified reasons - reviewed Issue #45):
+ *     core/storage      → MemStorage constructor performs file I/O
+ *                          (readFileSync, writeFileSync, mkdirSync).
+ *                          No pure in-memory mode available without DI refactor.
+ *     core/logger       → Suppress console spam in test output
+ *     routes/helpers    → Only getCurrentTimeInTimezone (deterministic clock control);
+ *                         isTimeInRange uses the REAL implementation
+ *     routes/shared-state → getOrCreateStrategyController returns test double
+ *                           because real controller constructor requires
+ *                           sendUdpCommand + imports all hardware modules
  */
 
-// Mock logger
+// --- Internal mocks (test-controllable) ---
+
 const mockLog = vi.fn();
 vi.mock("../core/logger", () => ({
   log: (...args: any[]) => mockLog(...args),
 }));
 
-// Mock storage with controllable state
 let mockSettings: any;
 let mockControlState: any;
 let mockChargingContext: any;
 
-vi.mock("../core/storage", () => {
-  return {
-    storage: {
-      getSettings: vi.fn(() => mockSettings),
-      saveSettings: vi.fn((s: any) => { mockSettings = s; }),
-      getControlState: vi.fn(() => mockControlState),
-      saveControlState: vi.fn((s: any) => { mockControlState = s; }),
-      getChargingContext: vi.fn(() => mockChargingContext),
-      saveChargingContext: vi.fn((c: any) => { mockChargingContext = c; }),
-    },
-  };
-});
-
-const mockSendUdpCommand = vi.fn().mockResolvedValue({});
-vi.mock("../wallbox/transport", () => ({
-  sendUdpCommand: (...args: any[]) => mockSendUdpCommand(...args),
-}));
-
-vi.mock("../e3dc/client", () => ({
-  e3dcClient: {
-    isConfigured: vi.fn(() => false),
-    configure: vi.fn(),
-    isGridChargeDuringNightChargingEnabled: vi.fn(() => false),
-    enableNightCharging: vi.fn(),
-    disableNightCharging: vi.fn(),
+vi.mock("../core/storage", () => ({
+  storage: {
+    getSettings: vi.fn(() => mockSettings),
+    saveSettings: vi.fn((s: any) => { mockSettings = s; }),
+    getControlState: vi.fn(() => mockControlState),
+    saveControlState: vi.fn((s: any) => { mockControlState = s; }),
+    getChargingContext: vi.fn(() => mockChargingContext),
+    saveChargingContext: vi.fn((c: any) => { mockChargingContext = c; }),
   },
-}));
-
-vi.mock("../e3dc/modbus", () => ({
-  getE3dcModbusService: vi.fn(() => ({ getLastReadLiveData: vi.fn(() => null) })),
-}));
-
-vi.mock("../monitoring/prowl-notifier", () => ({
-  triggerProwlEvent: vi.fn(),
-  extractTargetWh: vi.fn(),
-}));
-
-vi.mock("../monitoring/grid-frequency-monitor", () => ({
-  startGridFrequencyMonitor: vi.fn(),
-  stopGridFrequencyMonitor: vi.fn(),
-}));
-
-vi.mock("../fhem/e3dc-sync", () => ({
-  startFhemSyncScheduler: vi.fn(),
-  stopFhemSyncScheduler: vi.fn(),
-}));
-
-vi.mock("../e3dc/poller", () => ({
-  startE3dcPoller: vi.fn(),
-  stopE3dcPoller: vi.fn(),
-  getE3dcBackoffLevel: vi.fn(() => 0),
-}));
-
-vi.mock("../wallbox/sse", () => ({
-  broadcastWallboxStatus: vi.fn(),
-  broadcastPartialUpdate: vi.fn(),
 }));
 
 const mockGetCurrentTime = vi.fn(() => "02:00");
@@ -80,6 +55,7 @@ vi.mock("../routes/helpers", async () => {
   const actual = await vi.importActual("../routes/helpers") as any;
   return {
     ...actual,
+    // Only mock the clock; isTimeInRange uses the real implementation
     getCurrentTimeInTimezone: (...args: any[]) => mockGetCurrentTime(...args),
   };
 });
@@ -104,6 +80,54 @@ vi.mock("../routes/shared-state", () => ({
   setE3dcPollerInterval: vi.fn(),
   getOrCreateStrategyController: vi.fn(() => mockStrategyController),
 }));
+
+// --- Hardware/external stubs (no-op, never asserted) ---
+
+vi.mock("../wallbox/transport", () => ({
+  sendUdpCommand: () => Promise.resolve({}),
+}));
+
+vi.mock("../e3dc/client", () => ({
+  e3dcClient: {
+    isConfigured: () => false,
+    configure: () => {},
+    isGridChargeDuringNightChargingEnabled: () => false,
+    enableNightCharging: () => {},
+    disableNightCharging: () => {},
+  },
+}));
+
+vi.mock("../e3dc/modbus", () => ({
+  getE3dcModbusService: () => ({ getLastReadLiveData: () => null }),
+}));
+
+vi.mock("../e3dc/poller", () => ({
+  startE3dcPoller: () => null,
+  stopE3dcPoller: () => Promise.resolve(),
+  getE3dcBackoffLevel: () => 0,
+}));
+
+vi.mock("../monitoring/prowl-notifier", () => ({
+  triggerProwlEvent: () => {},
+  extractTargetWh: () => undefined,
+}));
+
+vi.mock("../monitoring/grid-frequency-monitor", () => ({
+  startGridFrequencyMonitor: () => {},
+  stopGridFrequencyMonitor: () => {},
+}));
+
+vi.mock("../fhem/e3dc-sync", () => ({
+  startFhemSyncScheduler: () => null,
+  stopFhemSyncScheduler: () => Promise.resolve(),
+}));
+
+vi.mock("../wallbox/sse", () => ({
+  broadcastWallboxStatus: () => {},
+  broadcastPartialUpdate: () => {},
+}));
+
+// --- Test state helpers ---
 
 function resetState() {
   mockStrategyController.startNightCharging.mockClear();
@@ -183,7 +207,6 @@ describe("Night Charging Scheduler", () => {
       await scheduler.startSchedulers();
       await new Promise(r => setTimeout(r, 50));
 
-      // ena 1 should NOT be sent because nightCharging is already true
       expect(mockStrategyController.startNightCharging).not.toHaveBeenCalled();
     });
   });

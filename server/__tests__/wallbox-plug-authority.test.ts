@@ -4,6 +4,12 @@
  * Tests the in-memory plug status tracking in the broadcast-listener.
  * The broadcast-listener is the single source of truth for plug status –
  * its value overrides report 2 responses from the wallbox.
+ *
+ * Mock strategy:
+ *   - wallbox/sse: vi.fn() — asserted (broadcastWallboxStatus checked for plug value)
+ *   - wallbox/udp-channel: vi.fn() — onBroadcast captures the handler reference
+ *   - core/storage: vi.fn() — broadcast-listener reads settings/state per event
+ *   - All others: plain stubs (never asserted, just satisfy imports)
  */
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
@@ -29,6 +35,7 @@ describe("Broadcast-listener authoritative plug state", () => {
       broadcastPartialUpdate: vi.fn(),
     };
 
+    // Storage: vi.fn() needed — broadcast-listener reads settings per broadcast event
     vi.doMock("../core/storage", () => ({
       storage: {
         getSettings: vi.fn(() => ({
@@ -55,41 +62,85 @@ describe("Broadcast-listener authoritative plug state", () => {
         savePlugStatusTracking: vi.fn(),
       },
     }));
-    vi.doMock("../core/logger", () => ({ log: vi.fn() }));
 
+    vi.doMock("../core/logger", () => ({ log: () => {} }));
+
+    // UDP channel: mockOnBroadcast is asserted (captures broadcast handler)
     const mockOnBroadcast = vi.fn();
     vi.doMock("../wallbox/udp-channel", () => ({
       wallboxUdpChannel: {
         onBroadcast: mockOnBroadcast,
-        offBroadcast: vi.fn(),
+        offBroadcast: () => {},
       },
     }));
+
+    // Hardware/external stubs (no-op, never asserted)
     vi.doMock("../routes/shared-state", () => ({
-      getOrCreateStrategyController: vi.fn(() => ({
-        handleStrategyChange: vi.fn().mockResolvedValue(undefined),
-        activateMaxPowerImmediately: vi.fn().mockResolvedValue(undefined),
-        stopChargingOnly: vi.fn().mockResolvedValue(undefined),
-      })),
+      getOrCreateStrategyController: () => ({
+        handleStrategyChange: () => Promise.resolve(),
+        activateMaxPowerImmediately: () => Promise.resolve(),
+        stopChargingOnly: () => Promise.resolve(),
+      }),
     }));
+
     vi.doMock("../monitoring/prowl-notifier", () => ({
-      getProwlNotifier: vi.fn(() => ({
-        sendPlugConnected: vi.fn(),
-        sendPlugDisconnected: vi.fn(),
-      })),
-      triggerProwlEvent: vi.fn(),
+      getProwlNotifier: () => ({
+        sendPlugConnected: () => {},
+        sendPlugDisconnected: () => {},
+      }),
+      triggerProwlEvent: () => {},
     }));
+
     vi.doMock("../wallbox/sse", () => sseMock);
+
     vi.doMock("../e3dc/poller", () => ({
-      resetWallboxIdleThrottle: vi.fn(),
+      resetWallboxIdleThrottle: () => {},
     }));
+
     vi.doMock("../routes/wallbox-routes", () => ({
-      resetStatusPollThrottle: vi.fn(),
+      resetStatusPollThrottle: () => {},
     }));
+
     vi.doMock("../routes/garage-routes", () => ({
-      autoCloseGarageIfNeeded: vi.fn().mockResolvedValue(undefined),
+      autoCloseGarageIfNeeded: () => Promise.resolve(),
     }));
 
     return mockOnBroadcast;
+  }
+
+  /** Minimal mock setup for tests that don't call startBroadcastListener */
+  function setupMinimalMocks() {
+    vi.doMock("../core/storage", () => ({
+      storage: {
+        getSettings: () => ({}),
+        getPlugStatusTracking: () => ({}),
+        savePlugStatusTracking: () => {},
+      },
+    }));
+    vi.doMock("../core/logger", () => ({ log: () => {} }));
+    vi.doMock("../wallbox/udp-channel", () => ({
+      wallboxUdpChannel: { onBroadcast: () => {}, offBroadcast: () => {} },
+    }));
+    vi.doMock("../monitoring/prowl-notifier", () => ({
+      getProwlNotifier: () => null,
+      triggerProwlEvent: () => {},
+    }));
+    vi.doMock("../wallbox/sse", () => ({
+      broadcastWallboxStatus: () => {},
+      broadcastPartialUpdate: () => {},
+    }));
+    vi.doMock("../e3dc/poller", () => ({
+      resetWallboxIdleThrottle: () => {},
+    }));
+    vi.doMock("../routes/wallbox-routes", () => ({
+      resetStatusPollThrottle: () => {},
+    }));
+    vi.doMock("../routes/shared-state", () => ({
+      getOrCreateStrategyController: () => null,
+    }));
+    vi.doMock("../routes/garage-routes", () => ({
+      autoCloseGarageIfNeeded: () => Promise.resolve(),
+    }));
   }
 
   beforeEach(async () => {
@@ -104,40 +155,8 @@ describe("Broadcast-listener authoritative plug state", () => {
   });
 
   it("getAuthoritativePlugStatus returns null before any broadcast", async () => {
-    // Need a fresh module without startBroadcastListener
     vi.resetModules();
-
-    vi.doMock("../core/storage", () => ({
-      storage: {
-        getSettings: vi.fn(() => ({})),
-        getPlugStatusTracking: vi.fn(() => ({})),
-        savePlugStatusTracking: vi.fn(),
-      },
-    }));
-    vi.doMock("../core/logger", () => ({ log: vi.fn() }));
-    vi.doMock("../wallbox/udp-channel", () => ({
-      wallboxUdpChannel: { onBroadcast: vi.fn(), offBroadcast: vi.fn() },
-    }));
-    vi.doMock("../monitoring/prowl-notifier", () => ({
-      getProwlNotifier: vi.fn(),
-      triggerProwlEvent: vi.fn(),
-    }));
-    vi.doMock("../wallbox/sse", () => ({
-      broadcastWallboxStatus: vi.fn(),
-      broadcastPartialUpdate: vi.fn(),
-    }));
-    vi.doMock("../e3dc/poller", () => ({
-      resetWallboxIdleThrottle: vi.fn(),
-    }));
-    vi.doMock("../routes/wallbox-routes", () => ({
-      resetStatusPollThrottle: vi.fn(),
-    }));
-    vi.doMock("../routes/shared-state", () => ({
-      getOrCreateStrategyController: vi.fn(),
-    }));
-    vi.doMock("../routes/garage-routes", () => ({
-      autoCloseGarageIfNeeded: vi.fn(),
-    }));
+    setupMinimalMocks();
 
     const freshModule = await import("../wallbox/broadcast-listener");
     expect(freshModule.getAuthoritativePlugStatus()).toBeNull();
@@ -149,45 +168,42 @@ describe("Broadcast-listener authoritative plug state", () => {
   });
 
   it("getAuthoritativePlugStatus updates on plug change", async () => {
-    await broadcastHandler({ Plug: 3 }, fakeRinfo); // initial
-    await broadcastHandler({ Plug: 7 }, fakeRinfo); // change
+    await broadcastHandler({ Plug: 3 }, fakeRinfo);
+    await broadcastHandler({ Plug: 7 }, fakeRinfo);
     expect(blModule.getAuthoritativePlugStatus()).toBe(7);
   });
 
   it("getAuthoritativePlugStatus tracks multiple transitions", async () => {
-    await broadcastHandler({ Plug: 1 }, fakeRinfo); // initial: no cable
+    await broadcastHandler({ Plug: 1 }, fakeRinfo);
     expect(blModule.getAuthoritativePlugStatus()).toBe(1);
 
-    await broadcastHandler({ Plug: 3 }, fakeRinfo); // cable plugged, no car
+    await broadcastHandler({ Plug: 3 }, fakeRinfo);
     expect(blModule.getAuthoritativePlugStatus()).toBe(3);
 
-    await broadcastHandler({ Plug: 5 }, fakeRinfo); // cable + car, not locked
+    await broadcastHandler({ Plug: 5 }, fakeRinfo);
     expect(blModule.getAuthoritativePlugStatus()).toBe(5);
 
-    await broadcastHandler({ Plug: 7 }, fakeRinfo); // cable + car, locked
+    await broadcastHandler({ Plug: 7 }, fakeRinfo);
     expect(blModule.getAuthoritativePlugStatus()).toBe(7);
 
-    await broadcastHandler({ Plug: 3 }, fakeRinfo); // car unplugged
+    await broadcastHandler({ Plug: 3 }, fakeRinfo);
     expect(blModule.getAuthoritativePlugStatus()).toBe(3);
   });
 
   it("fetchAndBroadcastStatus uses in-memory plug over stale report 2", async () => {
-    // Set plug to 7 via broadcast
     await broadcastHandler({ Plug: 7 }, fakeRinfo);
 
-    // Initialize state (first state broadcast is ignored)
     await broadcastHandler({ State: 2 }, fakeRinfo);
     sseMock.broadcastWallboxStatus.mockClear();
 
-    // Mock UDP responses: report 2 says Plug=3 (stale!)
     mockUdpSender
-      .mockResolvedValueOnce({}) // report 1
+      .mockResolvedValueOnce({})
       .mockResolvedValueOnce({
         State: 3,
-        Plug: 3, // ← STALE value from wallbox
+        Plug: 3,
         "Enable sys": 1,
         "Max curr": 16000,
-      }) // report 2
+      })
       .mockResolvedValueOnce({
         "E pres": 0,
         "E total": 0,
@@ -195,27 +211,21 @@ describe("Broadcast-listener authoritative plug state", () => {
         I1: 0,
         I2: 0,
         I3: 0,
-      }); // report 3
+      });
 
-    // State change triggers fetchAndBroadcastStatus
     await broadcastHandler({ State: 3 }, fakeRinfo);
-
-    // Give async fetchAndBroadcastStatus time to resolve
     await new Promise((r) => setTimeout(r, 50));
 
-    // The broadcasted status should use plug=7 (in-memory), NOT plug=3 (report 2)
     expect(sseMock.broadcastWallboxStatus).toHaveBeenCalled();
     const lastBroadcast = sseMock.broadcastWallboxStatus.mock.calls[0][0];
     expect(lastBroadcast.plug).toBe(7);
   });
 
   it("same plug value does not trigger a change broadcast", async () => {
-    await broadcastHandler({ Plug: 7 }, fakeRinfo); // initial
+    await broadcastHandler({ Plug: 7 }, fakeRinfo);
     sseMock.broadcastWallboxStatus.mockClear();
 
-    await broadcastHandler({ Plug: 7 }, fakeRinfo); // same value
-
-    // No fetchAndBroadcastStatus should have been triggered
+    await broadcastHandler({ Plug: 7 }, fakeRinfo);
     expect(sseMock.broadcastWallboxStatus).not.toHaveBeenCalled();
   });
 });
