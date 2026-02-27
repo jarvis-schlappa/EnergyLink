@@ -120,7 +120,7 @@ export async function sendPushNotification(
   }
 
   const { publicKey, privateKey } = ensureVapidKeys();
-  webPush.setVapidDetails("mailto:noreply@energylink.local", publicKey, privateKey);
+  webPush.setVapidDetails("mailto:noreply@energylink.app", publicKey, privateKey);
 
   const payload = JSON.stringify({ title, body, data });
   let sent = 0;
