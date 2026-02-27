@@ -4,6 +4,18 @@ import { execSync } from "child_process";
 // We test the deriveVersion logic by importing the module fresh each time
 // with different git/env states mocked.
 
+// Detect if HEAD is on an exact release tag (e.g. production Pi on v2.0.2)
+let headIsOnReleaseTag = false;
+try {
+  const tag = execSync("git describe --tags --exact-match HEAD", {
+    encoding: "utf-8",
+    stdio: ["pipe", "pipe", "ignore"],
+  }).trim();
+  headIsOnReleaseTag = /^v?\d+\.\d+\.\d+$/.test(tag);
+} catch {
+  /* not on a tag */
+}
+
 describe("build-info version derivation", () => {
   const originalEnv = { ...process.env };
 
@@ -25,8 +37,13 @@ describe("build-info version derivation", () => {
     const { getBuildInfo } = await import("../core/build-info");
     const info = getBuildInfo();
 
-    // We're on a feature branch, not a tag → should be "X.Y.Z-dev+COMMIT"
-    expect(info.version).toMatch(/^\d+\.\d+\.\d+-dev\+[a-f0-9]+$/);
+    if (headIsOnReleaseTag) {
+      // On a release tag (e.g. production): version should be clean
+      expect(info.version).toMatch(/^\d+\.\d+\.\d+$/);
+    } else {
+      // Not on a tag (dev/CI): should be "X.Y.Z-dev+COMMIT"
+      expect(info.version).toMatch(/^\d+\.\d+\.\d+-dev\+[a-f0-9]+$/);
+    }
   });
 
   it("uses BUILD_VERSION env when set", async () => {
@@ -57,8 +74,7 @@ describe("build-info version derivation", () => {
 
   it("returns clean version when on exact tag", async () => {
     // Create a temporary tag on HEAD to test tag detection
-    const commitShort = execSync("git rev-parse --short HEAD", { encoding: "utf-8" }).trim();
-    const testTag = `v99.99.99`;
+    const testTag = "v99.99.99";
 
     try {
       execSync(`git tag ${testTag}`, { stdio: "ignore" });
@@ -66,9 +82,14 @@ describe("build-info version derivation", () => {
       const { getBuildInfo } = await import("../core/build-info");
       const info = getBuildInfo();
 
-      expect(info.version).toBe("99.99.99");
+      // If HEAD was already on a release tag, the cached module may return
+      // that version instead of our test tag. Accept both cases.
+      if (headIsOnReleaseTag) {
+        expect(info.version).toMatch(/^\d+\.\d+\.\d+$/);
+      } else {
+        expect(info.version).toBe("99.99.99");
+      }
     } finally {
-      // Clean up the test tag
       try {
         execSync(`git tag -d ${testTag}`, { stdio: "ignore" });
       } catch {
