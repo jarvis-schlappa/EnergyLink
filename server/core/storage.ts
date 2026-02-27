@@ -184,6 +184,11 @@ export class MemStorage implements IStorage {
       },
       mockWallboxPhases: 3,
       mockWallboxPlugStatus: 7,
+      tls: {
+        enabled: false,
+        certPath: "certs/cert.pem",
+        keyPath: "certs/key.pem",
+      },
     };
     
     // Speichere Defaults in Datei

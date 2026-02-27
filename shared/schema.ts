@@ -129,6 +129,14 @@ export const gridFrequencyMonitorConfigSchema = z.object({
 
 export type GridFrequencyMonitorConfig = z.infer<typeof gridFrequencyMonitorConfigSchema>;
 
+export const tlsConfigSchema = z.object({
+  enabled: z.boolean(),
+  certPath: z.string(),
+  keyPath: z.string(),
+});
+
+export type TlsConfig = z.infer<typeof tlsConfigSchema>;
+
 export const settingsSchema = z.object({
   wallboxIp: z.string(),
   wallboxIpBackup: z.string().optional(),
@@ -145,6 +153,7 @@ export const settingsSchema = z.object({
   mockWallboxPlugStatus: z.number().min(0).max(7).optional().default(7), // 0-7 gemäß KEBA Spezifikation
   mockTimeEnabled: z.boolean().optional(), // Mock-Zeit aktiviert/deaktiviert
   mockDateTime: z.string().optional(), // Format "YYYY-MM-DDTHH:MM" für Demo-Modus Datum+Zeit-Simulation (Jahreszeit → PV-Leistung)
+  tls: tlsConfigSchema.optional(),
 });
 
 export type Settings = z.infer<typeof settingsSchema>;

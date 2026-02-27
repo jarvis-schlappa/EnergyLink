@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import request from "supertest";
-import type { Server } from "http";
+import { createServer, type Server } from "http";
 import type { AddressInfo } from "net";
 
 /**
@@ -47,7 +47,8 @@ beforeAll(async () => {
 
   await startUnifiedMock();
 
-  server = await registerRoutes(app);
+  await registerRoutes(app);
+  server = createServer(app);
 
   await new Promise<void>((resolve) => {
     server.listen(0, "127.0.0.1", () => {
