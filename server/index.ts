@@ -1,4 +1,8 @@
 import express, { type Request, Response, NextFunction } from "express";
+import { createServer as createHttpServer } from "http";
+import { createServer as createHttpsServer } from "https";
+import { readFileSync, existsSync } from "fs";
+import { resolve } from "path";
 import { registerRoutes } from "./routes/index";
 import { storage } from "./core/storage";
 import { startUnifiedMock, stopUnifiedMock } from "./demo/unified-mock";
@@ -122,10 +126,38 @@ app.use((req, res, next) => {
   // API-Key-Authentifizierung für alle API-Routen (inkl. SSE)
   app.use("/api", requireApiKey);
 
-  const server = await registerRoutes(app);
+  await registerRoutes(app);
 
   // SSE-Server ist bereits via /api/wallbox/stream in routes.ts konfiguriert
   log('info', 'system', '✅ SSE-Server bereit auf /api/wallbox/stream');
+
+  // Create HTTP or HTTPS server based on TLS settings
+  const tlsConfig = settings?.tls;
+  let server: ReturnType<typeof createHttpServer> | ReturnType<typeof createHttpsServer>;
+  let protocol = "HTTP";
+
+  if (tlsConfig?.enabled) {
+    const certPath = resolve(process.cwd(), tlsConfig.certPath);
+    const keyPath = resolve(process.cwd(), tlsConfig.keyPath);
+
+    if (existsSync(certPath) && existsSync(keyPath)) {
+      try {
+        const cert = readFileSync(certPath);
+        const key = readFileSync(keyPath);
+        server = createHttpsServer({ cert, key }, app);
+        protocol = "HTTPS";
+        log('info', 'system', '🔒 TLS aktiviert – HTTPS-Server wird gestartet');
+      } catch (error) {
+        log('warning', 'system', '⚠️ TLS-Zertifikate konnten nicht gelesen werden – Fallback auf HTTP', error instanceof Error ? error.message : String(error));
+        server = createHttpServer(app);
+      }
+    } else {
+      log('warning', 'system', `⚠️ TLS aktiviert, aber Zertifikatdateien fehlen – Fallback auf HTTP (cert: ${existsSync(certPath)}, key: ${existsSync(keyPath)})`);
+      server = createHttpServer(app);
+    }
+  } else {
+    server = createHttpServer(app);
+  }
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
@@ -156,7 +188,7 @@ app.use((req, res, next) => {
     port,
     host: process.env.HOST || "0.0.0.0",
   }, () => {
-    log('info', 'system', `serving on port ${port}`);
+    log('info', 'system', `serving ${protocol} on port ${port}`);
   });
 
   // Graceful Shutdown für alle Server-Ressourcen (Issue #82)
@@ -223,7 +255,7 @@ app.use((req, res, next) => {
 
       // 6. HTTP-Server schließen
       server.close(() => {
-        log('info', 'system', '✅ HTTP-Server geschlossen');
+        log('info', 'system', `✅ ${protocol}-Server geschlossen`);
       });
 
       log('info', 'system', '✅ Graceful Shutdown abgeschlossen');
