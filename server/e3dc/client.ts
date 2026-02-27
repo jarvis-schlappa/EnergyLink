@@ -17,9 +17,15 @@ const ALLOWED_E3DCSET_FLAGS: Record<string, 'none' | 'number' | 'string'> = {
   '-l': 'number',   // Tags auflisten (optional Kategorie-Nummer)
   '-H': 'string',   // Historische Daten (day/week/month/year)
   '-D': 'string',   // Datum für historische Daten (YYYY-MM-DD)
+  '-b': 'number',   // Batterie-Modul Index (0 = erstes Modul)
   '-m': 'number',   // Batterie-Modul Details
   '-q': 'none',     // Quiet-Modus (nur Wert ausgeben)
+  '-j': 'none',     // JSON Output
   '-E': 'number',   // Emergency Power Reserve (Wh)
+  '--info': 'none', // System-Info (SW-Version, Seriennummer, etc.)
+  '--raw': 'none',  // Rohdaten ausgeben (nur mit -H)
+  '--watch': 'none',      // Continuous Monitoring Modus
+  '--interval': 'number', // Abfrageintervall in Sekunden
 };
 
 /**
@@ -31,7 +37,10 @@ const ALLOWED_E3DCSET_FLAGS: Record<string, 'none' | 'number' | 'string'> = {
  * @throws Error wenn ungültige Flags oder Parameter gefunden werden
  */
 export function validateE3dcCommand(command: string): string[] {
-  const trimmed = command.replace(/^e3dcset\s+/, '').trim();
+  // Sanitize typographic dashes: browsers/OS may convert '--' to '—' (em-dash) or '–' (en-dash)
+  // Em-dash (—) represents two dashes, en-dash (–) represents one dash
+  const sanitized = command.replace(/—/g, '--').replace(/–/g, '-');
+  const trimmed = sanitized.replace(/^e3dcset\s+/, '').trim();
   if (trimmed === '') {
     throw new Error('Befehl ist leer');
   }

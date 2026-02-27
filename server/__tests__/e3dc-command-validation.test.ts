@@ -131,4 +131,44 @@ describe('validateE3dcCommand', () => {
   it('should reject single-quoted wrapping', () => {
     expect(() => validateE3dcCommand("-r 'EMS_BAT_SOC'")).toThrow();
   });
+
+  // New flags
+  it('should accept --info', () => {
+    expect(validateE3dcCommand('--info')).toEqual(['--info']);
+  });
+
+  it('should accept --raw', () => {
+    expect(validateE3dcCommand('-H day --raw')).toEqual(['-H', 'day', '--raw']);
+  });
+
+  it('should accept -j (JSON output)', () => {
+    expect(validateE3dcCommand('-r EMS_BAT_SOC -j')).toEqual(['-r', 'EMS_BAT_SOC', '-j']);
+  });
+
+  it('should accept -b with module index', () => {
+    expect(validateE3dcCommand('-b 0 -m 0')).toEqual(['-b', '0', '-m', '0']);
+  });
+
+  it('should accept --watch', () => {
+    expect(validateE3dcCommand('--watch')).toEqual(['--watch']);
+  });
+
+  it('should accept --interval with number', () => {
+    expect(validateE3dcCommand('--watch --interval 10')).toEqual(['--watch', '--interval', '10']);
+  });
+
+  // Typographic dash sanitization
+  it('should sanitize em-dash to regular dashes', () => {
+    // '—' is em-dash, browsers may convert '--' to it
+    expect(validateE3dcCommand('—info')).toEqual(['--info']);
+  });
+
+  it('should sanitize en-dash to regular dashes', () => {
+    // '–' is en-dash
+    expect(validateE3dcCommand('––info')).toEqual(['--info']);
+  });
+
+  it('should sanitize mixed typographic dashes in flags', () => {
+    expect(validateE3dcCommand('—raw')).toEqual(['--raw']);
+  });
 });
