@@ -597,6 +597,19 @@ export class ChargingStrategyController {
       return true;
     }
     
+    // Surplus-Strategien: Plug-Prüfung VOR Start-Delay (kein Countdown ohne Auto)
+    if (this.lastPlugStatus !== 7) {
+      if (context.startDelayTrackerSince) {
+        storage.updateChargingContext({
+          startDelayTrackerSince: undefined,
+          remainingStartDelay: undefined,
+        });
+        log("debug", "system", `Start-Delay zurückgesetzt - kein Auto angeschlossen (Plug=${this.lastPlugStatus})`);
+      }
+      log("debug", "system", `Surplus-Strategie: Kein Auto angeschlossen (Plug=${this.lastPlugStatus}) → return false`);
+      return false;
+    }
+
     // Surplus-Strategien verwenden Start-Delay
     if (surplus < config.minStartPowerWatt) {
       if (context.startDelayTrackerSince) {
@@ -631,18 +644,6 @@ export class ChargingStrategyController {
     });
     
     if (waitingDuration >= config.startDelaySeconds) {
-      // WICHTIG: Auch bei Surplus-Strategien prüfen, ob Auto angeschlossen ist!
-      if (this.lastPlugStatus !== 7) {
-        log("info", "system", 
-          `Start-Bedingung erfüllt: Überschuss ${surplus}W > ${config.minStartPowerWatt}W für ${waitingDuration}s, aber kein Auto angeschlossen (Plug=${this.lastPlugStatus}) - Stopp-Timer wird zurückgesetzt`
-        );
-        storage.updateChargingContext({
-          startDelayTrackerSince: undefined,
-          remainingStartDelay: undefined,
-        });
-        return false;
-      }
-
       log("info", "system", 
         `Start-Bedingung erfüllt: Überschuss ${surplus}W > ${config.minStartPowerWatt}W für ${waitingDuration}s, Auto angeschlossen (Plug=7)`
       );
