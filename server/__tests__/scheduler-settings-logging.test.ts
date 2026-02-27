@@ -1,5 +1,14 @@
 import { describe, it, expect, beforeEach, vi, type Mock } from "vitest";
 
+/**
+ * Tests for scheduler settings change detection and logging (Issue #109).
+ * Verifies that configuration changes are logged with correct time windows.
+ *
+ * Mock strategy: see scheduler-night-charging.test.ts header comment.
+ */
+
+// --- Internal mocks (test-controllable) ---
+
 const mockLog = vi.fn();
 vi.mock("../core/logger", () => ({
   log: (...args: any[]) => mockLog(...args),
@@ -7,64 +16,21 @@ vi.mock("../core/logger", () => ({
 
 let mockSettings: any;
 
-vi.mock("../core/storage", () => {
-  return {
-    storage: {
-      getSettings: vi.fn(() => mockSettings),
-      saveSettings: vi.fn((s: any) => { mockSettings = s; }),
-      getControlState: vi.fn(() => ({ nightCharging: false, batteryLock: false, gridCharging: false })),
-      saveControlState: vi.fn(),
-      getChargingContext: vi.fn(() => ({ currentPhases: 1 })),
-    },
-  };
-});
-
-vi.mock("../wallbox/transport", () => ({
-  sendUdpCommand: vi.fn().mockResolvedValue({}),
-}));
-
-vi.mock("../e3dc/client", () => ({
-  e3dcClient: {
-    isConfigured: vi.fn(() => false),
-    configure: vi.fn(),
-    isGridChargeDuringNightChargingEnabled: vi.fn(() => false),
+vi.mock("../core/storage", () => ({
+  storage: {
+    getSettings: vi.fn(() => mockSettings),
+    saveSettings: vi.fn((s: any) => { mockSettings = s; }),
+    getControlState: vi.fn(() => ({ nightCharging: false, batteryLock: false, gridCharging: false })),
+    saveControlState: vi.fn(),
+    getChargingContext: vi.fn(() => ({ currentPhases: 1 })),
   },
-}));
-
-vi.mock("../e3dc/modbus", () => ({
-  getE3dcModbusService: vi.fn(() => ({ getLastReadLiveData: vi.fn(() => null) })),
-}));
-
-vi.mock("../monitoring/prowl-notifier", () => ({
-  triggerProwlEvent: vi.fn(),
-  extractTargetWh: vi.fn(),
-}));
-
-vi.mock("../monitoring/grid-frequency-monitor", () => ({
-  startGridFrequencyMonitor: vi.fn(),
-  stopGridFrequencyMonitor: vi.fn(),
-}));
-
-vi.mock("../fhem/e3dc-sync", () => ({
-  startFhemSyncScheduler: vi.fn(),
-  stopFhemSyncScheduler: vi.fn(),
-}));
-
-vi.mock("../e3dc/poller", () => ({
-  startE3dcPoller: vi.fn(),
-  stopE3dcPoller: vi.fn(),
-  getE3dcBackoffLevel: vi.fn(() => 0),
-}));
-
-vi.mock("../wallbox/sse", () => ({
-  broadcastWallboxStatus: vi.fn(),
-  broadcastPartialUpdate: vi.fn(),
 }));
 
 vi.mock("../routes/helpers", async () => {
   const actual = await vi.importActual("../routes/helpers") as any;
   return {
     ...actual,
+    // Only mock the clock; isTimeInRange uses the real implementation
     getCurrentTimeInTimezone: vi.fn(() => "12:00"),
   };
 });
@@ -79,19 +45,64 @@ vi.mock("../routes/shared-state", () => ({
   setNightChargingSchedulerInterval: vi.fn(),
   setFhemSyncInterval: vi.fn(),
   setE3dcPollerInterval: vi.fn(),
-  getOrCreateStrategyController: vi.fn(() => ({
-    startEventListener: vi.fn(),
-    stopEventListener: vi.fn(),
-    stopChargingForStrategyOff: vi.fn(),
-  })),
+  getOrCreateStrategyController: () => ({
+    startEventListener: () => {},
+    stopEventListener: () => {},
+    stopChargingForStrategyOff: () => {},
+  }),
 }));
+
+// --- Hardware/external stubs (no-op, never asserted) ---
+
+vi.mock("../wallbox/transport", () => ({
+  sendUdpCommand: () => Promise.resolve({}),
+}));
+
+vi.mock("../e3dc/client", () => ({
+  e3dcClient: {
+    isConfigured: () => false,
+    configure: () => {},
+    isGridChargeDuringNightChargingEnabled: () => false,
+  },
+}));
+
+vi.mock("../e3dc/modbus", () => ({
+  getE3dcModbusService: () => ({ getLastReadLiveData: () => null }),
+}));
+
+vi.mock("../e3dc/poller", () => ({
+  startE3dcPoller: () => null,
+  stopE3dcPoller: () => Promise.resolve(),
+  getE3dcBackoffLevel: () => 0,
+}));
+
+vi.mock("../monitoring/prowl-notifier", () => ({
+  triggerProwlEvent: () => {},
+  extractTargetWh: () => undefined,
+}));
+
+vi.mock("../monitoring/grid-frequency-monitor", () => ({
+  startGridFrequencyMonitor: () => {},
+  stopGridFrequencyMonitor: () => {},
+}));
+
+vi.mock("../fhem/e3dc-sync", () => ({
+  startFhemSyncScheduler: () => null,
+  stopFhemSyncScheduler: () => Promise.resolve(),
+}));
+
+vi.mock("../wallbox/sse", () => ({
+  broadcastWallboxStatus: () => {},
+  broadcastPartialUpdate: () => {},
+}));
+
+// --- Imports after mocks ---
 
 import { storage } from "../core/storage";
 
 describe("Scheduler Settings Logging (Issue #109)", () => {
   beforeEach(async () => {
     vi.clearAllMocks();
-    // Reset module state by re-importing
     vi.resetModules();
   });
 
@@ -128,14 +139,11 @@ describe("Scheduler Settings Logging (Issue #109)", () => {
 
     mockLog.mockClear();
 
-    // Change settings
     mockSettings = {
       ...mockSettings,
       nightChargingSchedule: { enabled: true, startTime: "22:00", endTime: "06:00" },
     };
 
-    // Trigger another scheduler tick by calling startSchedulers again
-    // This will re-run checkNightChargingSchedule
     await scheduler.startSchedulers();
     await new Promise(r => setTimeout(r, 50));
 
@@ -152,7 +160,6 @@ describe("Scheduler Settings Logging (Issue #109)", () => {
     mockSettings = {
       wallboxIp: "192.168.40.16",
       e3dc: { enabled: false },
-      // No nightChargingSchedule
     };
 
     const scheduler = await import("../routes/scheduler");
@@ -163,7 +170,6 @@ describe("Scheduler Settings Logging (Issue #109)", () => {
       (call: any[]) => call[0] === "info" && call[2]?.includes("Konfiguration geladen")
     );
     expect(configCalls.length).toBeGreaterThanOrEqual(1);
-    // Should NOT contain "undefined"
     expect(configCalls[0][2]).not.toContain("undefined");
     expect(configCalls[0][2]).toContain("nicht konfiguriert");
 

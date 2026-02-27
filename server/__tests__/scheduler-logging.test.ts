@@ -1,6 +1,34 @@
 import { describe, it, expect, beforeEach, vi, type Mock } from "vitest";
 
-// Mock logger BEFORE imports
+/**
+ * Tests for scheduler log output (Issue #107).
+ * Verifies that night charging start/stop events emit INFO-level logs.
+ *
+ * Mock analysis (Issue #45):
+ *   HARDWARE/EXTERNAL (must be mocked - no real devices in tests):
+ *     wallbox/transport       → UDP to physical wallbox
+ *     e3dc/client             → Modbus/RSCP to physical E3DC inverter
+ *     e3dc/modbus             → Modbus service for live data
+ *     e3dc/poller             → Background polling scheduler
+ *     monitoring/prowl-notifier → External push notification service
+ *     monitoring/grid-frequency-monitor → External network monitoring
+ *     fhem/e3dc-sync          → FHEM hardware bridge
+ *     wallbox/sse             → SSE broadcast (side effects)
+ *
+ *   INTERNAL (mocked for justified reasons - reviewed Issue #45):
+ *     core/storage      → MemStorage constructor performs file I/O
+ *                          (readFileSync, writeFileSync, mkdirSync).
+ *                          No pure in-memory mode available without DI refactor.
+ *     core/logger       → Captured for log-level assertions (test subject)
+ *     routes/helpers    → Only getCurrentTimeInTimezone (deterministic clock control);
+ *                         isTimeInRange uses the REAL implementation
+ *     routes/shared-state → getOrCreateStrategyController returns test double
+ *                           because real controller constructor requires
+ *                           sendUdpCommand + imports all hardware modules
+ */
+
+// --- Internal mocks (test-controllable) ---
+
 const mockLog = vi.fn();
 vi.mock("../core/logger", () => ({
   log: (...args: any[]) => mockLog(...args),
@@ -40,56 +68,12 @@ vi.mock("../core/storage", () => {
   };
 });
 
-vi.mock("../wallbox/transport", () => ({
-  sendUdpCommand: vi.fn().mockResolvedValue({}),
-}));
-
-vi.mock("../e3dc/client", () => ({
-  e3dcClient: {
-    isConfigured: vi.fn(() => false),
-    configure: vi.fn(),
-    isGridChargeDuringNightChargingEnabled: vi.fn(() => false),
-    enableNightCharging: vi.fn(),
-    disableNightCharging: vi.fn(),
-  },
-}));
-
-vi.mock("../e3dc/modbus", () => ({
-  getE3dcModbusService: vi.fn(() => ({ getLastReadLiveData: vi.fn(() => null) })),
-}));
-
-vi.mock("../monitoring/prowl-notifier", () => ({
-  triggerProwlEvent: vi.fn(),
-  extractTargetWh: vi.fn(),
-}));
-
-vi.mock("../monitoring/grid-frequency-monitor", () => ({
-  startGridFrequencyMonitor: vi.fn(),
-  stopGridFrequencyMonitor: vi.fn(),
-}));
-
-vi.mock("../fhem/e3dc-sync", () => ({
-  startFhemSyncScheduler: vi.fn(),
-  stopFhemSyncScheduler: vi.fn(),
-}));
-
-vi.mock("../e3dc/poller", () => ({
-  startE3dcPoller: vi.fn(),
-  stopE3dcPoller: vi.fn(),
-  getE3dcBackoffLevel: vi.fn(() => 0),
-}));
-
-vi.mock("../wallbox/sse", () => ({
-  broadcastWallboxStatus: vi.fn(),
-  broadcastPartialUpdate: vi.fn(),
-}));
-
-// Mock helpers to control time
 vi.mock("../routes/helpers", async () => {
   const actual = await vi.importActual("../routes/helpers") as any;
   return {
     ...actual,
-    getCurrentTimeInTimezone: vi.fn(() => "02:00"), // default: inside time window
+    // Only mock the clock; isTimeInRange uses the real implementation
+    getCurrentTimeInTimezone: vi.fn(() => "02:00"),
   };
 });
 
@@ -114,16 +98,57 @@ vi.mock("../routes/shared-state", () => ({
   getOrCreateStrategyController: vi.fn(() => mockStrategyController),
 }));
 
-// Need dynamic import after mocks
+// --- Hardware/external stubs (no-op, never asserted) ---
+
+vi.mock("../wallbox/transport", () => ({
+  sendUdpCommand: () => Promise.resolve({}),
+}));
+
+vi.mock("../e3dc/client", () => ({
+  e3dcClient: {
+    isConfigured: () => false,
+    configure: () => {},
+    isGridChargeDuringNightChargingEnabled: () => false,
+    enableNightCharging: () => {},
+    disableNightCharging: () => {},
+  },
+}));
+
+vi.mock("../e3dc/modbus", () => ({
+  getE3dcModbusService: () => ({ getLastReadLiveData: () => null }),
+}));
+
+vi.mock("../e3dc/poller", () => ({
+  startE3dcPoller: () => null,
+  stopE3dcPoller: () => Promise.resolve(),
+  getE3dcBackoffLevel: () => 0,
+}));
+
+vi.mock("../monitoring/prowl-notifier", () => ({
+  triggerProwlEvent: () => {},
+  extractTargetWh: () => undefined,
+}));
+
+vi.mock("../monitoring/grid-frequency-monitor", () => ({
+  startGridFrequencyMonitor: () => {},
+  stopGridFrequencyMonitor: () => {},
+}));
+
+vi.mock("../fhem/e3dc-sync", () => ({
+  startFhemSyncScheduler: () => null,
+  stopFhemSyncScheduler: () => Promise.resolve(),
+}));
+
+vi.mock("../wallbox/sse", () => ({
+  broadcastWallboxStatus: () => {},
+  broadcastPartialUpdate: () => {},
+}));
+
+// --- Imports after mocks ---
+
 import { storage } from "../core/storage";
 import { getCurrentTimeInTimezone } from "../routes/helpers";
 
-// We can't easily call checkNightChargingSchedule directly since it's a module-level const.
-// Instead, we test by importing startSchedulers which calls it, but that's complex.
-// Better approach: extract the function or test via the module's exported startSchedulers.
-// For simplicity, let's re-implement the test by calling startSchedulers and checking logs.
-
-// Actually, let me dynamically import the scheduler module to trigger the initial check
 describe("Scheduler Logging (Issue #107)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -131,35 +156,22 @@ describe("Scheduler Logging (Issue #107)", () => {
   });
 
   it("logs INFO when starting timed charging in time window", async () => {
-    // Time is 02:00, window is 00:00-05:00, nightCharging is false → should start
     (getCurrentTimeInTimezone as Mock).mockReturnValue("02:00");
     
-    // Import scheduler to get the checkNightChargingSchedule via startSchedulers
-    // Since checkNightChargingSchedule is called immediately in startSchedulers, 
-    // we need to be more creative. Let's just test by calling startSchedulers.
     const scheduler = await import("../routes/scheduler");
-    
-    // startSchedulers calls checkNightChargingSchedule() immediately
-    // We need to wait for the async operation
     await scheduler.startSchedulers();
-    
-    // Wait for async operations
     await new Promise(r => setTimeout(r, 100));
     
-    // Check that INFO log was emitted for starting timed charging
     const infoCalls = mockLog.mock.calls.filter(
       (call: any[]) => call[0] === "info" && call[2]?.includes("Zeitfenster erreicht")
     );
     expect(infoCalls.length).toBeGreaterThanOrEqual(1);
-    
-    // Verify controller.startNightCharging was called (routes through strategy controller)
     expect(mockStrategyController.startNightCharging).toHaveBeenCalledWith("192.168.40.16");
     
     await scheduler.shutdownSchedulers();
   });
 
   it("logs INFO when stopping timed charging outside time window", async () => {
-    // Set nightCharging=true, time outside window → should stop
     (storage as any)._setControlState({ nightCharging: true, batteryLock: false, gridCharging: false });
     (getCurrentTimeInTimezone as Mock).mockReturnValue("06:00");
 
@@ -171,8 +183,6 @@ describe("Scheduler Logging (Issue #107)", () => {
       (call: any[]) => call[0] === "info" && call[2]?.includes("Zeitfenster beendet")
     );
     expect(infoCalls.length).toBeGreaterThanOrEqual(1);
-
-    // Verify controller.stopNightCharging was called (routes through strategy controller)
     expect(mockStrategyController.stopNightCharging).toHaveBeenCalledWith("192.168.40.16");
 
     await scheduler.shutdownSchedulers();
@@ -185,7 +195,6 @@ describe("Scheduler Logging (Issue #107)", () => {
     await scheduler.startSchedulers();
     await new Promise(r => setTimeout(r, 100));
 
-    // Verify controller was called with the correct wallbox IP
     expect(mockStrategyController.startNightCharging).toHaveBeenCalledWith("192.168.40.16");
 
     await scheduler.shutdownSchedulers();
