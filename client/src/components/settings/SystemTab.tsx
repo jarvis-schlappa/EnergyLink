@@ -185,6 +185,8 @@ export default function SystemTab({ settings, settingsLoaded, onDirtyChange }: S
 
   const demoMode = form.watch("demoMode") ?? false;
   const prowlEnabled = form.watch("prowl.enabled");
+  const webPushEnabled = form.watch("webPush.enabled");
+  const anyNotificationEnabled = prowlEnabled || webPushEnabled;
 
   return (
     <form onSubmit={form.handleSubmit(handleSave)} className="space-y-4" data-testid="system-tab">
@@ -358,34 +360,6 @@ export default function SystemTab({ settings, settingsLoaded, onDirtyChange }: S
 
               <Separator />
 
-              {/* Event-Gruppen */}
-              <div className="space-y-4">
-                <Label className="text-sm font-medium">Ereignis-Benachrichtigungen</Label>
-
-                {PROWL_EVENT_GROUPS.map((group) => (
-                  <div key={group.testId} className="space-y-2" data-testid={group.testId}>
-                    <p className="text-xs font-medium text-muted-foreground">{group.title}</p>
-                    {group.events.map(({ id, field, label }) => (
-                      <div key={id} className="flex items-center justify-between">
-                        <Label htmlFor={`event-${id}`} className="text-xs font-normal">
-                          {label}
-                        </Label>
-                        <Switch
-                          id={`event-${id}`}
-                          checked={form.watch(field)}
-                          onCheckedChange={(checked) =>
-                            form.setValue(field, checked, { shouldDirty: true })
-                          }
-                          data-testid={`switch-event-${id}`}
-                        />
-                      </div>
-                    ))}
-                  </div>
-                ))}
-              </div>
-
-              <Separator />
-
               <Button
                 type="button"
                 variant="outline"
@@ -431,6 +405,53 @@ export default function SystemTab({ settings, settingsLoaded, onDirtyChange }: S
 
       {/* Web Push-Benachrichtigungen */}
       <WebPushSection form={form} handleToggleSave={handleToggleSave} />
+
+      {/* Ereignis-Benachrichtigungen (gemeinsam für alle Kanäle) */}
+      <div className="border rounded-lg p-4 space-y-3">
+        <div className="space-y-0.5">
+          <Label className="text-sm font-medium">Ereignis-Benachrichtigungen</Label>
+          <p className="text-xs text-muted-foreground">
+            Gilt für alle aktiven Benachrichtigungsdienste
+          </p>
+        </div>
+
+        {anyNotificationEnabled ? (
+          <>
+            <Separator />
+
+            <div className="space-y-4">
+              {PROWL_EVENT_GROUPS.map((group) => (
+                <div key={group.testId} className="space-y-2" data-testid={group.testId}>
+                  <p className="text-xs font-medium text-muted-foreground">{group.title}</p>
+                  {group.events.map(({ id, field, label }) => (
+                    <div key={id} className="flex items-center justify-between">
+                      <Label htmlFor={`event-${id}`} className="text-xs font-normal">
+                        {label}
+                      </Label>
+                      <Switch
+                        id={`event-${id}`}
+                        checked={form.watch(field)}
+                        onCheckedChange={(checked) =>
+                          form.setValue(field, checked, { shouldDirty: true })
+                        }
+                        data-testid={`switch-event-${id}`}
+                      />
+                    </div>
+                  ))}
+                </div>
+              ))}
+            </div>
+          </>
+        ) : (
+          <>
+            <Separator />
+            <p className="text-xs text-muted-foreground">
+              Aktiviere mindestens einen Benachrichtigungsdienst (Prowl oder Browser Push),
+              um Ereignis-Benachrichtigungen zu konfigurieren.
+            </p>
+          </>
+        )}
+      </div>
 
       <Separator />
 
