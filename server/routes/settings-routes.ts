@@ -51,6 +51,11 @@ export function registerSettingsRoutes(app: Express): void {
         wallboxIp: "",
       });
     }
+    // Strip VAPID private key from response (security: only backend needs it)
+    if (settings.webPush?.vapidPrivateKey) {
+      const { vapidPrivateKey, ...webPushPublic } = settings.webPush;
+      return res.json({ ...settings, webPush: webPushPublic });
+    }
     res.json(settings);
   });
 

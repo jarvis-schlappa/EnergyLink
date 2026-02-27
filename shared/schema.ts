@@ -129,6 +129,27 @@ export const gridFrequencyMonitorConfigSchema = z.object({
 
 export type GridFrequencyMonitorConfig = z.infer<typeof gridFrequencyMonitorConfigSchema>;
 
+export const webPushSubscriptionSchema = z.object({
+  endpoint: z.string(),
+  keys: z.object({
+    p256dh: z.string(),
+    auth: z.string(),
+  }),
+  label: z.string().optional(),
+  createdAt: z.string(),
+});
+
+export type WebPushSubscription = z.infer<typeof webPushSubscriptionSchema>;
+
+export const webPushSchema = z.object({
+  enabled: z.boolean(),
+  vapidPublicKey: z.string().optional(),
+  vapidPrivateKey: z.string().optional(),
+  subscriptions: z.array(webPushSubscriptionSchema).optional(),
+});
+
+export type WebPush = z.infer<typeof webPushSchema>;
+
 export const tlsConfigSchema = z.object({
   enabled: z.boolean(),
   certPath: z.string(),
@@ -153,6 +174,7 @@ export const settingsSchema = z.object({
   mockWallboxPlugStatus: z.number().min(0).max(7).optional().default(7), // 0-7 gemäß KEBA Spezifikation
   mockTimeEnabled: z.boolean().optional(), // Mock-Zeit aktiviert/deaktiviert
   mockDateTime: z.string().optional(), // Format "YYYY-MM-DDTHH:MM" für Demo-Modus Datum+Zeit-Simulation (Jahreszeit → PV-Leistung)
+  webPush: webPushSchema.optional(),
   tls: tlsConfigSchema.optional(),
 });
 

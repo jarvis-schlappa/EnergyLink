@@ -19,6 +19,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { settingsSchema, buildInfoSchema } from "@shared/schema";
 import type { Settings, WallboxStatus, BuildInfo } from "@shared/schema";
+import WebPushSection from "./WebPushSection";
 
 // Demo X1 Input Control (extracted from original DemoModeSection)
 function DemoInputControl() {
@@ -427,6 +428,11 @@ export default function SystemTab({ settings, settingsLoaded, onDirtyChange }: S
           </>
         )}
       </div>
+
+      {/* Web Push-Benachrichtigungen */}
+      <WebPushSection form={form} handleToggleSave={handleToggleSave} />
+
+      <Separator />
 
       {/* Build-Info */}
       <div className="border rounded-lg p-4 space-y-3">

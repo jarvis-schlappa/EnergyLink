@@ -1,4 +1,5 @@
 import type { Settings, ProwlEvents } from "@shared/schema";
+import { sendPushNotification } from "../push/web-push-service";
 import { log } from "../core/logger";
 
 /**
@@ -23,25 +24,69 @@ export function extractTargetWh(command: string): number | undefined {
  * @param eventKey - Event-Name (z.B. "chargingStarted")
  * @param action - Async-Funktion die mit ProwlNotifier ausgeführt wird
  */
-export function triggerProwlEvent(
+/**
+ * Event-Name Mapping für Push-Benachrichtigungen
+ */
+const EVENT_DISPLAY_NAMES: Record<string, string> = {
+  appStarted: "App gestartet",
+  chargingStarted: "Ladung gestartet",
+  chargingStopped: "Ladung gestoppt",
+  currentAdjusted: "Ladestrom angepasst",
+  plugConnected: "Auto angesteckt",
+  plugDisconnected: "Auto abgesteckt",
+  batteryLockActivated: "Batterie-Sperre aktiviert",
+  batteryLockDeactivated: "Batterie-Sperre deaktiviert",
+  gridChargingActivated: "Netzstrom-Laden aktiviert",
+  gridChargingDeactivated: "Netzstrom-Laden deaktiviert",
+  strategyChanged: "Strategie gewechselt",
+  errors: "Fehler",
+  gridFrequencyWarning: "Netzfrequenz Warnung",
+  gridFrequencyCritical: "Netzfrequenz Kritisch",
+};
+
+/**
+ * Zentrale Funktion zum Auslösen von Benachrichtigungen (Prowl + Web Push)
+ * Prüft Settings, Event-Aktivierung und führt Action aus (fire-and-forget)
+ * 
+ * @param settings - Aktuelle Settings mit Notification-Konfiguration
+ * @param eventKey - Event-Name (z.B. "chargingStarted")
+ * @param action - Async-Funktion die mit ProwlNotifier ausgeführt wird
+ */
+export function triggerNotification(
   settings: Settings | null,
   eventKey: ProwlEventKey,
   action: (notifier: ProwlNotifier) => Promise<void>
 ): void {
+  // Check event toggle (shared between Prowl and Web Push)
+  if (!settings?.prowl?.events?.[eventKey]) {
+    return;
+  }
+
+  // Prowl
   try {
-    if (!settings?.prowl?.enabled) {
-      return;
+    if (settings.prowl?.enabled) {
+      void action(getProwlNotifier());
     }
-    
-    if (!settings.prowl.events?.[eventKey]) {
-      return;
-    }
-    
-    void action(getProwlNotifier());
   } catch (error) {
     log("debug", "system", "Prowl-Notifier nicht initialisiert");
   }
+
+  // Web Push (parallel, fire-and-forget)
+  try {
+    if (settings.webPush?.enabled) {
+      const title = EVENT_DISPLAY_NAMES[eventKey] || eventKey;
+      void sendPushNotification(title, "EnergyLink");
+    }
+  } catch (error) {
+    log("debug", "system", "Web Push fehlgeschlagen", error instanceof Error ? error.message : String(error));
+  }
 }
+
+/**
+ * Backward-compatible alias for triggerNotification
+ * @deprecated Use triggerNotification instead
+ */
+export const triggerProwlEvent = triggerNotification;
 
 export class ProwlNotifier {
   private apiKey: string;
