@@ -188,7 +188,7 @@ export class MemStorage implements IStorage {
         enabled: false,
       },
       tls: {
-        enabled: false,
+        enabled: true,
         certPath: "certs/cert.pem",
         keyPath: "certs/key.pem",
       },
