@@ -379,20 +379,15 @@ export class ChargingStrategyController {
     if (result === null) {
       if (context.isActive) {
         // WÄHREND aktiver Ladung: null bedeutet "Überschuss unter Mindest-Anpassungsleistung"
-        
-        // ABER: Bei surplus_vehicle_prio ist Auto-Phasenwechsel normal!
-        // Wenn Phasen gerade geändert wurden (reconciliation), nicht sofort stoppen
-        // - Wallbox wechselt von 1P auf 3P = das ist OK, lass sie laden
-        // - Bei battery_prio: SOFORT stoppen (Batterie hat Vorrang, kein Spielraum)
-        
-        if (config.activeStrategy === "surplus_battery_prio") {
-          log("info", "system", `[surplus_battery_prio] result=null && isActive → Batterie-Priorisierung: Überschuss reicht nicht (< 1380W @ 1P) - STOP`);
-          await this.stopCharging(wallboxIp, "Batterie-Priorisierung: Überschuss unter Mindestleistung");
-        } else {
-          // surplus_vehicle_prio: Lass weiterlaufen, solange Wallbox aktiv ist
-          // Wallbox kann sich selbst phasen (1P→3P) - das ist akzeptabel
-          log("debug", "system", `[surplus_vehicle_prio] result=null aber isActive - Wallbox lädt weiter (Auto-Phasenwechsel akzeptiert)`);
-        }
+        // (surplus < 1380W @ 1P, reicht nicht für 6A Minimum)
+        //
+        // NICHT sofort stoppen! shouldStopCharging() (oben) verwaltet bereits den
+        // Stopp-Timer via stopThresholdWatt und stopDelaySeconds.
+        // Sofortiges Stoppen hier würde diese Konfiguration umgehen und zu
+        // Start-Stop-Loops führen (Issue #33).
+        //
+        // Beide Surplus-Strategien: Wallbox läuft weiter mit dem zuletzt gesetzten Strom.
+        log("debug", "system", `[${config.activeStrategy}] result=null aber isActive - Wallbox lädt weiter (shouldStopCharging verwaltet Stopp-Timer)`);
       }
       return;
     }
