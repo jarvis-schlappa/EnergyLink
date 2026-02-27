@@ -184,6 +184,9 @@ export class MemStorage implements IStorage {
       },
       mockWallboxPhases: 3,
       mockWallboxPlugStatus: 7,
+      webPush: {
+        enabled: false,
+      },
       tls: {
         enabled: false,
         certPath: "certs/cert.pem",

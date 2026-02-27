@@ -89,6 +89,9 @@ const DEFAULT_SETTINGS: SettingsType = {
     port: 7072,
     autoCloseGarageOnPlug: false,
   },
+  webPush: {
+    enabled: false,
+  },
   demoMode: false,
   mockWallboxPhases: 3,
   mockWallboxPlugStatus: 7,
@@ -121,6 +124,7 @@ export default function SettingsPage() {
         },
         gridFrequencyMonitor: { ...DEFAULT_SETTINGS.gridFrequencyMonitor!, ...rawSettings.gridFrequencyMonitor },
         fhemSync: { ...DEFAULT_SETTINGS.fhemSync!, ...rawSettings.fhemSync },
+        webPush: { ...DEFAULT_SETTINGS.webPush!, ...rawSettings.webPush },
       }
     : DEFAULT_SETTINGS, [rawSettings]);
 

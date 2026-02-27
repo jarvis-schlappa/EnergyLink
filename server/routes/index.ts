@@ -7,6 +7,7 @@ import { registerSettingsRoutes } from "./settings-routes";
 import { registerStatusRoutes } from "./status-routes";
 import { registerDemoRoutes } from "./demo-routes";
 import { registerGarageRoutes } from "./garage-routes";
+import { registerPushRoutes } from "./push-routes";
 import { startSchedulers, shutdownSchedulers } from "./scheduler";
 
 // Re-export helpers for direct import by tests
@@ -23,6 +24,7 @@ export async function registerRoutes(app: Express): Promise<void> {
   registerSettingsRoutes(app);
   registerStatusRoutes(app);
   registerGarageRoutes(app);
+  registerPushRoutes(app);
 
   // Demo-Routes immer registrieren (Runtime-Check auf demoMode erfolgt in den Routes selbst)
   // Dies ermöglicht Demo-Modus-Toggle zur Laufzeit ohne Server-Neustart
