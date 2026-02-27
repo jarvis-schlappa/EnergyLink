@@ -88,6 +88,45 @@ Nutzt die bestehende FHEM HTTP-API (Port 8083) zur Steuerung. Details siehe [Gar
 
 Der Demo-Modus simuliert KEBA Wallbox, E3DC S10 und FHEM mit realistischen, tageszeitabhängigen Daten.
 
+## TLS/HTTPS
+
+| Parameter | Beschreibung | Standard |
+|-----------|-------------|---------|
+| `tls.enabled` | HTTPS aktivieren | `false` |
+| `tls.certPath` | Pfad zum Zertifikat | `certs/cert.pem` |
+| `tls.keyPath` | Pfad zum Private Key | `certs/key.pem` |
+
+iOS erfordert HTTPS für Service Worker und Push-Benachrichtigungen. Empfohlener Ansatz für Tailscale-Nutzer:
+
+```bash
+tailscale cert <hostname>.tailnet.ts.net
+mkdir -p certs
+mv <hostname>.crt certs/cert.pem
+mv <hostname>.key certs/key.pem
+```
+
+Alternativ: [mkcert](https://github.com/FiloSottile/mkcert) für lokale Entwicklung.
+
+Wenn TLS aktiviert ist aber die Zertifikatdateien fehlen, fällt der Server automatisch auf HTTP zurück.
+
+## Web Push-Benachrichtigungen
+
+| Parameter | Beschreibung | Standard |
+|-----------|-------------|---------|
+| `webPush.enabled` | Browser-Push aktivieren | `false` |
+| `webPush.vapidPublicKey` | VAPID Public Key (auto-generiert) | — |
+| `webPush.vapidPrivateKey` | VAPID Private Key (auto-generiert) | — |
+| `webPush.subscriptions` | Registrierte Geräte | `[]` |
+
+VAPID-Keys werden beim ersten Aktivieren automatisch generiert. Kein Apple Developer Account nötig.
+
+Push-Benachrichtigungen nutzen dieselben Event-Toggles wie Prowl – ein Switch steuert beide Kanäle.
+
+### Voraussetzungen für iOS
+- PWA muss zum Homescreen hinzugefügt sein
+- HTTPS erforderlich (siehe TLS-Konfiguration oben)
+- Explizite Benutzer-Geste für die Push-Berechtigung
+
 ## Prowl-Benachrichtigungen
 
 | Parameter | Beschreibung |
@@ -96,6 +135,8 @@ Der Demo-Modus simuliert KEBA Wallbox, E3DC S10 und FHEM mit realistischen, tage
 | `prowlEvents.*` | Einzelne Events aktivieren/deaktivieren |
 
 Events: Ladestart/-stopp, Kabel ein-/ausstecken, Strategiewechsel, Fehler.
+
+> **Hinweis:** Event-Toggles werden mit Web Push geteilt. Ein Toggle steuert beide Kanäle gleichzeitig.
 
 ---
 
