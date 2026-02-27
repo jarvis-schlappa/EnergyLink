@@ -318,7 +318,17 @@ describe("Settings Tabs", () => {
     const SettingsPage = await importSettingsPage();
     const queryClient = new QueryClient({
       defaultOptions: {
-        queries: { retry: false, staleTime: Infinity },
+        queries: {
+          retry: false,
+          staleTime: Infinity,
+          queryFn: async ({ queryKey }) => {
+            const url = queryKey[0] as string;
+            if (url === "/api/settings") return mockSettings;
+            if (url === "/api/build-info") return mockBuildInfo;
+            if (url === "/api/wallbox/status") return { state: 3, plug: 7, enableSys: 1, maxCurr: 32000, ePres: 0, eTotal: 0, power: 0 };
+            return {};
+          },
+        },
         mutations: { retry: false },
       },
     });
