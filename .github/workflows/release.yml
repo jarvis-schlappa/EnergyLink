@@ -33,8 +33,14 @@ jobs:
 
       - name: Update package.json version
         run: |
-          npm version "${{ steps.version.outputs.version }}" --no-git-tag-version
-          echo "Updated package.json to ${{ steps.version.outputs.version }}"
+          CURRENT=$(node -p "require('./package.json').version")
+          TARGET="${{ steps.version.outputs.version }}"
+          if [ "$CURRENT" = "$TARGET" ]; then
+            echo "package.json already at $TARGET – skipping"
+          else
+            npm version "$TARGET" --no-git-tag-version
+            echo "Updated package.json to $TARGET"
+          fi
 
       - name: Verify build
         run: |
@@ -48,11 +54,12 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add package.json package-lock.json
-          git diff --cached --quiet && echo "No changes to commit" && exit 0
-          git commit -m "chore: bump version to ${{ steps.version.outputs.version }}"
-          git push origin main
+          git diff --cached --quiet && echo "No changes to commit – moving tag only" || {
+            git commit -m "chore: bump version to ${{ steps.version.outputs.version }}"
+            git push origin main
+          }
 
-          # Move the release tag to include the version bump commit
+          # Move the release tag to HEAD (includes version bump if any)
           # so build-info.ts resolves the clean version (not -dev+hash)
           TAG="${{ github.event.release.tag_name }}"
           git tag -f "$TAG"
