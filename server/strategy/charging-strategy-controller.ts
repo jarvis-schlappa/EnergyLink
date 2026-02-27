@@ -575,6 +575,12 @@ export class ChargingStrategyController {
     
     log("debug", "system", `shouldStartCharging: strategy=${strategy}, surplus=${surplus}W, plug=${this.lastPlugStatus}`);
     
+    // Restart-Loop-Schutz: Wenn Auto Ladung beendet hat, nicht erneut starten
+    if (context.vehicleFinishedCharging) {
+      log("debug", "system", `shouldStartCharging: vehicleFinishedCharging=true → return false (Auto hat Ladung beendet)`);
+      return false;
+    }
+    
     // Issue #105: Strategie "off" darf NIEMALS Ladung starten
     if (strategy === "off") {
       log("debug", "system", `shouldStartCharging: strategy=off → return false`);
@@ -668,7 +674,15 @@ export class ChargingStrategyController {
       const currents = [report3.I1 || 0, report3.I2 || 0, report3.I3 || 0];  // Ströme in mA
       
       // Speichere Plug-Status (1=kein Kabel, 7=Auto bereit)
+      const previousPlugStatus = this.lastPlugStatus;
       this.lastPlugStatus = report2.Plug || 1;
+      
+      // Plug-Wechsel → vehicleFinishedCharging zurücksetzen
+      // Auto wurde ab-/angesteckt → nächster Ladeversuch soll erlaubt sein
+      if (previousPlugStatus !== this.lastPlugStatus && context.vehicleFinishedCharging) {
+        log("info", "system", `[RECONCILE] Plug-Wechsel (${previousPlugStatus} → ${this.lastPlugStatus}) → vehicleFinishedCharging zurückgesetzt`);
+        storage.updateChargingContext({ vehicleFinishedCharging: false });
+      }
       
       // Wallbox lädt wirklich, wenn State=3 UND Power>0
       const reallyCharging = wallboxState === 3 && wallboxPower > 1000;  // >1W
@@ -700,12 +714,19 @@ export class ChargingStrategyController {
           }
         }
         
+        // Auto hat Ladung beendet: Plug=7 (noch verbunden) aber Wallbox lädt nicht
+        // → vehicleFinishedCharging setzen um Restart-Loop zu verhindern
+        const vehicleStillConnected = this.lastPlugStatus === 7;
+        if (vehicleStillConnected) {
+          log("info", "system", `[RECONCILE] Auto noch verbunden (Plug=7) aber Wallbox gestoppt → vehicleFinishedCharging=true (verhindert Restart-Loop)`);
+        }
         log("info", "system", `[RECONCILE] Context sagt isActive=true, aber Wallbox lädt nicht (State=${wallboxState}, Power=${wallboxPower}mW) → setze isActive=false`);
         storage.updateChargingContext({
           isActive: false,
           currentAmpere: 0,
           targetAmpere: 0,
           currentPhases: detectedPhases,
+          ...(vehicleStillConnected ? { vehicleFinishedCharging: true } : {}),
         });
       } else if (!context.isActive && reallyCharging) {
         log("info", "system", `[RECONCILE] Context sagt isActive=false, aber Wallbox lädt (State=${wallboxState}, Power=${wallboxPower}mW) → setze isActive=true`);
@@ -1031,6 +1052,12 @@ export class ChargingStrategyController {
     }
     
     log("info", "system", `Strategie-Wechsel: ${oldStrategy} → ${newStrategy}`);
+    
+    // Strategie-Wechsel → vehicleFinishedCharging zurücksetzen
+    if (context.vehicleFinishedCharging) {
+      log("info", "system", `[switchStrategy] vehicleFinishedCharging zurückgesetzt (Strategie-Wechsel)`);
+      storage.updateChargingContext({ vehicleFinishedCharging: false });
+    }
     
     // Bei Strategie-Wechsel IMMER stoppen (falls aktiv), dann neu starten
     if (context.isActive) {

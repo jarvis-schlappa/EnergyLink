@@ -25,6 +25,7 @@ vi.mock("../core/storage", () => ({
     saveSettings: vi.fn((s: any) => { mockSettings = s; }),
     getChargingContext: vi.fn(() => mockChargingContext),
     saveChargingContext: vi.fn((c: any) => { mockChargingContext = c; }),
+    updateChargingContext: vi.fn((updates: any) => { mockChargingContext = { ...mockChargingContext, ...updates }; }),
     getControlState: vi.fn(() => mockControlState),
     saveControlState: vi.fn((s: any) => { mockControlState = s; }),
     getPlugStatusTracking: vi.fn(() => mockPlugTracking),
@@ -273,5 +274,111 @@ describe("Broadcast Listener", () => {
       // Rollback: stopChargingOnly should be called
       expect(mockStopChargingOnly).toHaveBeenCalled();
     });
+  });
+});
+
+// --- Vehicle Finished Charging Detection (Broadcast-based) ---
+
+describe("Broadcast Listener - Vehicle Finished Charging Detection", () => {
+  let startBroadcastListener: typeof import("../wallbox/broadcast-listener").startBroadcastListener;
+  let stopBroadcastListener: typeof import("../wallbox/broadcast-listener").stopBroadcastListener;
+  let broadcastHandler: (data: any, rinfo: any) => Promise<void>;
+
+  const fakeRinfo = { address: "192.168.40.16", port: 7090, family: "IPv4", size: 0 };
+  const mockUdpSender = vi.fn().mockResolvedValue({});
+
+  beforeEach(async () => {
+    vi.clearAllMocks();
+    mockSettings = {
+      wallboxIp: "192.168.40.16",
+      chargingStrategy: { activeStrategy: "surplus_vehicle_prio", inputX1Strategy: "max_without_battery" },
+      prowl: { enabled: false },
+    };
+    mockChargingContext = {
+      strategy: "surplus_vehicle_prio",
+      isActive: true,
+      currentAmpere: 10,
+      targetAmpere: 10,
+      currentPhases: 1,
+    };
+    mockPlugTracking = {};
+
+    vi.resetModules();
+    const mod = await import("../wallbox/broadcast-listener");
+    startBroadcastListener = mod.startBroadcastListener;
+    stopBroadcastListener = mod.stopBroadcastListener;
+
+    await startBroadcastListener(mockUdpSender);
+    broadcastHandler = mockOnBroadcast.mock.calls[0][0];
+  });
+
+  afterEach(async () => {
+    await stopBroadcastListener();
+  });
+
+  it("sets vehicleFinishedCharging when State goes 3→2 with Plug=7 and isActive=true", async () => {
+    // Initialize Plug and State
+    await broadcastHandler({ Plug: 7 }, fakeRinfo); // init plug
+    await broadcastHandler({ State: 3 }, fakeRinfo); // init state (charging)
+
+    // Car finishes charging → State 3→2
+    await broadcastHandler({ State: 2 }, fakeRinfo);
+
+    const { storage } = await import("../core/storage");
+    expect(storage.updateChargingContext).toHaveBeenCalledWith(
+      expect.objectContaining({ vehicleFinishedCharging: true })
+    );
+  });
+
+  it("does NOT set vehicleFinishedCharging when State goes 3→2 with Plug≠7", async () => {
+    // Plug is 3 (cable connected but no car)
+    await broadcastHandler({ Plug: 3 }, fakeRinfo); // init plug
+    await broadcastHandler({ State: 3 }, fakeRinfo); // init state (charging)
+
+    // State 3→2
+    await broadcastHandler({ State: 2 }, fakeRinfo);
+
+    const { storage } = await import("../core/storage");
+    const vehicleCalls = (storage.updateChargingContext as any).mock.calls.filter(
+      (call: any[]) => call[0]?.vehicleFinishedCharging === true
+    );
+    expect(vehicleCalls).toHaveLength(0);
+  });
+
+  it("does NOT set vehicleFinishedCharging when WE stopped charging (isActive=false)", async () => {
+    // We already stopped → isActive=false
+    mockChargingContext = {
+      ...mockChargingContext,
+      isActive: false,
+      currentAmpere: 0,
+    };
+
+    await broadcastHandler({ Plug: 7 }, fakeRinfo); // init plug
+    await broadcastHandler({ State: 3 }, fakeRinfo); // init state
+
+    // State 3→2 (but we stopped it, isActive is already false)
+    await broadcastHandler({ State: 2 }, fakeRinfo);
+
+    const { storage } = await import("../core/storage");
+    const vehicleCalls = (storage.updateChargingContext as any).mock.calls.filter(
+      (call: any[]) => call[0]?.vehicleFinishedCharging === true
+    );
+    expect(vehicleCalls).toHaveLength(0);
+  });
+
+  it("does NOT set vehicleFinishedCharging on State transitions other than 3→2", async () => {
+    mockChargingContext.isActive = true;
+
+    await broadcastHandler({ Plug: 7 }, fakeRinfo); // init plug
+    await broadcastHandler({ State: 1 }, fakeRinfo); // init state
+
+    // State 1→2 (not from charging)
+    await broadcastHandler({ State: 2 }, fakeRinfo);
+
+    const { storage } = await import("../core/storage");
+    const vehicleCalls = (storage.updateChargingContext as any).mock.calls.filter(
+      (call: any[]) => call[0]?.vehicleFinishedCharging === true
+    );
+    expect(vehicleCalls).toHaveLength(0);
   });
 });

@@ -29,6 +29,12 @@ let isEnabled = false;
 let sendUdpCommand: ((ip: string, command: string) => Promise<any>) | null =
   null;
 
+// Zähler für E-pres-Events seit letztem vollen Status-Broadcast.
+// Alle EPRES_FULL_STATUS_INTERVAL Events wird ein voller Status geholt,
+// damit power/phases/currents live im GUI aktualisiert werden.
+let epresCountSinceFullStatus = 0;
+const EPRES_FULL_STATUS_INTERVAL = 5;
+
 // Handler für Broadcast-Nachrichten (async für stopChargingForStrategyOff)
 const handleBroadcast = async (data: any, rinfo: any) => {
   let targetStrategy: any = null;
@@ -193,6 +199,24 @@ const handleBroadcast = async (data: any, rinfo: any) => {
         
         // Vollständigen Status im Hintergrund holen für alle Felder
         void fetchAndBroadcastStatus("State-Änderung");
+        
+        // Frühe "Auto voll"-Erkennung: State 3→2 bei Plug=7 und WIR haben nicht gestoppt
+        // Wenn lastState===3 (charging) und neuer state===2 (ready, not charging)
+        // und Auto noch angesteckt (lastPlugStatus===7) und context sagt isActive=true
+        // → das Auto hat die Ladung selbst beendet (nicht wir per ena 0)
+        // Begründung: Wenn WIR stoppen, setzt stopCharging() isActive=false BEVOR
+        // der State-Broadcast kommt. Also: isActive=true → Auto hat gestoppt.
+        if (lastState === 3 && (state === 2 || state === 5) && lastPlugStatus === 7) {
+          const context = storage.getChargingContext();
+          if (context.isActive) {
+            log(
+              "info",
+              "system",
+              "[Wallbox-Broadcast-Listener] Auto hat Ladung beendet (State 3→" + state + " bei Plug=7, isActive=true) → vehicleFinishedCharging=true",
+            );
+            storage.updateChargingContext({ vehicleFinishedCharging: true });
+          }
+        }
       }
 
       lastState = state;
@@ -208,6 +232,17 @@ const handleBroadcast = async (data: any, rinfo: any) => {
         // Broadcast partial SSE update (Wh = raw / 10)
         // Include lastPlugStatus to prevent frontend from losing plug value
         broadcastPartialUpdate({ ePres: epresRaw / 10, ...(lastPlugStatus !== null ? { plug: lastPlugStatus } : {}) });
+
+        // Periodisch vollen Status holen während Ladung aktiv (State=3),
+        // damit power/phases/currents live im GUI aktualisiert werden.
+        // E-pres kommt alle ~1-2s → alle 5 Events ≈ alle 5-10s ein voller Status.
+        if (lastState === 3) {
+          epresCountSinceFullStatus++;
+          if (epresCountSinceFullStatus >= EPRES_FULL_STATUS_INTERVAL) {
+            epresCountSinceFullStatus = 0;
+            void fetchAndBroadcastStatus("E-pres periodisch (Ladeleistung)");
+          }
+        }
       }
     }
 
@@ -572,6 +607,7 @@ export async function stopBroadcastListener(): Promise<void> {
   lastPlugStatus = null;
   lastState = null;
   lastEpres = null;
+  epresCountSinceFullStatus = 0;
   sendUdpCommand = null;
   log("info", "system", "✅ [Wallbox-Broadcast-Listener] Gestoppt");
 }
