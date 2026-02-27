@@ -37,6 +37,18 @@ const EPRES_FULL_STATUS_INTERVAL = 5;
 
 // Handler für Broadcast-Nachrichten (async für stopChargingForStrategyOff)
 const handleBroadcast = async (data: any, rinfo: any) => {
+  // IP-Filter: Nur Broadcasts von der konfigurierten Wallbox-IP verarbeiten (Fixes #40)
+  // Wenn wallboxIp nicht konfiguriert → durchlassen (Fallback für unkonfigurierte Systeme)
+  const currentSettings = storage.getSettings();
+  if (currentSettings?.wallboxIp && rinfo.address !== currentSettings.wallboxIp) {
+    log(
+      "debug",
+      "system",
+      `[Wallbox-Broadcast-Listener] Broadcast von fremder IP ignoriert: ${rinfo.address} (erwartet: ${currentSettings.wallboxIp})`,
+    );
+    return;
+  }
+
   let targetStrategy: any = null;
 
   try {

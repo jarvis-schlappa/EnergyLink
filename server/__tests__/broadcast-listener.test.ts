@@ -275,6 +275,46 @@ describe("Broadcast Listener", () => {
       expect(mockStopChargingOnly).toHaveBeenCalled();
     });
   });
+
+  describe("IP Filter (Issue #40)", () => {
+    it("processes broadcast from correct wallbox IP", async () => {
+      // fakeRinfo.address matches mockSettings.wallboxIp ("192.168.40.16")
+      await broadcastHandler({ Plug: 7 }, fakeRinfo);
+      const { storage } = await import("../core/storage");
+      expect(storage.savePlugStatusTracking).toHaveBeenCalledWith(
+        expect.objectContaining({ lastPlugStatus: 7 })
+      );
+    });
+
+    it("ignores broadcast from foreign IP and logs it", async () => {
+      const foreignRinfo = { address: "192.168.40.33", port: 7090, family: "IPv4", size: 0 };
+      await broadcastHandler({ Plug: 0 }, foreignRinfo);
+
+      // Should NOT process the plug status
+      const { storage } = await import("../core/storage");
+      expect(storage.savePlugStatusTracking).not.toHaveBeenCalled();
+
+      // Should log the rejected broadcast
+      const filterLogs = mockLog.mock.calls.filter(
+        (c: any[]) => c[2]?.includes?.("fremder IP ignoriert")
+      );
+      expect(filterLogs).toHaveLength(1);
+      expect(filterLogs[0][2]).toContain("192.168.40.33");
+    });
+
+    it("allows broadcast when wallboxIp is not configured (fallback)", async () => {
+      mockSettings = {
+        chargingStrategy: { activeStrategy: "off", inputX1Strategy: "max_without_battery" },
+        prowl: { enabled: false },
+      };
+      // No wallboxIp → should process normally
+      await broadcastHandler({ Plug: 3 }, fakeRinfo);
+      const { storage } = await import("../core/storage");
+      expect(storage.savePlugStatusTracking).toHaveBeenCalledWith(
+        expect.objectContaining({ lastPlugStatus: 3 })
+      );
+    });
+  });
 });
 
 // --- Vehicle Finished Charging Detection (Broadcast-based) ---
