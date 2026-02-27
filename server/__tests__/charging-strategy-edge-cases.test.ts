@@ -229,4 +229,104 @@ describe("ChargingStrategyController - Edge Cases", () => {
       expect(result).toBe(false);
     });
   });
+
+  describe("Surplus start-delay must not start without car connected (Plug !== 7)", () => {
+    const callShouldStart = (ctrl: any, config: any, surplus: number): boolean => {
+      return ctrl.shouldStartCharging(config, surplus);
+    };
+
+    const makeConfig = (overrides: any = {}) => ({
+      activeStrategy: "surplus_battery_prio" as const,
+      minStartPowerWatt: 1500,
+      stopThresholdWatt: 500,
+      startDelaySeconds: 60,
+      stopDelaySeconds: 120,
+      physicalPhaseSwitch: 1,
+      minCurrentChangeAmpere: 1,
+      minChangeIntervalSeconds: 30,
+      inputX1Strategy: "max_without_battery" as const,
+      ...overrides,
+    });
+
+    it("does NOT start delay timer when no car is connected (Plug=1)", () => {
+      // Bug: Frontend shows "Start in Xs" even though no car is plugged in
+      (storage as any)._setContext({
+        isActive: false,
+        currentPhases: 1,
+      });
+      (controller as any).lastPlugStatus = 1; // No cable
+
+      const result = callShouldStart(controller, makeConfig(), 5000);
+      expect(result).toBe(false);
+
+      // The key assertion: startDelayTrackerSince must NOT be set
+      const context = storage.getChargingContext();
+      expect(context.startDelayTrackerSince).toBeUndefined();
+      expect(context.remainingStartDelay).toBeUndefined();
+    });
+
+    it("resets running delay timer when car is disconnected (Plug=1)", () => {
+      // Scenario: Delay was running (car was connected), then car gets unplugged
+      (storage as any)._setContext({
+        isActive: false,
+        currentPhases: 1,
+        startDelayTrackerSince: new Date(Date.now() - 30000).toISOString(), // 30s ago
+        remainingStartDelay: 30,
+      });
+      (controller as any).lastPlugStatus = 1; // Car disconnected
+
+      const result = callShouldStart(controller, makeConfig(), 5000);
+      expect(result).toBe(false);
+
+      // Delay tracker must be reset
+      const context = storage.getChargingContext();
+      expect(context.startDelayTrackerSince).toBeUndefined();
+      expect(context.remainingStartDelay).toBeUndefined();
+    });
+
+    it("starts delay timer correctly when car IS connected (Plug=7)", () => {
+      (storage as any)._setContext({
+        isActive: false,
+        currentPhases: 1,
+      });
+      (controller as any).lastPlugStatus = 7; // Car connected
+
+      const result = callShouldStart(controller, makeConfig(), 5000);
+      expect(result).toBe(false); // Still false because delay just started
+
+      // But the delay tracker SHOULD be set now
+      const context = storage.getChargingContext();
+      expect(context.startDelayTrackerSince).toBeDefined();
+      expect(context.remainingStartDelay).toBe(60);
+    });
+
+    it("works the same for surplus_vehicle_prio strategy", () => {
+      (storage as any)._setContext({
+        isActive: false,
+        currentPhases: 1,
+      });
+      (controller as any).lastPlugStatus = 1; // No car
+
+      const result = callShouldStart(controller, makeConfig({ activeStrategy: "surplus_vehicle_prio" }), 5000);
+      expect(result).toBe(false);
+
+      const context = storage.getChargingContext();
+      expect(context.startDelayTrackerSince).toBeUndefined();
+      expect(context.remainingStartDelay).toBeUndefined();
+    });
+
+    it("allows delay to complete and start charging when car is connected (Plug=7)", () => {
+      // Full happy path: car connected, delay expired -> should return true
+      (storage as any)._setContext({
+        isActive: false,
+        currentPhases: 1,
+        startDelayTrackerSince: new Date(Date.now() - 120000).toISOString(), // 2min ago (> 60s delay)
+      });
+      (controller as any).lastPlugStatus = 7; // Car connected
+
+      const result = callShouldStart(controller, makeConfig(), 5000);
+      expect(result).toBe(true);
+    });
+  });
+
 });
