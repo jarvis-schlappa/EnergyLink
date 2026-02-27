@@ -98,12 +98,51 @@ Die App erscheint wie eine native App auf dem Startbildschirm.
 
 ---
 
+## HTTPS einrichten (für iOS Push-Benachrichtigungen)
+
+iOS erfordert HTTPS für Push-Benachrichtigungen. Für Tailscale-Nutzer:
+
+```bash
+# Auf dem Server (z.B. Raspberry Pi):
+tailscale cert <hostname>.tailnet.ts.net
+mkdir -p /opt/energylink/certs
+mv <hostname>.crt /opt/energylink/certs/cert.pem
+mv <hostname>.key /opt/energylink/certs/key.pem
+```
+
+In `data/settings.json`:
+```json
+{
+  "tls": {
+    "enabled": true,
+    "certPath": "certs/cert.pem",
+    "keyPath": "certs/key.pem"
+  }
+}
+```
+
+> **Voraussetzung:** HTTPS muss im Tailscale Admin Panel aktiviert sein (DNS → Enable HTTPS).
+
+---
+
+## Push-Benachrichtigungen einrichten
+
+1. **HTTPS aktivieren** (siehe oben) – erforderlich für iOS
+2. **PWA installieren** – Push funktioniert nur aus der installierten App
+3. **In den Settings:** Browser Push aktivieren → „Browser für Push registrieren"
+4. **Event-Toggles konfigurieren** – wähle welche Events Benachrichtigungen auslösen
+
+Push-Benachrichtigungen sehen auf iOS aus wie native Notifications (Lockscreen, Banner, Notification Center).
+
+---
+
 ## Erste Schritte nach der Installation
 
 1. **Wallbox-IP konfigurieren** – Einstellungen → IP-Adresse der KEBA Wallbox eintragen
-2. **E3DC aktivieren** (optional) – IP + Port des E3DC S10 eintragen (z.B. `192.168.40.50:502`)
+2. **E3DC aktivieren** (optional) – IP + Port des E3DC S10 eintragen
 3. **Ladestrategie wählen** – Siehe [Ladestrategien](charging-strategies.md)
-4. **Feintuning** – Schwellwerte und Verzögerungen anpassen, siehe [Konfiguration](configuration.md)
+4. **HTTPS + Push** (optional) – Siehe Abschnitte oben
+5. **Feintuning** – Schwellwerte und Verzögerungen anpassen, siehe [Konfiguration](configuration.md)
 
 ---
 

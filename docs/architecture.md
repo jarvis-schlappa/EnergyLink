@@ -1,6 +1,6 @@
 # Architektur
 
-Technischer Überblick über den Aufbau von EnergyLink (v1.0.2).
+Technischer Überblick über den Aufbau von EnergyLink (v2.0.2).
 
 ## Systemübersicht
 

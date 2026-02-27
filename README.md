@@ -1,7 +1,7 @@
 # EnergyLink
 
 [![CI](https://github.com/mschlappa/EnergyLink/actions/workflows/ci.yml/badge.svg)](https://github.com/mschlappa/EnergyLink/actions)
-![Version](https://img.shields.io/badge/version-1.0.2-blue)
+![Version](https://img.shields.io/badge/version-2.0.2-blue)
 ![Lizenz](https://img.shields.io/badge/license-MIT-green)
 
 Intelligente Wallbox-Steuerung für KEBA Ladestationen mit E3DC S10 Integration. Optimiert das Laden Ihres Elektrofahrzeugs mit PV-Überschuss, zeitgesteuerten Ladefenstern und SmartHome-Anbindung – als Progressive Web App direkt vom Smartphone.
@@ -19,7 +19,10 @@ Intelligente Wallbox-Steuerung für KEBA Ladestationen mit E3DC S10 Integration.
 - ⏰ **Zeitgesteuerte Ladung** – Nachtstrom-Tarife automatisch nutzen
 - 📊 **Echtzeit-Dashboard** – Ladeleistung, PV, Batterie-SOC, Netzfluss
 - 🏡 **SmartHome** – FHEM-Sync, potenzialfreier Kontakt (X1), Prowl-Benachrichtigungen
-- 📱 **PWA** – Installierbar, Touch-optimiert, offline-fähig
+- 🔔 **Push-Benachrichtigungen** – Native Browser-Push (PWA) + Prowl, konfigurierbare Events
+- 🔒 **HTTPS/TLS** – Optionales TLS für sicheren LAN-Zugriff (Tailscale / mkcert)
+- 🚗 **Garagentor** – FHEM-Integration mit Auto-Close bei Kabel-Einstecken
+- 📱 **PWA** – Installierbar, Touch-optimiert, Push-Benachrichtigungen
 
 ## Quick Start
 
@@ -52,13 +55,14 @@ NODE_ENV=production node dist/index.js
 | [Architektur](docs/architecture.md) | Systemaufbau, Interfaces, Tests |
 | [Use Cases](docs/use-cases.md) | Praxisszenarien mit Event-Flows |
 | [Design Guidelines](docs/design-guidelines.md) | UI/UX-Richtlinien |
+| [Garagentor](docs/garage-integration.md) | FHEM-basierte Garagentor-Steuerung |
 | [FAQ](docs/faq.md) | Häufige Fragen |
 
 ## Technologie
 
 **Frontend:** React 18, TypeScript, Vite, TanStack Query, shadcn/ui, Tailwind CSS  
 **Backend:** Node.js, Express, Modbus TCP, UDP (KEBA), Zod-Validierung  
-**Tests:** 185 Tests (Vitest + Supertest), CI via GitHub Actions
+**Tests:** 690+ Tests (Vitest + Supertest), CI via GitHub Actions
 
 ## Lizenz
 
