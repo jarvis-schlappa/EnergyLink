@@ -2,6 +2,8 @@ import { DEFAULT_WALLBOX_IP } from "../core/defaults";
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { ChargingStrategyController } from "../strategy/charging-strategy-controller";
 import { RealPhaseProvider } from "../strategy/phase-provider";
+import { deriveState, evaluate } from "../strategy/charging-state-machine";
+import type { StateInput, StateConfig } from "../strategy/charging-state-machine";
 import type { E3dcLiveData } from "@shared/schema";
 
 // Mock all external dependencies (same pattern as charging-strategy.test.ts)
@@ -269,16 +271,33 @@ describe("Car Full → Restart Loop Prevention", () => {
     expect(context.vehicleFinishedCharging).toBe(true); // NEW field
   });
 
-  it("shouldStartCharging returns false when vehicleFinishedCharging is true", () => {
-    (storage as any)._setContext({
-      strategy: "surplus_vehicle_prio",
+  it("state machine stays in CAR_FINISHED when vehicleFinishedCharging is true", () => {
+    // State machine replaces shouldStartCharging: CAR_FINISHED state prevents restart
+    const state = deriveState({
       isActive: false,
       vehicleFinishedCharging: true,
     });
-    (controller as any).lastPlugStatus = 7;
+    expect(state).toBe("CAR_FINISHED");
 
-    const config = storage.getSettings()!.chargingStrategy!;
-    const result = (controller as any).shouldStartCharging(config, 5000);
-    expect(result).toBe(false);
+    const input: StateInput = {
+      surplus: 5000,
+      plug: 7,
+      wallboxReallyCharging: false,
+      targetCurrentMa: 6000,
+      userLimitAmpere: undefined,
+      strategy: "surplus_vehicle_prio",
+      isMaxPower: false,
+    };
+    const config: StateConfig = {
+      minStartPowerWatt: 1500,
+      stopThresholdWatt: 500,
+      startDelaySeconds: 0,
+      stopDelaySeconds: 120,
+    };
+    const transition = evaluate(state, input, config, {
+      stabilizationPeriodMs: 20000,
+    });
+    expect(transition.newState).toBe("CAR_FINISHED");
+    expect(transition.actions.some(a => a.type === "START_CHARGING")).toBe(false);
   });
 });

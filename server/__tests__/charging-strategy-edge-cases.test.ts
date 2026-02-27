@@ -2,6 +2,8 @@ import { DEFAULT_WALLBOX_IP } from "../core/defaults";
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { ChargingStrategyController } from "../strategy/charging-strategy-controller";
 import { RealPhaseProvider } from "../strategy/phase-provider";
+import { deriveState, evaluate } from "../strategy/charging-state-machine";
+import type { StateInput, StateConfig } from "../strategy/charging-state-machine";
 import type { E3dcLiveData } from "@shared/schema";
 
 // Reuse mocks from charging-strategy.test.ts
@@ -181,151 +183,137 @@ describe("ChargingStrategyController - Edge Cases", () => {
     });
   });
 
-  describe("Issue #105: shouldStartCharging must return false when strategy is 'off'", () => {
-    const callShouldStart = (ctrl: any, config: any, surplus: number): boolean => {
-      return ctrl.shouldStartCharging(config, surplus);
-    };
-
-    const makeConfig = (overrides: any = {}) => ({
-      activeStrategy: "off" as const,
+  describe("Issue #105: strategy 'off' must never produce START_CHARGING action", () => {
+    const makeStateConfig = (): StateConfig => ({
       minStartPowerWatt: 1500,
       stopThresholdWatt: 500,
       startDelaySeconds: 60,
       stopDelaySeconds: 120,
-      physicalPhaseSwitch: 1,
-      minCurrentChangeAmpere: 1,
-      minChangeIntervalSeconds: 30,
-      inputX1Strategy: "max_without_battery" as const,
-      ...overrides,
     });
 
-    it("returns false when strategy is 'off' even with high surplus", () => {
+    it("stays IDLE when strategy is 'off' even with high surplus and car connected", () => {
       // Scenario: X1-OFF sets strategy to "off", but surplus is high enough
-      // to satisfy surplus start conditions. shouldStartCharging MUST still return false.
-      (storage as any)._setContext({
-        isActive: false,
-        currentPhases: 1,
+      // to satisfy surplus start conditions. State machine must NOT produce START_CHARGING.
+      const state = deriveState({ isActive: false });
+      const input: StateInput = {
+        surplus: 5000,
+        plug: 7,
+        wallboxReallyCharging: false,
+        targetCurrentMa: null, // "off" strategy → calculateTargetCurrent returns null
+        userLimitAmpere: undefined,
         strategy: "off",
+        isMaxPower: false,
+      };
+      const transition = evaluate(state, input, makeStateConfig(), {
+        stabilizationPeriodMs: 20000,
       });
-      // Set plug status to 7 (car connected) to rule out plug guard
-      (controller as any).lastPlugStatus = 7;
-
-      const result = callShouldStart(controller, makeConfig({ activeStrategy: "off" }), 5000);
-      expect(result).toBe(false);
+      expect(transition.newState).toBe("IDLE");
+      expect(transition.actions.some(a => a.type === "START_CHARGING")).toBe(false);
     });
 
-    it("returns false when strategy is 'off' even with plug=7 (max_power path guard)", () => {
-      // Edge case: strategy "off" must not fall through to surplus delay logic
-      // which could return true after startDelaySeconds
-      (storage as any)._setContext({
+    it("stays IDLE when strategy is 'off' even with plug=7 and expired delay", () => {
+      // Edge case: strategy "off" must not produce START_CHARGING even with expired delay
+      const state = deriveState({
         isActive: false,
-        currentPhases: 1,
-        strategy: "off",
-        startDelayTrackerSince: new Date(Date.now() - 120000).toISOString(), // 2min ago
+        startDelayTrackerSince: new Date(Date.now() - 120000).toISOString(),
       });
-      (controller as any).lastPlugStatus = 7;
-
-      const result = callShouldStart(controller, makeConfig({ activeStrategy: "off" }), 5000);
-      expect(result).toBe(false);
+      const input: StateInput = {
+        surplus: 5000,
+        plug: 7,
+        wallboxReallyCharging: false,
+        targetCurrentMa: null, // "off" strategy → calculateTargetCurrent returns null
+        userLimitAmpere: undefined,
+        strategy: "off",
+        isMaxPower: false,
+      };
+      const transition = evaluate(state, input, makeStateConfig(), {
+        startDelayTrackerSince: new Date(Date.now() - 120000).toISOString(),
+        stabilizationPeriodMs: 20000,
+      });
+      // State machine resets to IDLE because surplus < minStartPowerWatt is handled,
+      // but more importantly: targetCurrentMa=null means no start possible
+      expect(transition.actions.some(a => a.type === "START_CHARGING")).toBe(false);
     });
   });
 
   describe("Surplus start-delay must not start without car connected (Plug !== 7)", () => {
-    const callShouldStart = (ctrl: any, config: any, surplus: number): boolean => {
-      return ctrl.shouldStartCharging(config, surplus);
-    };
-
-    const makeConfig = (overrides: any = {}) => ({
-      activeStrategy: "surplus_battery_prio" as const,
+    const makeStateConfig = (): StateConfig => ({
       minStartPowerWatt: 1500,
       stopThresholdWatt: 500,
       startDelaySeconds: 60,
       stopDelaySeconds: 120,
-      physicalPhaseSwitch: 1,
-      minCurrentChangeAmpere: 1,
-      minChangeIntervalSeconds: 30,
-      inputX1Strategy: "max_without_battery" as const,
+    });
+
+    const makeSurplusInput = (overrides: Partial<StateInput> = {}): StateInput => ({
+      surplus: 5000,
+      plug: 1,
+      wallboxReallyCharging: false,
+      targetCurrentMa: 6000, // Enough surplus for 6A
+      userLimitAmpere: undefined,
+      strategy: "surplus_battery_prio",
+      isMaxPower: false,
       ...overrides,
     });
 
-    it("does NOT start delay timer when no car is connected (Plug=1)", () => {
+    it("does NOT produce START_DELAY_BEGIN when no car is connected (Plug=1)", () => {
       // Bug: Frontend shows "Start in Xs" even though no car is plugged in
-      (storage as any)._setContext({
-        isActive: false,
-        currentPhases: 1,
+      const state = deriveState({ isActive: false });
+      const transition = evaluate(state, makeSurplusInput({ plug: 1 }), makeStateConfig(), {
+        stabilizationPeriodMs: 20000,
       });
-      (controller as any).lastPlugStatus = 1; // No cable
-
-      const result = callShouldStart(controller, makeConfig(), 5000);
-      expect(result).toBe(false);
-
-      // The key assertion: startDelayTrackerSince must NOT be set
-      const context = storage.getChargingContext();
-      expect(context.startDelayTrackerSince).toBeUndefined();
-      expect(context.remainingStartDelay).toBeUndefined();
+      expect(transition.newState).toBe("IDLE");
+      expect(transition.actions.some(a => a.type === "START_DELAY_BEGIN")).toBe(false);
     });
 
     it("resets running delay timer when car is disconnected (Plug=1)", () => {
       // Scenario: Delay was running (car was connected), then car gets unplugged
-      (storage as any)._setContext({
-        isActive: false,
-        currentPhases: 1,
-        startDelayTrackerSince: new Date(Date.now() - 30000).toISOString(), // 30s ago
-        remainingStartDelay: 30,
+      const startDelayTrackerSince = new Date(Date.now() - 30000).toISOString();
+      const state = deriveState({ isActive: false, startDelayTrackerSince });
+      expect(state).toBe("WAIT_START"); // Confirm we start in WAIT_START
+
+      const transition = evaluate(state, makeSurplusInput({ plug: 1 }), makeStateConfig(), {
+        startDelayTrackerSince,
+        stabilizationPeriodMs: 20000,
       });
-      (controller as any).lastPlugStatus = 1; // Car disconnected
-
-      const result = callShouldStart(controller, makeConfig(), 5000);
-      expect(result).toBe(false);
-
-      // Delay tracker must be reset
-      const context = storage.getChargingContext();
-      expect(context.startDelayTrackerSince).toBeUndefined();
-      expect(context.remainingStartDelay).toBeUndefined();
+      expect(transition.newState).toBe("IDLE");
+      expect(transition.actions.some(a => a.type === "START_DELAY_RESET")).toBe(true);
     });
 
-    it("starts delay timer correctly when car IS connected (Plug=7)", () => {
-      (storage as any)._setContext({
-        isActive: false,
-        currentPhases: 1,
+    it("produces START_DELAY_BEGIN when car IS connected (Plug=7)", () => {
+      const state = deriveState({ isActive: false });
+      const transition = evaluate(state, makeSurplusInput({ plug: 7 }), makeStateConfig(), {
+        stabilizationPeriodMs: 20000,
       });
-      (controller as any).lastPlugStatus = 7; // Car connected
-
-      const result = callShouldStart(controller, makeConfig(), 5000);
-      expect(result).toBe(false); // Still false because delay just started
-
-      // But the delay tracker SHOULD be set now
-      const context = storage.getChargingContext();
-      expect(context.startDelayTrackerSince).toBeDefined();
-      expect(context.remainingStartDelay).toBe(60);
+      expect(transition.newState).toBe("WAIT_START");
+      expect(transition.actions.some(a => a.type === "START_DELAY_BEGIN")).toBe(true);
     });
 
     it("works the same for surplus_vehicle_prio strategy", () => {
-      (storage as any)._setContext({
-        isActive: false,
-        currentPhases: 1,
-      });
-      (controller as any).lastPlugStatus = 1; // No car
-
-      const result = callShouldStart(controller, makeConfig({ activeStrategy: "surplus_vehicle_prio" }), 5000);
-      expect(result).toBe(false);
-
-      const context = storage.getChargingContext();
-      expect(context.startDelayTrackerSince).toBeUndefined();
-      expect(context.remainingStartDelay).toBeUndefined();
+      const state = deriveState({ isActive: false });
+      const transition = evaluate(
+        state,
+        makeSurplusInput({ plug: 1, strategy: "surplus_vehicle_prio" }),
+        makeStateConfig(),
+        { stabilizationPeriodMs: 20000 },
+      );
+      expect(transition.newState).toBe("IDLE");
+      expect(transition.actions.some(a => a.type === "START_DELAY_BEGIN")).toBe(false);
     });
 
-    it("allows delay to complete and start charging when car is connected (Plug=7)", () => {
-      // Full happy path: car connected, delay expired -> should return true
-      (storage as any)._setContext({
-        isActive: false,
-        currentPhases: 1,
-        startDelayTrackerSince: new Date(Date.now() - 120000).toISOString(), // 2min ago (> 60s delay)
-      });
-      (controller as any).lastPlugStatus = 7; // Car connected
+    it("produces START_CHARGING when delay expired and car is connected (Plug=7)", () => {
+      // Full happy path: car connected, delay expired -> should produce START_CHARGING
+      const startDelayTrackerSince = new Date(Date.now() - 120000).toISOString(); // 2min ago (> 60s delay)
+      const state = deriveState({ isActive: false, startDelayTrackerSince });
+      expect(state).toBe("WAIT_START");
 
-      const result = callShouldStart(controller, makeConfig(), 5000);
-      expect(result).toBe(true);
+      const transition = evaluate(
+        state,
+        makeSurplusInput({ plug: 7 }),
+        makeStateConfig(),
+        { startDelayTrackerSince, stabilizationPeriodMs: 20000 },
+      );
+      expect(transition.newState).toBe("CHARGING");
+      expect(transition.actions.some(a => a.type === "START_CHARGING")).toBe(true);
     });
   });
 

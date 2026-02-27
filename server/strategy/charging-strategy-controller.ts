@@ -8,6 +8,7 @@ import { broadcastPartialUpdate } from "../wallbox/sse";
 import { getAuthoritativePlugStatus } from "../wallbox/broadcast-listener";
 import { DEFAULT_WALLBOX_IP } from "../core/defaults";
 import type { PhaseProvider } from "./phase-provider";
+import { deriveState, evaluate, type StateInput, type StateConfig, type StateAction, type ChargingState } from "./charging-state-machine";
 
 const PHASE_VOLTAGE_1P = 230;
 const MIN_CURRENT_AMPERE = 6;
@@ -327,7 +328,7 @@ export class ChargingStrategyController {
     }
   }
 
-  async processStrategy(liveData: E3dcLiveData, wallboxIp: string): Promise<void> {
+async processStrategy(liveData: E3dcLiveData, wallboxIp: string): Promise<void> {
     this.lastE3dcData = liveData;
     
     const settings = storage.getSettings();
@@ -339,7 +340,6 @@ export class ChargingStrategyController {
     
     // WICHTIG: Prüfe "off"-Strategie VOR reconcile, um repetitive Stops zu vermeiden
     if (config.activeStrategy === "off") {
-      // Verwende stopChargingForStrategyOff für idempotentes Stoppen
       await this.stopChargingForStrategyOff(wallboxIp);
       return;
     }
@@ -357,18 +357,23 @@ export class ChargingStrategyController {
     const surplus = this.calculateSurplus(config.activeStrategy, liveData);
     storage.updateChargingContext({ calculatedSurplus: surplus });
     
+    const isMaxPower = config.activeStrategy === "max_with_battery" || config.activeStrategy === "max_without_battery";
+    
     log("debug", "system", `Strategy: ${config.activeStrategy}, isActive: ${context.isActive}, surplus: ${surplus}W`);
     
-    if (this.shouldStopCharging(config, surplus, liveData)) {
-      log("debug", "system", `shouldStopCharging = true → stopCharging`);
-      await this.stopCharging(wallboxIp, "Überschuss zu gering");
-      return;
-    }
+    // ─── State Machine: derive state → evaluate → execute actions ───
+    const currentState = deriveState({
+      isActive: context.isActive,
+      vehicleFinishedCharging: context.vehicleFinishedCharging,
+      startDelayTrackerSince: context.startDelayTrackerSince,
+      belowThresholdSince: context.belowThresholdSince,
+    });
     
     const result = this.calculateTargetCurrent(config, surplus, liveData);
     const currentPhases = context.currentPhases;
     const userLimitAmpere = context.userCurrentLimitAmpere;
     
+    // Logging for target current (unchanged from original)
     if (result && userLimitAmpere && userLimitAmpere * 1000 < result.currentMa) {
       const effectiveMa = userLimitAmpere * 1000;
       log("debug", "system", `calculateTargetCurrent: Strategy=${result.currentMa}mA, User-Limit=${effectiveMa}mA → effektiv ${effectiveMa}mA @ ${currentPhases}P`);
@@ -376,47 +381,132 @@ export class ChargingStrategyController {
       log("debug", "system", `calculateTargetCurrent result: ${result ? `${result.currentMa}mA @ ${currentPhases}P` : 'null'}`);
     }
     
-    if (result === null) {
-      if (context.isActive) {
-        // WÄHREND aktiver Ladung: null bedeutet "Überschuss unter Mindest-Anpassungsleistung"
-        // (surplus < 1380W @ 1P, reicht nicht für 6A Minimum)
-        //
-        // NICHT sofort stoppen! shouldStopCharging() (oben) verwaltet bereits den
-        // Stopp-Timer via stopThresholdWatt und stopDelaySeconds.
-        // Sofortiges Stoppen hier würde diese Konfiguration umgehen und zu
-        // Start-Stop-Loops führen (Issue #33).
-        //
-        // Beide Surplus-Strategien: Wallbox läuft weiter mit dem zuletzt gesetzten Strom.
-        log("debug", "system", `[${config.activeStrategy}] result=null aber isActive - Wallbox lädt weiter (shouldStopCharging verwaltet Stopp-Timer)`);
-      }
-      return;
-    }
+    const pollingIntervalSeconds = settings?.e3dc?.pollingIntervalSeconds || 10;
+    const stabilizationPeriodMs = pollingIntervalSeconds * 2 * 1000;
     
-    if (!context.isActive) {
-      log("debug", "system", `!isActive → prüfe shouldStartCharging`);
-      if (this.shouldStartCharging(config, surplus)) {
-        const startCurrentMa = (userLimitAmpere && userLimitAmpere * 1000 < result.currentMa) ? userLimitAmpere * 1000 : result.currentMa;
-        if (startCurrentMa < result.currentMa) {
-          log("debug", "system", `shouldStartCharging = true → startCharging: Strategy=${result.currentMa}mA, User-Limit=${startCurrentMa}mA → sende ${startCurrentMa}mA @ ${currentPhases}P`);
-        } else {
-          log("debug", "system", `shouldStartCharging = true → startCharging mit ${result.currentMa}mA @ ${currentPhases}P`);
+    const stateInput: StateInput = {
+      surplus,
+      plug: this.lastPlugStatus,
+      wallboxReallyCharging: context.isActive,
+      targetCurrentMa: result ? result.currentMa : null,
+      userLimitAmpere,
+      strategy: config.activeStrategy,
+      isMaxPower,
+    };
+    
+    const stateConfig: StateConfig = {
+      minStartPowerWatt: config.minStartPowerWatt,
+      stopThresholdWatt: config.stopThresholdWatt,
+      startDelaySeconds: config.startDelaySeconds,
+      stopDelaySeconds: config.stopDelaySeconds,
+    };
+    
+    const transition = evaluate(currentState, stateInput, stateConfig, {
+      startDelayTrackerSince: context.startDelayTrackerSince,
+      belowThresholdSince: context.belowThresholdSince,
+      lastStartedAt: context.lastStartedAt,
+      stabilizationPeriodMs,
+    });
+    
+    log("debug", "system", `[StateMachine] ${currentState} → ${transition.newState} (actions: ${transition.actions.map(a => a.type).join(', ')})`);
+    
+    // ─── Execute actions ───
+    for (const action of transition.actions) {
+      switch (action.type) {
+        case "START_CHARGING": {
+          log("debug", "system", `[StateMachine] START_CHARGING → startCharging mit ${action.currentMa / 1000}A @ ${currentPhases}P`);
+          await this.startCharging(wallboxIp, action.currentMa, config);
+          break;
         }
-        await this.startCharging(wallboxIp, startCurrentMa, config);
-      } else {
-        log("debug", "system", `shouldStartCharging = false → warte noch`);
-      }
-    } else {
-      if (userLimitAmpere && userLimitAmpere * 1000 < result.currentMa) {
-        log("debug", "system", `isActive → adjustCurrent: Strategy=${result.currentMa}mA, User-Limit=${userLimitAmpere * 1000}mA → sende ${userLimitAmpere * 1000}mA @ ${currentPhases}P`);
-        await this.adjustCurrent(wallboxIp, userLimitAmpere * 1000, config);
-      } else {
-        log("debug", "system", `isActive → adjustCurrent mit ${result.currentMa}mA @ ${currentPhases}P`);
-        await this.adjustCurrent(wallboxIp, result.currentMa, config);
+        
+        case "STOP_CHARGING": {
+          log("debug", "system", `[StateMachine] STOP_CHARGING → stopCharging`);
+          await this.stopCharging(wallboxIp, action.reason);
+          break;
+        }
+        
+        case "ADJUST_CURRENT": {
+          log("debug", "system", `isActive → adjustCurrent mit ${action.currentMa / 1000}A @ ${currentPhases}P`);
+          await this.adjustCurrent(wallboxIp, action.currentMa, config);
+          break;
+        }
+        
+        case "START_DELAY_BEGIN": {
+          const now = new Date();
+          storage.updateChargingContext({
+            startDelayTrackerSince: now.toISOString(),
+            remainingStartDelay: config.startDelaySeconds,
+          });
+          log("debug", "system", 
+            `Start-Delay gestartet: Überschuss ${surplus}W > ${config.minStartPowerWatt}W - warte ${config.startDelaySeconds}s`
+          );
+          break;
+        }
+        
+        case "START_DELAY_TICK": {
+          storage.updateChargingContext({
+            remainingStartDelay: action.remainingSeconds,
+          });
+          log("debug", "system", `Warte noch ${action.remainingSeconds}s`);
+          break;
+        }
+        
+        case "START_DELAY_RESET": {
+          storage.updateChargingContext({
+            startDelayTrackerSince: undefined,
+            remainingStartDelay: undefined,
+          });
+          break;
+        }
+        
+        case "STOP_DELAY_BEGIN": {
+          const now = new Date();
+          storage.updateChargingContext({
+            belowThresholdSince: now.toISOString(),
+            remainingStopDelay: config.stopDelaySeconds,
+          });
+          log("info", "system", 
+            `[${config.activeStrategy}] Überschuss unter Schwellwert: ${Math.round(surplus)}W < ${config.stopThresholdWatt}W - Stopp-Timer gestartet`
+          );
+          break;
+        }
+        
+        case "STOP_DELAY_TICK": {
+          storage.updateChargingContext({
+            remainingStopDelay: action.remainingSeconds,
+          });
+          const duration = config.stopDelaySeconds - action.remainingSeconds;
+          log("debug", "system", 
+            `[${config.activeStrategy}] Unter Schwellwert seit ${Math.round(duration)}s von ${config.stopDelaySeconds}s - warte noch ${action.remainingSeconds}s`
+          );
+          break;
+        }
+        
+        case "STOP_DELAY_RESET": {
+          storage.updateChargingContext({
+            belowThresholdSince: undefined,
+            remainingStopDelay: undefined,
+          });
+          // Log recovery only if we were in WAIT_STOP
+          if (currentState === "WAIT_STOP" && transition.newState !== "IDLE") {
+            log("info", "system", 
+              `[${config.activeStrategy}] Überschuss wieder ausreichend: ${Math.round(surplus)}W >= ${config.stopThresholdWatt}W - Stopp-Timer zurückgesetzt`
+            );
+          }
+          break;
+        }
+        
+        case "NONE":
+          // result=null during active charging: log explanation
+          if (context.isActive && result === null && !isMaxPower) {
+            log("debug", "system", `[${config.activeStrategy}] result=null aber isActive - Wallbox lädt weiter (Stopp-Timer verwaltet Stopp)`);
+          }
+          break;
       }
     }
   }
 
-  private calculateSurplus(strategy: ChargingStrategy, liveData: E3dcLiveData): number {
+    private calculateSurplus(strategy: ChargingStrategy, liveData: E3dcLiveData): number {
     // WICHTIG: E3DC liefert housePower MIT Wallbox-Anteil!
     // Für korrekte Überschuss-Berechnung muss Wallbox-Leistung abgezogen werden
     const housePowerWithoutWallbox = liveData.housePower - liveData.wallboxPower;
@@ -563,96 +653,6 @@ export class ChargingStrategyController {
     return currentAmpere;
   }
 
-  private shouldStartCharging(config: ChargingStrategyConfig, surplus: number): boolean {
-    const context = storage.getChargingContext();
-    const now = new Date();
-    const strategy = config.activeStrategy;
-    
-    log("debug", "system", `shouldStartCharging: strategy=${strategy}, surplus=${surplus}W, plug=${this.lastPlugStatus}`);
-    
-    // Restart-Loop-Schutz: Wenn Auto Ladung beendet hat, nicht erneut starten
-    if (context.vehicleFinishedCharging) {
-      log("debug", "system", `shouldStartCharging: vehicleFinishedCharging=true → return false (Auto hat Ladung beendet)`);
-      return false;
-    }
-    
-    // Issue #105: Strategie "off" darf NIEMALS Ladung starten
-    if (strategy === "off") {
-      log("debug", "system", `shouldStartCharging: strategy=off → return false`);
-      return false;
-    }
-    
-    // Max Power Strategien starten sofort ohne Delay - ABER nur wenn Auto angeschlossen
-    if (strategy === "max_with_battery" || strategy === "max_without_battery") {
-      if (this.lastPlugStatus !== 7) {
-        log("debug", "system", `Max Power Strategie (${strategy}) → Kein Auto angeschlossen (Plug=${this.lastPlugStatus}) - return false`);
-        return false;
-      }
-      log("debug", "system", `Max Power Strategie (${strategy}) → Auto bereit (Plug=7), Sofortstart ohne Delay - return true`);
-      return true;
-    }
-    
-    // Surplus-Strategien: Plug-Prüfung VOR Start-Delay (kein Countdown ohne Auto)
-    if (this.lastPlugStatus !== 7) {
-      if (context.startDelayTrackerSince) {
-        storage.updateChargingContext({
-          startDelayTrackerSince: undefined,
-          remainingStartDelay: undefined,
-        });
-        log("debug", "system", `Start-Delay zurückgesetzt - kein Auto angeschlossen (Plug=${this.lastPlugStatus})`);
-      }
-      log("debug", "system", `Surplus-Strategie: Kein Auto angeschlossen (Plug=${this.lastPlugStatus}) → return false`);
-      return false;
-    }
-
-    // Surplus-Strategien verwenden Start-Delay
-    if (surplus < config.minStartPowerWatt) {
-      if (context.startDelayTrackerSince) {
-        storage.updateChargingContext({
-          startDelayTrackerSince: undefined,
-          remainingStartDelay: undefined,
-        });
-        log("debug", "system", "Start-Delay zurückgesetzt - Überschuss zu niedrig");
-      }
-      log("debug", "system", `surplus < minStartPowerWatt → return false`);
-      return false;
-    }
-    
-    if (!context.startDelayTrackerSince) {
-      storage.updateChargingContext({
-        startDelayTrackerSince: now.toISOString(),
-        remainingStartDelay: config.startDelaySeconds, // Initial countdown
-      });
-      log("debug", "system", 
-        `Start-Delay gestartet: Überschuss ${surplus}W > ${config.minStartPowerWatt}W - warte ${config.startDelaySeconds}s`
-      );
-      return false;
-    }
-    
-    const waitingSince = new Date(context.startDelayTrackerSince);
-    const waitingDuration = (now.getTime() - waitingSince.getTime()) / 1000;
-    const remainingSeconds = Math.max(0, config.startDelaySeconds - waitingDuration);
-    
-    // Update remaining delay für Frontend-Countdown
-    storage.updateChargingContext({
-      remainingStartDelay: Math.ceil(remainingSeconds),
-    });
-    
-    if (waitingDuration >= config.startDelaySeconds) {
-      log("info", "system", 
-        `Start-Bedingung erfüllt: Überschuss ${surplus}W > ${config.minStartPowerWatt}W für ${waitingDuration}s, Auto angeschlossen (Plug=7)`
-      );
-      storage.updateChargingContext({
-        startDelayTrackerSince: undefined,
-        remainingStartDelay: undefined,
-      });
-      return true;
-    }
-    
-    log("debug", "system", `Warte noch ${remainingSeconds.toFixed(1)}s`);
-    return false;
-  }
-
   /**
    * Gleicht den gespeicherten Charging Context mit dem echten Wallbox-Status ab.
    * Verhindert, dass veraltete Zustände (z.B. isActive=true aus alter Sitzung) zu Fehlverhalten führen.
@@ -754,95 +754,6 @@ export class ChargingStrategyController {
     }
   }
 
-  private shouldStopCharging(config: ChargingStrategyConfig, surplus: number, liveData: E3dcLiveData): boolean {
-    const strategy = config.activeStrategy;
-    
-    if (strategy === "max_with_battery" || strategy === "max_without_battery") {
-      return false;
-    }
-    
-    const context = storage.getChargingContext();
-    
-    if (!context.isActive) {
-      return false;
-    }
-    
-    const now = new Date();
-    
-    // KRITISCH: Stabilisierungsphase nach Start!
-    // E3DC-Daten brauchen Zeit, um die Wallbox-Last zu erfassen
-    // Dauer = 2× Polling-Intervall (damit mindestens 1-2 E3DC-Updates erfolgen)
-    // Ohne diese Phase: Sofortiger Stop wegen falscher Überschuss-Berechnung
-    const settings = storage.getSettings();
-    const pollingIntervalSeconds = settings?.e3dc?.pollingIntervalSeconds || 10;
-    const STABILIZATION_PERIOD_MS = pollingIntervalSeconds * 2 * 1000;
-    
-    if (context.lastStartedAt) {
-      const timeSinceStart = now.getTime() - new Date(context.lastStartedAt).getTime();
-      
-      if (timeSinceStart < STABILIZATION_PERIOD_MS) {
-        const remainingStabilization = Math.ceil((STABILIZATION_PERIOD_MS - timeSinceStart) / 1000);
-        log("debug", "system", 
-          `[${strategy}] Stabilisierungsphase aktiv (${pollingIntervalSeconds}s × 2) - Stop-Prüfung unterdrückt für noch ${remainingStabilization}s (E3DC-Daten müssen Wallbox-Last erfassen)`
-        );
-        return false;
-      }
-    }
-    
-    // WICHTIG: surplus_battery_prio & surplus_vehicle_prio berechnen den Überschuss bereits OHNE Wallbox
-    // (aus E3DC-Daten, wo housePowerWithoutWallbox die Wallbox nicht enthält)
-    // Daher: surplus direkt verwenden, KEINE Wallbox-Addition!
-    const availableSurplus = surplus;
-    
-    if (availableSurplus < config.stopThresholdWatt) {
-      if (!context.belowThresholdSince) {
-        storage.updateChargingContext({
-          belowThresholdSince: now.toISOString(),
-          remainingStopDelay: config.stopDelaySeconds, // Initial Stopp-Countdown
-        });
-        log("info", "system", 
-          `[${strategy}] Überschuss unter Schwellwert: ${Math.round(availableSurplus)}W < ${config.stopThresholdWatt}W - Stopp-Timer gestartet`
-        );
-        return false;
-      }
-      
-      const belowSince = new Date(context.belowThresholdSince);
-      const duration = (now.getTime() - belowSince.getTime()) / 1000;
-      const remainingSeconds = Math.max(0, config.stopDelaySeconds - duration);
-      
-      // Update remaining delay für Frontend-Countdown
-      storage.updateChargingContext({
-        remainingStopDelay: Math.ceil(remainingSeconds),
-      });
-      
-      if (duration >= config.stopDelaySeconds) {
-        log("info", "system", 
-          `[${strategy}] Stopp-Bedingung erfüllt: Überschuss ${Math.round(availableSurplus)}W zu niedrig für ${Math.round(duration)}s (Schwellwert: ${config.stopThresholdWatt}W, Verzögerung: ${config.stopDelaySeconds}s)`
-        );
-        storage.updateChargingContext({
-          belowThresholdSince: undefined,
-          remainingStopDelay: undefined,
-        });
-        return true;
-      } else {
-        log("debug", "system", 
-          `[${strategy}] Unter Schwellwert seit ${Math.round(duration)}s von ${config.stopDelaySeconds}s - warte noch ${remainingSeconds.toFixed(1)}s`
-        );
-      }
-    } else {
-      if (context.belowThresholdSince) {
-        log("info", "system", 
-          `[${strategy}] Überschuss wieder ausreichend: ${Math.round(availableSurplus)}W >= ${config.stopThresholdWatt}W - Stopp-Timer zurückgesetzt`
-        );
-        storage.updateChargingContext({
-          belowThresholdSince: undefined,
-          remainingStopDelay: undefined,
-        });
-      }
-    }
-    
-    return false;
-  }
 
   private async startCharging(wallboxIp: string, targetCurrentMa: number, config: ChargingStrategyConfig): Promise<void> {
     try {

@@ -9,7 +9,7 @@ import type { E3dcLiveData } from "@shared/schema";
  * stopThresholdWatt und stopDelaySeconds, was zu Start-Stop-Loops führt.
  *
  * Root Cause: Bei result=null && isActive wird stopCharging() direkt aufgerufen,
- * anstatt shouldStopCharging() den Stopp-Timer verwalten zu lassen.
+ * anstatt den Stopp-Timer korrekt über die State Machine verwalten zu lassen.
  */
 
 vi.mock("../core/storage", () => {
@@ -89,7 +89,7 @@ describe("Issue #33: surplus_battery_prio stop delay respected on result=null", 
 
   it("should NOT immediately stop when surplus is between stopThresholdWatt and minPower (result=null)", async () => {
     // Scenario: Wallbox is actively charging, surplus drops to ~900W
-    // - 900W > stopThresholdWatt (500W) -> shouldStopCharging says NO
+    // - 900W > stopThresholdWatt (500W) -> state machine does not trigger stop
     // - 900W < minPower for 6A@1P (1380W) -> calculateTargetCurrent returns null
     // BUG: surplus_battery_prio immediately calls stopCharging() here
     // FIX: Should let the wallbox continue running (like surplus_vehicle_prio does)
@@ -137,7 +137,7 @@ describe("Issue #33: surplus_battery_prio stop delay respected on result=null", 
 
   it("should stop after stopDelaySeconds when surplus stays below stopThresholdWatt", async () => {
     // Scenario: surplus drops below stopThresholdWatt for longer than stopDelaySeconds
-    // This tests that shouldStopCharging path works correctly for surplus_battery_prio
+    // This tests that the stop-delay path works correctly for surplus_battery_prio
 
     const startedAt = new Date(Date.now() - 60000).toISOString();
     (storage as any)._setContext({
@@ -163,7 +163,7 @@ describe("Issue #33: surplus_battery_prio stop delay respected on result=null", 
     // PV=4000W, house=4000W, wallboxPower=0 (set to 0 to avoid wallbox subtraction confusion)
     // totalSurplus = 4000 - 4000 = 0
     // batteryReservation = min(0, 3000) = 0 (SOC<95, but surplus is 0)
-    // surplusForWallbox = 0 -> shouldStopCharging triggers
+    // surplusForWallbox = 0 -> state machine triggers stop
     const liveData = makeLiveData({
       pvPower: 1000,
       housePower: 1000,
@@ -174,11 +174,11 @@ describe("Issue #33: surplus_battery_prio stop delay respected on result=null", 
     // totalSurplus = 1000 - 1000 = 0
     // batteryReservation = min(0, 3000) = 0
     // surplusForWallbox = 0, withMargin = 0
-    // shouldStopCharging: 0 < 500 (stopThresholdWatt) AND belowThresholdSince > 120s -> true
+    // state machine: 0 < 500 (stopThresholdWatt) AND belowThresholdSince > 120s -> STOP_CHARGING
 
     await controller.processStrategy(liveData, DEFAULT_WALLBOX_IP);
 
-    // shouldStopCharging should have triggered (surplus=0 < 500W, belowThresholdSince > 120s)
+    // state machine should have triggered stop (surplus=0 < 500W, belowThresholdSince > 120s)
     const ena0Calls = mockSendUdp.mock.calls.filter((call: any[]) => call[1] === "ena 0");
     expect(ena0Calls).toHaveLength(1);
 
