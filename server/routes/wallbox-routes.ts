@@ -21,7 +21,9 @@ let lastCachedStatus: any = null;
  */
 export function resetStatusPollThrottle(): void {
   lastStatusPollTime = 0;
-  lastCachedStatus = null;
+  // Issue #74: Cache nicht nullen – nur Timestamp zurücksetzen.
+  // So liefert getLastCachedWallboxStatus() weiterhin den letzten bekannten Status,
+  // während der nächste API-Call frische UDP-Daten holt (weil Timestamp=0).
   log("debug", "wallbox", "Status-Poll-Throttle zurückgesetzt (State-/Strategie-Änderung)");
 }
 
