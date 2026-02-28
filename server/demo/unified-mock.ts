@@ -569,6 +569,9 @@ export async function startUnifiedMock(): Promise<void> {
   
   // E3DC-Mock State zurücksetzen (SOC, Battery Lock State etc.)
   e3dcMockService.reset();
+  // Cache invalidieren damit der erste API-Aufruf frische Mock-Daten liefert
+  cachedE3dcData = null;
+  lastE3dcUpdate = 0;
   
   // Broadcast-Callback setzen (sendet Broadcasts über UDP-Channel)
   wallboxMockService.setBroadcastCallback((data) => {
