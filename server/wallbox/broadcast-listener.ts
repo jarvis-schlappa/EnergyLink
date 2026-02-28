@@ -18,6 +18,7 @@ import { getOrCreateStrategyController } from "../routes/shared-state";
 import { getProwlNotifier, triggerProwlEvent } from "../monitoring/prowl-notifier";
 import { broadcastWallboxStatus, broadcastPartialUpdate } from "./sse";
 import { invalidateWallboxCaches } from "./cache-invalidation";
+import { updateLastCachedWallboxStatus } from "../routes/wallbox-routes";
 import { autoCloseGarageIfNeeded } from "../routes/garage-routes";
 
 let lastInputStatus: number | null = null;
@@ -562,6 +563,8 @@ async function fetchAndBroadcastStatus(reason: string): Promise<void> {
 
     // Broadcast zu allen WebSocket-Clients
     broadcastWallboxStatus(status);
+    // Issue #79: Auch den gecachten Status aktualisieren, damit /api/status aktuelle Werte liefert
+    updateLastCachedWallboxStatus(status);
     log("debug", "system", `[WebSocket] Broadcast gesendet (${reason})`);
   } catch (error) {
     log("debug", "system", "[WebSocket] Fehler beim Status-Abruf für Broadcast:", error instanceof Error ? error.message : String(error));

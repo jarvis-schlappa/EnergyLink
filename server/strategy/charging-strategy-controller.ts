@@ -695,7 +695,7 @@ async processStrategy(liveData: E3dcLiveData, wallboxIp: string): Promise<void> 
       if (isMaxPowerStrategy) {
         // Nur bei Max-Power: Erkenne echte Phasen aus Strömen (>500mA als "aktiv" betrachten)
         const activePhases = currents.filter(i => i > 500).length;
-        detectedPhases = activePhases > 0 ? (activePhases === 1 ? 1 : 3) : 3;  // Default 3P bei Max-Power
+        detectedPhases = activePhases > 0 ? (activePhases === 1 ? 1 : 3) : (context.currentPhases ?? 1);  // Issue #79: Bei Anlauf letzten Wert beibehalten
       }
       
       // Korrigiere Context wenn nötig
