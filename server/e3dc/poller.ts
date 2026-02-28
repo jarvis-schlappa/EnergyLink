@@ -262,6 +262,31 @@ export function resetWallboxIdleThrottle(): void {
 }
 
 /**
+ * Triggert sofort einen E3DC-Poll (Issue #67).
+ * Wird aufgerufen nach Demo-Modus-Toggle, damit das Frontend sofort
+ * aktuelle Daten bekommt statt bis zum nächsten Polling-Intervall (bis zu 30s) zu warten.
+ * Bricht den ausstehenden Timer ab und führt den Poll unmittelbar aus.
+ */
+export function triggerImmediateE3dcPoll(): void {
+  // Ausstehenden Timer abbrechen (verhindert doppelten Poll)
+  if (initialPollerTimeout) {
+    clearTimeout(initialPollerTimeout);
+    initialPollerTimeout = null;
+    log("debug", "e3dc-poller", "Ausstehender Poll-Timer abgebrochen für sofortigen Poll (Issue #67)");
+  }
+
+  log("info", "e3dc-poller", "Sofortiger E3DC-Poll angefordert (Demo-Mode-Toggle, Issue #67)");
+
+  // Asynchron ausführen ohne auf Ergebnis zu warten (fire-and-forget mit Fehlerbehandlung)
+  void (async () => {
+    await pollE3dcData();
+    await scheduleNextPoll();
+  })().catch((err) => {
+    log("warning", "e3dc-poller", "Sofortiger E3DC-Poll fehlgeschlagen", err instanceof Error ? err.message : String(err));
+  });
+}
+
+/**
  * Stoppt den E3DC-Background-Poller und wartet auf laufenden Poll
  */
 export async function stopE3dcPoller(): Promise<void> {
