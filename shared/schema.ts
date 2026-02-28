@@ -258,6 +258,7 @@ export const chargingContextSchema = z.object({
   remainingStopDelay: z.number().optional(), // Sekunden bis zum Stopp (nur für Überschuss-Strategien)
   userCurrentLimitAmpere: z.number().optional(), // Vom User per UI-Regler gesetzter Stromlimit (Ampere)
   vehicleFinishedCharging: z.boolean().optional(), // Auto hat Ladung beendet (verhindert Restart-Loop)
+  lastStopReason: z.enum(["user", "system"]).optional(), // Issue #75: Grund des letzten Stopps (user=UI-Button, system=Strategie/Timer)
 });
 
 export type ChargingContext = z.infer<typeof chargingContextSchema>;

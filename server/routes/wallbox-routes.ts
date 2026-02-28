@@ -271,6 +271,8 @@ export function registerWallboxRoutes(app: Express): void {
       };
 
       storage.saveSettings(updatedSettings);
+      // Issue #75: User-initiierter Stopp tracken (Badge zeigt "Gestoppt" statt "Unterbrochen")
+      storage.updateChargingContext({ lastStopReason: "user" });
       log("info", "wallbox", `Ladestrategie deaktiviert (auf "off" gesetzt)`);
       
       // Issue #93: Throttle zurücksetzen bei Stopp

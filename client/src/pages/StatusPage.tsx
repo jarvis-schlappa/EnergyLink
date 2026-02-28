@@ -383,7 +383,7 @@ export default function StatusPage() {
       case 2: return "Bereit";
       case 3: return "Lädt";
       case 4: return "Fehler";
-      case 5: return "Unterbrochen";
+      case 5: return chargingContext?.lastStopReason === "user" ? "Gestoppt" : "Unterbrochen";
       default: return "Unbekannt";
     }
   };
