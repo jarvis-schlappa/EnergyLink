@@ -111,10 +111,20 @@ class E3dcClient {
 
   /**
    * Setzt das Gateway (Real oder Mock).
-   * Wird beim App-Start einmalig aufgerufen.
+   * Wird beim App-Start und bei Demo-Mode-Toggles aufgerufen.
+   *
+   * Fix #69: Wenn auf ein RealE3dcGateway umgestellt wird und eine bestehende
+   * Konfiguration mit Prefix vorhanden ist, wird der Prefix auf das neue Gateway
+   * übertragen. Ohne diesen Transfer würde das neue Gateway mit leerem Prefix
+   * starten und der Befehl "-d 0" ohne Pfad zu e3dcset ausgeführt werden,
+   * was zu "/bin/sh: Illegal option -d" führt.
    */
   setGateway(gateway: E3dcGateway): void {
     this.gateway = gateway;
+    // Prefix aus bestehender Config auf neues RealE3dcGateway übertragen
+    if (gateway instanceof RealE3dcGateway && this.config) {
+      gateway.setPrefix(this.config.prefix?.trim() || '');
+    }
   }
 
   configure(config: E3dcConfig): void {
