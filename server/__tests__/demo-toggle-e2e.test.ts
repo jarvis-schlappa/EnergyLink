@@ -35,7 +35,7 @@ beforeAll(async () => {
 
   app.get("/api/health", healthHandler);
 
-  // Ensure settings exist with a "real" wallbox IP (NOT 127.0.0.1)
+  // Ensure settings exist with "real" IPs (NOT 127.0.0.1)
   const currentSettings = storage.getSettings();
   storage.saveSettings({
     ...currentSettings,
@@ -43,6 +43,12 @@ beforeAll(async () => {
     demoMode: false,
     mockWallboxPhases: 3,
     mockWallboxPlugStatus: 7,
+    fhemSync: {
+      enabled: false,
+      host: "192.168.40.11",
+      port: 7072,
+      autoCloseGarageOnPlug: false,
+    },
   });
 
   // Register routes — no mock server started!
@@ -182,4 +188,85 @@ describe("Mock wallbox plug status broadcast (#18)", () => {
       .send({ ...finalSettings.body, demoMode: false });
     await new Promise((r) => setTimeout(r, 2000));
   }, 20_000);
+});
+
+describe("fhemSync.host backup/restore on demo toggle (#62)", () => {
+  it("should restore fhemSync.host when demo mode is deactivated", async () => {
+    // 0. Ensure clean state: demo OFF, real fhemSync.host set
+    const cleanup = await request(server).get("/api/settings");
+    await request(server)
+      .post("/api/settings")
+      .send({
+        ...cleanup.body,
+        demoMode: false,
+        fhemSync: { enabled: false, host: "192.168.40.11", port: 7072, autoCloseGarageOnPlug: false },
+      });
+    await new Promise((r) => setTimeout(r, 2000));
+
+    // 1. Verify initial state: demo OFF, real fhemSync.host
+    const initialRes = await request(server).get("/api/settings");
+    expect(initialRes.status).toBe(200);
+    expect(initialRes.body.demoMode).toBe(false);
+    expect(initialRes.body.fhemSync?.host).toBe("192.168.40.11");
+
+    // 2. Toggle demo mode ON via POST /api/settings (full E2E path)
+    const settingsOn = await request(server).get("/api/settings");
+    const postOnRes = await request(server)
+      .post("/api/settings")
+      .send({ ...settingsOn.body, demoMode: true });
+    expect(postOnRes.status).toBe(200);
+
+    // Wait for startUnifiedMock() to finish (may partly fail on ports, that's ok)
+    await new Promise((r) => setTimeout(r, 3000));
+
+    // 3. Verify fhemSync.host is now 127.0.0.1 (mock)
+    const demoOnRes = await request(server).get("/api/settings");
+    expect(demoOnRes.status).toBe(200);
+    expect(demoOnRes.body.demoMode).toBe(true);
+    expect(demoOnRes.body.fhemSync?.host).toBe("127.0.0.1");
+
+    // 4. Toggle demo mode OFF via POST /api/settings
+    const settingsOff = await request(server).get("/api/settings");
+    const postOffRes = await request(server)
+      .post("/api/settings")
+      .send({ ...settingsOff.body, demoMode: false });
+    expect(postOffRes.status).toBe(200);
+
+    await new Promise((r) => setTimeout(r, 2000));
+
+    // 5. CRITICAL: fhemSync.host MUST be restored to original "192.168.40.11"
+    const restoredRes = await request(server).get("/api/settings");
+    expect(restoredRes.status).toBe(200);
+    expect(restoredRes.body.demoMode).toBe(false);
+    expect(restoredRes.body.fhemSync?.host).toBe("192.168.40.11");
+
+    // 6. fhemHostBackup must be cleaned up (no stale backup after demo OFF)
+    expect(restoredRes.body.fhemHostBackup).toBeUndefined();
+  }, 20_000);
+});
+
+describe("E3DC mock state reset on demo toggle (#63)", () => {
+  it("should reset SOC state when demo is restarted via reset()", async () => {
+    const { e3dcMockService } = await import("../demo/e3dc-mock");
+
+    // 1. Reset to get a clean time-appropriate initial SOC
+    e3dcMockService.reset();
+    const freshData = await e3dcMockService.getLiveData(0);
+    const initialSoc = freshData.batterySoc;
+
+    // 2. Dirty the singleton state directly (simulates SOC drift during long demo session)
+    (e3dcMockService as any).currentSoc = 99;
+    const dirtyData = await e3dcMockService.getLiveData(0);
+    expect(dirtyData.batterySoc).toBe(99);
+
+    // 3. Reset — SOC must return to time-appropriate value, NOT stay at 99
+    e3dcMockService.reset();
+    const resetData = await e3dcMockService.getLiveData(0);
+    expect(resetData.batterySoc).toBe(initialSoc);
+    expect(resetData.batterySoc).not.toBe(99);
+
+    // 4. SOC must be in valid range (0-100)
+    expect(resetData.batterySoc).toBeGreaterThanOrEqual(0);
+    expect(resetData.batterySoc).toBeLessThanOrEqual(100);
+  });
 });

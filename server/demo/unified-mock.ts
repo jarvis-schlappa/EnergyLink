@@ -567,6 +567,9 @@ export async function startUnifiedMock(): Promise<void> {
   // Wallbox-Mock initialisieren (nur bei Start, nicht bei Import)
   wallboxMockService.initializeDemo();
   
+  // E3DC-Mock State zurücksetzen (SOC, Battery Lock State etc.)
+  e3dcMockService.reset();
+  
   // Broadcast-Callback setzen (sendet Broadcasts über UDP-Channel)
   wallboxMockService.setBroadcastCallback((data) => {
     log("debug", "wallbox-mock", `[Mock-Wallbox → Broadcast] Sende: ${JSON.stringify(data)}`);

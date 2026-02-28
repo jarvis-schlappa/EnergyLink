@@ -42,6 +42,19 @@ export class E3dcMockService {
     const { hour } = this.getBerlinTime();
     this.currentSoc = this.getInitialSocForTime(hour);
   }
+
+  /**
+   * Setzt den internen State auf frische Startwerte zurück.
+   * Wird von startUnifiedMock() aufgerufen um sicherzustellen,
+   * dass der Singleton nach Demo-Toggle-Zyklen nicht stale ist.
+   */
+  reset(): void {
+    const { hour } = this.getBerlinTime();
+    this.currentSoc = this.getInitialSocForTime(hour);
+    this.lastUpdateTime = Date.now();
+    this.lastBatteryLockState = false;
+    this.batteryLockChangeTime = 0;
+  }
   
   /**
    * Gibt die aktuelle Zeit in Europe/Berlin Zeitzone zurück
