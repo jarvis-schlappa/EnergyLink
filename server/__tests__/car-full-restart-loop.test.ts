@@ -94,7 +94,6 @@ describe("Car Full → Restart Loop Prevention", () => {
       currentPhases: 1,
       lastStartedAt: new Date(Date.now() - 60000).toISOString(), // Started 60s ago (past grace period)
     });
-    (controller as any).lastPlugStatus = 7; // Car connected
 
     // Step 2: Car becomes full → Wallbox stops (State=2, Power=0)
     // reconcileChargingContext sees: isActive=true but wallbox not charging
@@ -141,7 +140,6 @@ describe("Car Full → Restart Loop Prevention", () => {
       currentPhases: 1,
       lastStartedAt: new Date(Date.now() - 60000).toISOString(),
     });
-    (controller as any).lastPlugStatus = 7;
 
     // Reconcile detects car stopped
     mockSendUdp
@@ -196,7 +194,6 @@ describe("Car Full → Restart Loop Prevention", () => {
       currentPhases: 1,
       lastStartedAt: new Date(Date.now() - 60000).toISOString(),
     });
-    (controller as any).lastPlugStatus = 7;
 
     // Reconcile detects car stopped
     mockSendUdp
@@ -258,7 +255,6 @@ describe("Car Full → Restart Loop Prevention", () => {
       currentPhases: 1,
       lastStartedAt: new Date(Date.now() - 60000).toISOString(),
     });
-    (controller as any).lastPlugStatus = 7;
 
     // Wallbox stopped (car full)
     mockSendUdp

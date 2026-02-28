@@ -83,6 +83,10 @@ describe("Issue #73 – triggerImmediateE3dcPoll after stop", () => {
       resetWallboxIdleThrottle: vi.fn(),
     }));
 
+    vi.doMock("../wallbox/cache-invalidation", () => ({
+      invalidateWallboxCaches: vi.fn(),
+    }));
+
     vi.doMock("../e3dc/client", () => ({
       e3dcClient: {
         isConfigured: vi.fn(() => true),

@@ -84,6 +84,10 @@ vi.mock("../routes/wallbox-routes", () => ({
   resetStatusPollThrottle: vi.fn(),
 }));
 
+vi.mock("../wallbox/cache-invalidation", () => ({
+  invalidateWallboxCaches: vi.fn(),
+}));
+
 vi.mock("../routes/garage-routes", () => ({
   autoCloseGarageIfNeeded: vi.fn().mockResolvedValue(undefined),
 }));

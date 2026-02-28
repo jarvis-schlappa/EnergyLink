@@ -7,6 +7,7 @@ import { initSSEClient, broadcastWallboxStatus } from "../wallbox/sse";
 import { getOrCreateStrategyController } from "./shared-state";
 import { getAuthoritativePlugStatus } from "../wallbox/broadcast-listener";
 import { triggerImmediateE3dcPoll } from "../e3dc/poller";
+import { invalidateWallboxCaches } from "../wallbox/cache-invalidation";
 
 // Issue #93: Status-Poll-Throttle im Idle
 // Wenn Strategie "off" + State 5 (unterbrochen) → gecachten Status zurückgeben statt 3 UDP-Requests
@@ -172,7 +173,7 @@ export function registerWallboxRoutes(app: Express): void {
       }
 
       // Issue #93: Throttle zurücksetzen bei Start
-      resetStatusPollThrottle();
+      invalidateWallboxCaches();
 
       // Sofort antworten für schnelle UI-Reaktion
       res.json({ success: true });
@@ -276,7 +277,7 @@ export function registerWallboxRoutes(app: Express): void {
       log("info", "wallbox", `Ladestrategie deaktiviert (auf "off" gesetzt)`);
       
       // Issue #93: Throttle zurücksetzen bei Stopp
-      resetStatusPollThrottle();
+      invalidateWallboxCaches();
 
       // Sofort antworten für schnelle UI-Reaktion
       res.json({ success: true });
