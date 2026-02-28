@@ -89,7 +89,8 @@ vi.mock("../e3dc/modbus", () => ({
 }));
 vi.mock("../monitoring/prowl-notifier", () => ({ triggerProwlEvent: vi.fn() }));
 vi.mock("../wallbox/sse", () => ({ broadcastPartialUpdate: vi.fn() }));
-vi.mock("../wallbox/broadcast-listener", () => ({ getAuthoritativePlugStatus: vi.fn(() => 7) }));
+let mockPlugStatus: number | null = 7;
+vi.mock("../wallbox/broadcast-listener", () => ({ getAuthoritativePlugStatus: vi.fn(() => mockPlugStatus) }));
 
 import { storage } from "../core/storage";
 
@@ -402,7 +403,6 @@ describe("State Machine E2E Reference Tests", () => {
         currentPhases: 1,
         lastStartedAt: new Date(Date.now() - 60000).toISOString(),
       });
-      (controller as any).lastPlugStatus = 7;
 
       mockSendUdp
         .mockResolvedValueOnce({ State: 2, Plug: 7 })
@@ -475,8 +475,10 @@ describe("State Machine E2E Reference Tests", () => {
         startDelayTrackerSince: new Date(Date.now() - 40000).toISOString(),
         remainingStartDelay: 20,
       });
-      (controller as any).lastPlugStatus = 7;
 
+      // Simulate car disconnected: authoritative plug status = 1 (no cable)
+      mockPlugStatus = 1;
+      
       mockSendUdp
         .mockResolvedValueOnce({ State: 1, Plug: 1 })
         .mockResolvedValueOnce({ P: 0, I1: 0, I2: 0, I3: 0 });
@@ -488,6 +490,9 @@ describe("State Machine E2E Reference Tests", () => {
       expect(ctx.startDelayTrackerSince).toBeUndefined();
       expect(ctx.remainingStartDelay).toBeUndefined();
       expect(ctx.isActive).toBe(false);
+      
+      // Reset for other tests
+      mockPlugStatus = 7;
     });
 
     it("resets start delay when surplus drops below minStartPowerWatt during countdown", async () => {
@@ -513,7 +518,6 @@ describe("State Machine E2E Reference Tests", () => {
         startDelayTrackerSince: new Date(Date.now() - 40000).toISOString(),
         remainingStartDelay: 20,
       });
-      (controller as any).lastPlugStatus = 7;
 
       mockReconcileIdle(mockSendUdp);
 
@@ -553,7 +557,6 @@ describe("State Machine E2E Reference Tests", () => {
         startDelayTrackerSince: trackerTime,
         remainingStartDelay: 20,
       });
-      (controller as any).lastPlugStatus = 7;
 
       mockReconcileIdle(mockSendUdp);
 
@@ -626,6 +629,9 @@ describe("State Machine E2E Reference Tests", () => {
     });
 
     it("max_with_battery does NOT start when no car connected (plug=1)", async () => {
+      // Simulate no car connected: authoritative plug status = 1
+      mockPlugStatus = 1;
+      
       (storage as any)._setSettings({
         wallboxIp: IP,
         chargingStrategy: {
@@ -651,6 +657,9 @@ describe("State Machine E2E Reference Tests", () => {
       const ctx = storage.getChargingContext();
       expect(ctx.isActive).toBe(false);
       expect(countUdpCalls(mockSendUdp, "ena 1")).toBe(0);
+      
+      // Reset for other tests
+      mockPlugStatus = 7;
     });
 
     it("max power never triggers stop", async () => {

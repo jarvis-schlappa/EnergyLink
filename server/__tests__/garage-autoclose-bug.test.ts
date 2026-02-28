@@ -369,6 +369,10 @@ describe("Integration: Broadcast-Listener triggers autoClose with correct timing
       resetStatusPollThrottle: () => {},
     }));
 
+    vi.doMock("../wallbox/cache-invalidation", () => ({
+      invalidateWallboxCaches: () => {},
+    }));
+
     const blMod = await import("../wallbox/broadcast-listener");
     await blMod.startBroadcastListener(mockUdpSender);
     broadcastHandler = mockOnBroadcast.mock.calls[0][0];

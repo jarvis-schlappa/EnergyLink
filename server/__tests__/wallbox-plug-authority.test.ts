@@ -101,6 +101,10 @@ describe("Broadcast-listener authoritative plug state", () => {
       resetStatusPollThrottle: () => {},
     }));
 
+    vi.doMock("../wallbox/cache-invalidation", () => ({
+      invalidateWallboxCaches: () => {},
+    }));
+
     vi.doMock("../routes/garage-routes", () => ({
       autoCloseGarageIfNeeded: () => Promise.resolve(),
     }));
@@ -134,6 +138,9 @@ describe("Broadcast-listener authoritative plug state", () => {
     }));
     vi.doMock("../routes/wallbox-routes", () => ({
       resetStatusPollThrottle: () => {},
+    }));
+    vi.doMock("../wallbox/cache-invalidation", () => ({
+      invalidateWallboxCaches: () => {},
     }));
     vi.doMock("../routes/shared-state", () => ({
       getOrCreateStrategyController: () => null,

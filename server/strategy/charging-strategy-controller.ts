@@ -25,7 +25,7 @@ export class ChargingStrategyController {
   private wallboxIp: string = DEFAULT_WALLBOX_IP;
   private isShuttingDown: boolean = false;
   private pendingE3dcData: E3dcLiveData | null = null;
-  private lastPlugStatus: number = 1;  // Plug-Status: 1=kein Kabel, 7=Auto bereit
+
   private phaseProvider: PhaseProvider;
   
   constructor(sendUdpCommand: (ip: string, command: string) => Promise<any>, phaseProvider: PhaseProvider) {
@@ -386,7 +386,7 @@ async processStrategy(liveData: E3dcLiveData, wallboxIp: string): Promise<void> 
     
     const stateInput: StateInput = {
       surplus,
-      plug: this.lastPlugStatus,
+      plug: getAuthoritativePlugStatus() ?? 1,
       wallboxReallyCharging: context.isActive,
       targetCurrentMa: result ? result.currentMa : null,
       userLimitAmpere,
@@ -669,14 +669,15 @@ async processStrategy(liveData: E3dcLiveData, wallboxIp: string): Promise<void> 
       const wallboxPower = report3.P || 0;  // Leistung in mW
       const currents = [report3.I1 || 0, report3.I2 || 0, report3.I3 || 0];  // Ströme in mA
       
-      // Speichere Plug-Status (1=kein Kabel, 7=Auto bereit)
-      const previousPlugStatus = this.lastPlugStatus;
-      this.lastPlugStatus = report2.Plug || 1;
+      // Plug-Status: Autoritative Quelle ist der broadcast-listener (Echtzeit-UDP-Push).
+      // Fallback auf report2.Plug beim Kaltstart (noch kein Broadcast empfangen).
+      const currentPlugStatus = getAuthoritativePlugStatus() ?? report2.Plug ?? 1;
+      const polledPlugStatus = report2.Plug || 1;
       
       // Plug-Wechsel → vehicleFinishedCharging zurücksetzen
       // Auto wurde ab-/angesteckt → nächster Ladeversuch soll erlaubt sein
-      if (previousPlugStatus !== this.lastPlugStatus && context.vehicleFinishedCharging) {
-        log("info", "system", `[RECONCILE] Plug-Wechsel (${previousPlugStatus} → ${this.lastPlugStatus}) → vehicleFinishedCharging zurückgesetzt`);
+      if (currentPlugStatus !== polledPlugStatus && context.vehicleFinishedCharging) {
+        log("info", "system", `[RECONCILE] Plug-Wechsel (${currentPlugStatus} → ${polledPlugStatus}) → vehicleFinishedCharging zurückgesetzt`);
         storage.updateChargingContext({ vehicleFinishedCharging: false });
       }
       
@@ -712,7 +713,7 @@ async processStrategy(liveData: E3dcLiveData, wallboxIp: string): Promise<void> 
         
         // Auto hat Ladung beendet: Plug=7 (noch verbunden) aber Wallbox lädt nicht
         // → vehicleFinishedCharging setzen um Restart-Loop zu verhindern
-        const vehicleStillConnected = this.lastPlugStatus === 7;
+        const vehicleStillConnected = (getAuthoritativePlugStatus() ?? polledPlugStatus) === 7;
         if (vehicleStillConnected) {
           log("info", "system", `[RECONCILE] Auto noch verbunden (Plug=7) aber Wallbox gestoppt → vehicleFinishedCharging=true (verhindert Restart-Loop)`);
         }

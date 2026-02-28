@@ -17,8 +17,7 @@ import { wallboxUdpChannel } from "./udp-channel";
 import { getOrCreateStrategyController } from "../routes/shared-state";
 import { getProwlNotifier, triggerProwlEvent } from "../monitoring/prowl-notifier";
 import { broadcastWallboxStatus, broadcastPartialUpdate } from "./sse";
-import { resetWallboxIdleThrottle } from "../e3dc/poller";
-import { resetStatusPollThrottle } from "../routes/wallbox-routes";
+import { invalidateWallboxCaches } from "./cache-invalidation";
 import { autoCloseGarageIfNeeded } from "../routes/garage-routes";
 
 let lastInputStatus: number | null = null;
@@ -202,8 +201,7 @@ const handleBroadcast = async (data: any, rinfo: any) => {
         
         // Issue #80/#93: Bei State-Änderung Idle-Throttle zurücksetzen
         // Damit nächster E3DC-Poll sofort die Wallbox abfragt
-        resetWallboxIdleThrottle();
-        resetStatusPollThrottle();
+        invalidateWallboxCaches();
         
         // Sofortiges partial SSE update (ohne 3 UDP-Requests)
         // Include lastPlugStatus to prevent frontend from losing plug value
@@ -290,8 +288,8 @@ const handleBroadcast = async (data: any, rinfo: any) => {
     lastInputStatus = inputStatus;
     
     // Issue #80/#93: Throttle zurücksetzen bei Strategie-Wechsel
-    resetWallboxIdleThrottle();
-    resetStatusPollThrottle();
+    invalidateWallboxCaches();
+
 
     // Reagiere auf Input-Änderung
     if (inputStatus === 1) {

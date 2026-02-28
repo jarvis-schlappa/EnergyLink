@@ -79,6 +79,10 @@ vi.mock("../routes/wallbox-routes", () => ({
   resetStatusPollThrottle: vi.fn(),
 }));
 
+vi.mock("../wallbox/cache-invalidation", () => ({
+  invalidateWallboxCaches: vi.fn(),
+}));
+
 // --- Tests ---
 
 describe("Broadcast Listener", () => {
