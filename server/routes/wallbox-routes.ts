@@ -24,6 +24,15 @@ export function resetStatusPollThrottle(): void {
   log("debug", "wallbox", "Status-Poll-Throttle zurückgesetzt (State-/Strategie-Änderung)");
 }
 
+/**
+ * Gibt den zuletzt gecachten Wallbox-Status zurück (Issue #71).
+ * Wird vom FRONTEND-STATE Trace-Log in status-routes.ts verwendet.
+ */
+export function getLastCachedWallboxStatus(): { state: number; plug: number; power: number } | null {
+  if (!lastCachedStatus) return null;
+  return { state: lastCachedStatus.state, plug: lastCachedStatus.plug, power: lastCachedStatus.power };
+}
+
 export function registerWallboxRoutes(app: Express): void {
   // SSE-Endpoint für Echtzeit-Status-Updates
   app.get("/api/wallbox/stream", (req, res) => {
