@@ -37,7 +37,7 @@ export class WallboxMockService {
   
   // Charging state
   private sessionEnergy: number = 0; // E pres in Wh
-  private totalEnergy: number = 31166830; // E total in Wh (31.166 kWh wie echte Wallbox)
+  private totalEnergy: number = 4_823_500; // E total in Wh (~4.8 MWh – offensichtlich simuliert, kein echter Gerätewert)
   private lastUpdateTime: number = Date.now();
   
   // Charging power tracking with ramp-up
@@ -535,7 +535,7 @@ export class WallboxMockService {
    * Initialisiert den Mock mit Demo-Startwerten
    */
   initializeDemo(): void {
-    this.totalEnergy = 31166830; // ~31.166 kWh like real wallbox
+    this.totalEnergy = 4_823_500; // ~4.8 MWh – offensichtlich simuliert, kein echter Gerätewert
     this.sessionEnergy = 0;
     this.enabled = false;
     this.enableUser = false;

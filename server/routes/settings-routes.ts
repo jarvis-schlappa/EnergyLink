@@ -14,6 +14,7 @@ import { DEFAULT_WALLBOX_IP } from "../core/defaults";
 import { z } from "zod";
 import { wallboxMockService } from "../demo/wallbox-mock";
 import { startUnifiedMock, stopUnifiedMock } from "../demo/unified-mock";
+import { triggerImmediateE3dcPoll } from "../e3dc/poller";
 import { MockE3dcGateway, RealE3dcGateway } from "../e3dc/gateway";
 import { sendUdpCommand } from "../wallbox/transport";
 import { getBuildInfo } from "../core/build-info";
@@ -106,6 +107,8 @@ export function registerSettingsRoutes(app: Express): void {
             await startUnifiedMock();
             // Reset cached strategy controller so it picks up MockPhaseProvider
             setStrategyController(null);
+            // Sofortiger E3DC-Poll nach Demo-Aktivierung (#67): kein 30s Warten mehr
+            triggerImmediateE3dcPoll();
             log("info", "system", "Demo-Modus zur Laufzeit aktiviert: Mock-Server gestartet, E3DC auf Mock umgestellt");
           } catch (error) {
             log("error", "system", "Fehler beim Starten des Demo-Modus", error instanceof Error ? error.message : String(error));
@@ -116,6 +119,8 @@ export function registerSettingsRoutes(app: Express): void {
             e3dcClient.setGateway(new RealE3dcGateway());
             // Reset cached strategy controller so it picks up RealPhaseProvider
             setStrategyController(null);
+            // Sofortiger E3DC-Poll nach Demo-Deaktivierung (#67): kein 30s Warten mehr
+            triggerImmediateE3dcPoll();
             log("info", "system", "Demo-Modus zur Laufzeit deaktiviert: Mock-Server gestoppt, E3DC auf Production umgestellt");
           } catch (error) {
             log("error", "system", "Fehler beim Stoppen des Demo-Modus", error instanceof Error ? error.message : String(error));
