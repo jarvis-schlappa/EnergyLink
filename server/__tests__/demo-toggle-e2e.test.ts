@@ -35,7 +35,7 @@ beforeAll(async () => {
 
   app.get("/api/health", healthHandler);
 
-  // Ensure settings exist with a "real" wallbox IP (NOT 127.0.0.1)
+  // Ensure settings exist with "real" IPs (NOT 127.0.0.1)
   const currentSettings = storage.getSettings();
   storage.saveSettings({
     ...currentSettings,
@@ -43,6 +43,12 @@ beforeAll(async () => {
     demoMode: false,
     mockWallboxPhases: 3,
     mockWallboxPlugStatus: 7,
+    fhemSync: {
+      enabled: false,
+      host: "192.168.40.11",
+      port: 7072,
+      autoCloseGarageOnPlug: false,
+    },
   });
 
   // Register routes — no mock server started!
@@ -141,6 +147,10 @@ describe("Demo mode toggle at runtime (#18)", () => {
     expect(settingsRes.body.demoMode).toBe(false);
     // wallboxIp should be restored from backup (192.168.40.16)
     expect(settingsRes.body.wallboxIp).toBe("192.168.40.16");
+    // fhemSync.host must also be restored from backup (#62)
+    expect(settingsRes.body.fhemSync?.host).toBe("192.168.40.11");
+    // fhemHostBackup must be cleaned up after demo OFF (#62)
+    expect(settingsRes.body.fhemHostBackup).toBeUndefined();
   }, 10_000);
 });
 
@@ -182,4 +192,31 @@ describe("Mock wallbox plug status broadcast (#18)", () => {
       .send({ ...finalSettings.body, demoMode: false });
     await new Promise((r) => setTimeout(r, 2000));
   }, 20_000);
+});
+
+
+describe("E3DC mock state reset on demo toggle (#63)", () => {
+  it("should reset SOC state when demo is restarted via reset()", async () => {
+    const { e3dcMockService } = await import("../demo/e3dc-mock");
+
+    // 1. Reset to get a clean time-appropriate initial SOC
+    e3dcMockService.reset();
+    const freshData = await e3dcMockService.getLiveData(0);
+    const initialSoc = freshData.batterySoc;
+
+    // 2. Dirty the singleton state directly (simulates SOC drift during long demo session)
+    (e3dcMockService as any).currentSoc = 99;
+    const dirtyData = await e3dcMockService.getLiveData(0);
+    expect(dirtyData.batterySoc).toBe(99);
+
+    // 3. Reset — SOC must return to time-appropriate value, NOT stay at 99
+    e3dcMockService.reset();
+    const resetData = await e3dcMockService.getLiveData(0);
+    expect(resetData.batterySoc).toBe(initialSoc);
+    expect(resetData.batterySoc).not.toBe(99);
+
+    // 4. SOC must be in valid range (0-100)
+    expect(resetData.batterySoc).toBeGreaterThanOrEqual(0);
+    expect(resetData.batterySoc).toBeLessThanOrEqual(100);
+  });
 });

@@ -335,6 +335,13 @@ export class MemStorage implements IStorage {
         logStorage("debug", `Demo-Modus aktiviert - E3DC Backup: ${settings.e3dcIpBackup} → 127.0.0.1:5502`);
       }
       settings.e3dcIp = "127.0.0.1:5502";
+
+      // FHEM Host: Backup erstellen und auf Mock setzen
+      if (settings.fhemSync?.host) {
+        settings.fhemHostBackup = settings.fhemSync.host;
+        settings.fhemSync = { ...settings.fhemSync, host: "127.0.0.1" };
+        logStorage("debug", `Demo-Modus aktiviert - FHEM Backup: ${settings.fhemHostBackup} → 127.0.0.1`);
+      }
     }
     // Demo-Modus deaktiviert: IPs aus previousSettings-Backup wiederherstellen
     else if (!isDemoMode && wasDemoMode) {
@@ -361,6 +368,15 @@ export class MemStorage implements IStorage {
         delete settings.e3dcIp;
         logStorage("warning", "Demo-Modus deaktiviert ohne E3DC Backup - E3DC IP entfernt");
       }
+
+      // FHEM Host wiederherstellen
+      if (previousSettings?.fhemHostBackup && settings.fhemSync) {
+        settings.fhemSync = { ...settings.fhemSync, host: previousSettings.fhemHostBackup };
+        logStorage("debug", `Demo-Modus deaktiviert - FHEM wiederhergestellt: ${settings.fhemSync.host}`);
+      } else if (settings.fhemSync?.host === "127.0.0.1" && !previousSettings?.fhemHostBackup) {
+        logStorage("warning", "Demo-Modus deaktiviert ohne FHEM Backup - Host bleibt auf 127.0.0.1");
+      }
+      delete settings.fhemHostBackup;
     }
     // Demo-Modus bleibt aktiv: IPs auf Mock-Server behalten, Backups erhalten
     else if (isDemoMode && wasDemoMode) {
@@ -391,6 +407,14 @@ export class MemStorage implements IStorage {
         // User hat E3DC gelöscht (undefined/null) UND previous war ECHTE IP → Respektiere Löschung
         delete settings.e3dcIpBackup;
         logStorage("debug", "Demo-Modus aktiv - E3DC IP gelöscht (User-Request)");
+      }
+
+      // FHEM Host: Force Mock-IP, Backup erhalten
+      if (settings.fhemSync) {
+        settings.fhemSync = { ...settings.fhemSync, host: "127.0.0.1" };
+      }
+      if (!settings.fhemHostBackup && previousSettings?.fhemHostBackup) {
+        settings.fhemHostBackup = previousSettings.fhemHostBackup;
       }
     }
     

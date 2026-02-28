@@ -76,7 +76,9 @@ let garageMovingTimer: NodeJS.Timeout | null = null;
 // FHEM TCP SERVER (Port 7072) - Empfängt setreading-Befehle vom FHEM-Sync
 // =============================================================================
 
-const fhemTcpServer = net.createServer((socket) => {
+let fhemTcpServer: net.Server | null = null;
+
+const fhemTcpHandler = (socket: net.Socket) => {
   const clientAddress = `${socket.remoteAddress}:${socket.remotePort}`;
   log("debug", "fhem-mock", `[FHEM-TCP] Neue Verbindung von ${clientAddress}`);
   
@@ -103,13 +105,15 @@ const fhemTcpServer = net.createServer((socket) => {
   socket.on('error', (err) => {
     log("error", "fhem-mock", `[FHEM-TCP] Socket-Fehler von ${clientAddress}:`, err.message);
   });
-});
+};
 
 // =============================================================================
 // FHEM HTTP SERVER (Port 8083)
 // =============================================================================
 
-const fhemServer = http.createServer((req, res) => {
+let fhemServer: http.Server | null = null;
+
+const fhemHttpHandler = (req: http.IncomingMessage, res: http.ServerResponse) => {
   const url = new URL(req.url || '', `http://${req.headers.host}`);
   log("debug", "fhem-mock", `[FHEM-HTTP] ${req.method} ${url.pathname}${url.search}`);
 
@@ -241,11 +245,7 @@ const fhemServer = http.createServer((req, res) => {
   // Fallback: Unbekannter Request
   res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
   res.end('<html><body>FHEM Mock Server - OK</body></html>');
-});
-
-fhemServer.on('error', (err) => {
-  log("error", "fhem-mock", `[FHEM-HTTP] Server Error:`, err instanceof Error ? err.message : String(err));
-});
+};
 
 // =============================================================================
 // WALLBOX UDP HANDLER (verwendet zentralen UDP-Channel)
@@ -567,6 +567,12 @@ export async function startUnifiedMock(): Promise<void> {
   // Wallbox-Mock initialisieren (nur bei Start, nicht bei Import)
   wallboxMockService.initializeDemo();
   
+  // E3DC-Mock State zurücksetzen (SOC, Battery Lock State etc.)
+  e3dcMockService.reset();
+  // Cache invalidieren damit der erste API-Aufruf frische Mock-Daten liefert
+  cachedE3dcData = null;
+  lastE3dcUpdate = 0;
+  
   // Broadcast-Callback setzen (sendet Broadcasts über UDP-Channel)
   wallboxMockService.setBroadcastCallback((data) => {
     log("debug", "wallbox-mock", `[Mock-Wallbox → Broadcast] Sende: ${JSON.stringify(data)}`);
@@ -585,22 +591,27 @@ export async function startUnifiedMock(): Promise<void> {
   wallboxUdpChannel.onBroadcast(handleWallboxBroadcast);
   log("info", "wallbox-mock", "✅ [Wallbox-UDP] KEBA Mock läuft auf 0.0.0.0:7090");
 
-  // HTTP Server starten
+  // HTTP Server erstellen und starten
+  fhemServer = http.createServer(fhemHttpHandler);
+  fhemServer.on('error', (err) => {
+    log("error", "fhem-mock", `[FHEM-HTTP] Server Error:`, err instanceof Error ? err.message : String(err));
+  });
   await new Promise<void>((resolve, reject) => {
-    fhemServer.once('error', reject);
-    fhemServer.listen(FHEM_HTTP_PORT, HOST, () => {
-      fhemServer.removeListener('error', reject);
+    fhemServer!.once('error', reject);
+    fhemServer!.listen(FHEM_HTTP_PORT, HOST, () => {
+      fhemServer!.removeListener('error', reject);
       log("info", "fhem-mock", `✅ [FHEM-HTTP] FHEM Mock läuft auf ${HOST}:${FHEM_HTTP_PORT}`);
       log("info", "fhem-mock", `   Unterstützt FHEM-typische URLs für Status & Befehle`);
       resolve();
     });
   });
 
-  // FHEM TCP Server starten (empfängt setreading-Befehle vom FHEM-Sync)
+  // FHEM TCP Server erstellen und starten
+  fhemTcpServer = net.createServer(fhemTcpHandler);
   await new Promise<void>((resolve, reject) => {
-    fhemTcpServer.once('error', reject);
-    fhemTcpServer.listen(FHEM_TCP_PORT, HOST, () => {
-      fhemTcpServer.removeListener('error', reject);
+    fhemTcpServer!.once('error', reject);
+    fhemTcpServer!.listen(FHEM_TCP_PORT, HOST, () => {
+      fhemTcpServer!.removeListener('error', reject);
       log("info", "fhem-mock", `✅ [FHEM-TCP] FHEM Telnet Mock läuft auf ${HOST}:${FHEM_TCP_PORT}`);
       log("info", "fhem-mock", `   Empfängt setreading-Befehle vom FHEM-E3DC-Sync (DEBUG-Level)`);
       resolve();
@@ -734,14 +745,18 @@ export async function stopUnifiedMock(): Promise<void> {
   // Beim Shutdown wird er separat in server/index.ts gestoppt.
   const promises: Promise<void>[] = [
     new Promise<void>((resolve) => {
+      if (!fhemServer) { resolve(); return; }
       fhemServer.close(() => {
         log("info", "fhem-mock", "   ✅ FHEM HTTP Server gestoppt");
+        fhemServer = null;
         resolve();
       });
     }),
     new Promise<void>((resolve) => {
+      if (!fhemTcpServer) { resolve(); return; }
       fhemTcpServer.close(() => {
         log("info", "fhem-mock", "   ✅ FHEM TCP Server gestoppt");
+        fhemTcpServer = null;
         resolve();
       });
     })

@@ -163,6 +163,7 @@ export const settingsSchema = z.object({
   wallboxIpBackup: z.string().optional(),
   e3dcIp: z.string().optional(),
   e3dcIpBackup: z.string().optional(),
+  fhemHostBackup: z.string().optional(),
   nightChargingSchedule: nightChargingScheduleSchema.optional(),
   e3dc: e3dcConfigSchema.optional(),
   chargingStrategy: chargingStrategyConfigSchema.optional(),
