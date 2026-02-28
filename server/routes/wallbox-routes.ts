@@ -6,6 +6,7 @@ import { sendUdpCommand } from "../wallbox/transport";
 import { initSSEClient, broadcastWallboxStatus } from "../wallbox/sse";
 import { getOrCreateStrategyController } from "./shared-state";
 import { getAuthoritativePlugStatus } from "../wallbox/broadcast-listener";
+import { triggerImmediateE3dcPoll } from "../e3dc/poller";
 
 // Issue #93: Status-Poll-Throttle im Idle
 // Wenn Strategie "off" + State 5 (unterbrochen) → gecachten Status zurückgeben statt 3 UDP-Requests
@@ -281,6 +282,8 @@ export function registerWallboxRoutes(app: Express): void {
         try {
           const controller = getOrCreateStrategyController();
           await controller.stopChargingForStrategyOff(settings.wallboxIp);
+          // Issue #73: Sofortiger E3DC-Poll nach Stopp, damit Frontend aktuelle Energiedaten bekommt
+          triggerImmediateE3dcPoll();
         } catch (bgError) {
           log(
             "error",
