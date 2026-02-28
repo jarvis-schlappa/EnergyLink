@@ -37,6 +37,15 @@ export function getLastCachedWallboxStatus(): { state: number; plug: number; pow
   return { state: lastCachedStatus.state, plug: lastCachedStatus.plug, power: lastCachedStatus.power };
 }
 
+/**
+ * Aktualisiert den gecachten Wallbox-Status (Issue #79).
+ * Wird von fetchAndBroadcastStatus() im Broadcast-Listener aufgerufen,
+ * damit /api/status aktuelle Power-Werte liefert (nicht nur vom letzten HTTP-Poll).
+ */
+export function updateLastCachedWallboxStatus(status: any): void {
+  lastCachedStatus = status;
+}
+
 export function registerWallboxRoutes(app: Express): void {
   // SSE-Endpoint für Echtzeit-Status-Updates
   app.get("/api/wallbox/stream", (req, res) => {
