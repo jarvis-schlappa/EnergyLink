@@ -6,6 +6,7 @@ import { sendUdpCommand } from "../wallbox/transport";
 import { initSSEClient, broadcastWallboxStatus } from "../wallbox/sse";
 import { getOrCreateStrategyController } from "./shared-state";
 import { getAuthoritativePlugStatus } from "../wallbox/broadcast-listener";
+import { triggerImmediateE3dcPoll } from "../e3dc/poller";
 
 // Issue #93: Status-Poll-Throttle im Idle
 // Wenn Strategie "off" + State 5 (unterbrochen) → gecachten Status zurückgeben statt 3 UDP-Requests
@@ -20,7 +21,9 @@ let lastCachedStatus: any = null;
  */
 export function resetStatusPollThrottle(): void {
   lastStatusPollTime = 0;
-  lastCachedStatus = null;
+  // Issue #74: Cache nicht nullen – nur Timestamp zurücksetzen.
+  // So liefert getLastCachedWallboxStatus() weiterhin den letzten bekannten Status,
+  // während der nächste API-Call frische UDP-Daten holt (weil Timestamp=0).
   log("debug", "wallbox", "Status-Poll-Throttle zurückgesetzt (State-/Strategie-Änderung)");
 }
 
@@ -268,6 +271,8 @@ export function registerWallboxRoutes(app: Express): void {
       };
 
       storage.saveSettings(updatedSettings);
+      // Issue #75: User-initiierter Stopp tracken (Badge zeigt "Gestoppt" statt "Unterbrochen")
+      storage.updateChargingContext({ lastStopReason: "user" });
       log("info", "wallbox", `Ladestrategie deaktiviert (auf "off" gesetzt)`);
       
       // Issue #93: Throttle zurücksetzen bei Stopp
@@ -281,6 +286,8 @@ export function registerWallboxRoutes(app: Express): void {
         try {
           const controller = getOrCreateStrategyController();
           await controller.stopChargingForStrategyOff(settings.wallboxIp);
+          // Issue #73: Sofortiger E3DC-Poll nach Stopp, damit Frontend aktuelle Energiedaten bekommt
+          triggerImmediateE3dcPoll();
         } catch (bgError) {
           log(
             "error",
