@@ -46,13 +46,15 @@ export function registerStatusRoutes(app: Express): void {
       const gridPower = e3dcLiveData ? Math.round(e3dcLiveData.gridPower) : 0;
       const batPower = e3dcLiveData ? Math.round(e3dcLiveData.batteryPower) : 0;
 
-      const snapshot = `wb=${wbPower}/${wbState}/${wbPlug}/${wbCharging} e3dc=${pvPower}/${soc}/${gridPower}/${batPower} strategy=${strategy} demo=${demo}`;
+      const auto = controls?.pvSurplus ?? false;
+
+      const snapshot = `wb=${wbPower}/${wbState}/${wbPlug}/${wbCharging} e3dc=${pvPower}/${soc}/${gridPower}/${batPower} strategy=${strategy} demo=${demo} auto=${auto}`;
       if (snapshot !== lastFrontendStateSnapshot) {
         lastFrontendStateSnapshot = snapshot;
         log(
           "trace",
           "system",
-          `[FRONTEND-STATE] wallbox={power:${wbPower}W, state:${wbState}, plug:${wbPlug}, charging:${wbCharging}} e3dc={pv:${pvPower}W, soc:${soc}%, grid:${gridPower}W, bat:${batPower}W} strategy=${strategy} demo=${demo}`,
+          `[FRONTEND-STATE] wallbox={power:${wbPower}W, state:${wbState}, plug:${wbPlug}, charging:${wbCharging}} e3dc={pv:${pvPower}W, soc:${soc}%, grid:${gridPower}W, bat:${batPower}W} strategy=${strategy} demo=${demo} auto=${auto}`,
         );
       }
 
