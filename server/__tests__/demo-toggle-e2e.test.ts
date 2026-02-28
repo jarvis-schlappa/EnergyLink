@@ -147,6 +147,10 @@ describe("Demo mode toggle at runtime (#18)", () => {
     expect(settingsRes.body.demoMode).toBe(false);
     // wallboxIp should be restored from backup (192.168.40.16)
     expect(settingsRes.body.wallboxIp).toBe("192.168.40.16");
+    // fhemSync.host must also be restored from backup (#62)
+    expect(settingsRes.body.fhemSync?.host).toBe("192.168.40.11");
+    // fhemHostBackup must be cleaned up after demo OFF (#62)
+    expect(settingsRes.body.fhemHostBackup).toBeUndefined();
   }, 10_000);
 });
 
@@ -190,60 +194,6 @@ describe("Mock wallbox plug status broadcast (#18)", () => {
   }, 20_000);
 });
 
-describe("fhemSync.host backup/restore on demo toggle (#62)", () => {
-  it("should restore fhemSync.host when demo mode is deactivated", async () => {
-    // 0. Ensure clean state: demo OFF, real fhemSync.host set
-    const cleanup = await request(server).get("/api/settings");
-    await request(server)
-      .post("/api/settings")
-      .send({
-        ...cleanup.body,
-        demoMode: false,
-        fhemSync: { enabled: false, host: "192.168.40.11", port: 7072, autoCloseGarageOnPlug: false },
-      });
-    await new Promise((r) => setTimeout(r, 2000));
-
-    // 1. Verify initial state: demo OFF, real fhemSync.host
-    const initialRes = await request(server).get("/api/settings");
-    expect(initialRes.status).toBe(200);
-    expect(initialRes.body.demoMode).toBe(false);
-    expect(initialRes.body.fhemSync?.host).toBe("192.168.40.11");
-
-    // 2. Toggle demo mode ON via POST /api/settings (full E2E path)
-    const settingsOn = await request(server).get("/api/settings");
-    const postOnRes = await request(server)
-      .post("/api/settings")
-      .send({ ...settingsOn.body, demoMode: true });
-    expect(postOnRes.status).toBe(200);
-
-    // Wait for startUnifiedMock() to finish (may partly fail on ports, that's ok)
-    await new Promise((r) => setTimeout(r, 3000));
-
-    // 3. Verify fhemSync.host is now 127.0.0.1 (mock)
-    const demoOnRes = await request(server).get("/api/settings");
-    expect(demoOnRes.status).toBe(200);
-    expect(demoOnRes.body.demoMode).toBe(true);
-    expect(demoOnRes.body.fhemSync?.host).toBe("127.0.0.1");
-
-    // 4. Toggle demo mode OFF via POST /api/settings
-    const settingsOff = await request(server).get("/api/settings");
-    const postOffRes = await request(server)
-      .post("/api/settings")
-      .send({ ...settingsOff.body, demoMode: false });
-    expect(postOffRes.status).toBe(200);
-
-    await new Promise((r) => setTimeout(r, 2000));
-
-    // 5. CRITICAL: fhemSync.host MUST be restored to original "192.168.40.11"
-    const restoredRes = await request(server).get("/api/settings");
-    expect(restoredRes.status).toBe(200);
-    expect(restoredRes.body.demoMode).toBe(false);
-    expect(restoredRes.body.fhemSync?.host).toBe("192.168.40.11");
-
-    // 6. fhemHostBackup must be cleaned up (no stale backup after demo OFF)
-    expect(restoredRes.body.fhemHostBackup).toBeUndefined();
-  }, 20_000);
-});
 
 describe("E3DC mock state reset on demo toggle (#63)", () => {
   it("should reset SOC state when demo is restarted via reset()", async () => {
