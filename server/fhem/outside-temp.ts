@@ -3,11 +3,11 @@ import { log } from "../core/logger";
 const FHEM_HTTP_PORT = 8083;
 
 /**
- * Außentemperatur von FHEM abfragen (heatronic Device, Reading ch_tOutside).
+ * Außentemperatur von FHEM abfragen (heatronic Device, Reading ch_Toutside).
  * Gibt null zurück wenn FHEM nicht erreichbar oder Reading nicht vorhanden.
  */
 export async function getOutsideTemp(host: string): Promise<number | null> {
-  const url = `http://${host}:${FHEM_HTTP_PORT}/fhem?cmd=jsonlist2%20heatronic%20ch_tOutside&XHR=1`;
+  const url = `http://${host}:${FHEM_HTTP_PORT}/fhem?cmd=jsonlist2%20heatronic%20ch_Toutside&XHR=1`;
 
   try {
     const response = await fetch(url, {
@@ -22,10 +22,10 @@ export async function getOutsideTemp(host: string): Promise<number | null> {
 
     const json = await response.json();
     const device = json?.Results?.[0];
-    const value = device?.Readings?.ch_tOutside?.Value;
+    const value = device?.Readings?.ch_Toutside?.Value;
 
     if (value === undefined || value === null) {
-      log("debug", "fhem", "FHEM heatronic.ch_tOutside nicht vorhanden");
+      log("debug", "fhem", "FHEM heatronic.ch_Toutside nicht vorhanden");
       return null;
     }
 
