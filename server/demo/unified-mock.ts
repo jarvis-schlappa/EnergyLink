@@ -196,6 +196,26 @@ const fhemHttpHandler = (req: http.IncomingMessage, res: http.ServerResponse) =>
       return;
     }
 
+    // Handle jsonlist2 heatronic (Issue #81: Außentemperatur)
+    if (cmd.match(/jsonlist2\s+heatronic/i)) {
+      const mockTemp = 5 + Math.round(Math.random() * 20); // 5-25°C
+      const jsonResponse = {
+        Results: [{
+          Name: "heatronic",
+          Readings: {
+            ch_tOutside: {
+              Value: String(mockTemp),
+              Time: new Date().toISOString(),
+            }
+          }
+        }]
+      };
+      log("debug", "fhem-mock", `[FHEM-HTTP] jsonlist2 heatronic → ch_tOutside=${mockTemp}°C`);
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify(jsonResponse));
+      return;
+    }
+
     // Handle set aktor_garagentor on-for-timer 1
     if (cmd.match(/set\s+aktor_garagentor\s+on-for-timer/i)) {
       const previousState = garageState;

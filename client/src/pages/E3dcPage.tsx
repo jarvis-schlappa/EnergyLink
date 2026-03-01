@@ -290,7 +290,7 @@ export default function E3dcPage() {
                   <div>
                     <div className="flex items-center gap-2 mb-3">
                       <Sun className="w-4 h-4 text-muted-foreground" />
-                      <span className="text-base font-semibold">PV</span>
+                      <span className="text-base font-semibold">PV</span>{e3dcData.outsideTemp !== undefined && (<span className="text-xs text-muted-foreground ml-1">{Math.round(e3dcData.outsideTemp)}°C</span>)}
                     </div>
                     <div className="text-2xl font-bold" data-testid="text-pv-power">
                       {formatPower(e3dcData.pvPower)}

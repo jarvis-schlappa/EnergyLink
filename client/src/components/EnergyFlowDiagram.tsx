@@ -7,6 +7,7 @@ interface EnergyFlowData {
   gridPower: number;      // Netzleistung (negativ = Einspeisung, positiv = Bezug)
   batterySoc: number;     // Batterie-Ladestand in %
   wallboxPower: number;   // Wallbox-Ladeleistung in Watt
+  outsideTemp?: number;   // Außentemperatur in °C (optional, von FHEM)
 }
 
 interface EnergyFlowDiagramProps {
@@ -42,7 +43,7 @@ export default function EnergyFlowDiagram({ data }: EnergyFlowDiagramProps) {
             <Zap className={`w-8 h-8 ${isPvActive ? "text-yellow-500" : "text-muted-foreground"}`} />
           </div>
           <div className="text-center">
-            <div className="text-xs text-muted-foreground">PV</div>
+            <div className="flex items-center justify-center gap-1"><span className="text-xs text-muted-foreground">PV</span>{data.outsideTemp !== undefined && (<span className="text-xs text-muted-foreground">{Math.round(data.outsideTemp)}°C</span>)}</div>
             <div className={`text-sm font-semibold ${isPvActive ? "text-foreground" : "text-muted-foreground"}`}>
               {formatPower(data.pvPower)}
             </div>
