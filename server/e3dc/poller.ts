@@ -3,6 +3,7 @@ import { storage } from "../core/storage";
 import { getE3dcModbusService, getE3dcLiveDataHub } from "./modbus";
 import { sendUdpCommand } from "../wallbox/transport";
 import { getProwlNotifier } from "../monitoring/prowl-notifier";
+import { getOutsideTemp } from "../fhem/outside-temp";
 
 /**
  * E3DC-Background-Poller
@@ -42,6 +43,12 @@ let lastWallboxPower = 0;
 // Wenn Strategie "off" → gesamtes E3DC-Polling auf 30s drosseln statt ~7-10s
 const IDLE_E3DC_POLL_INTERVAL_S = 30;
 let idleThrottleOverride = false;
+
+// Außentemperatur-Cache (Issue #81)
+// FHEM nur alle 60s abfragen statt jeden Poll-Zyklus
+const OUTSIDE_TEMP_POLL_INTERVAL_MS = 60_000;
+let lastOutsideTempPollTime = 0;
+let cachedOutsideTemp: number | null = null;
 
 /**
  * Einzelner Poll-Durchlauf (mit Promise-Tracking und Exponential Backoff)
@@ -105,6 +112,23 @@ async function pollE3dcData(): Promise<boolean> {
 
       // Lese E3DC-Daten (cached für FHEM-Sync und andere Consumer)
       const liveData = await e3dcService.readLiveData(wallboxPower);
+
+      // Issue #81: Außentemperatur von FHEM abfragen (gecacht, alle 60s)
+      const fhemHost = settings?.fhemSync?.host;
+      if (fhemHost && settings?.fhemSync?.enabled) {
+        const tempPollDue = (now - lastOutsideTempPollTime) >= OUTSIDE_TEMP_POLL_INTERVAL_MS;
+        if (tempPollDue) {
+          try {
+            cachedOutsideTemp = await getOutsideTemp(fhemHost);
+            lastOutsideTempPollTime = now;
+          } catch {
+            // Non-critical: Cache behalten bei Fehler
+          }
+        }
+      }
+      if (cachedOutsideTemp !== null) {
+        liveData.outsideTemp = cachedOutsideTemp;
+      }
 
       // Event-Emission an alle registrierten Listener (FHEM, etc.)
       const hub = getE3dcLiveDataHub();

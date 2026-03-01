@@ -237,6 +237,7 @@ export const e3dcLiveDataSchema = z.object({
   autarky: z.number(),
   selfConsumption: z.number(),
   gridFrequency: z.number().optional(),
+  outsideTemp: z.number().optional(),
   timestamp: z.string(),
 });
 
