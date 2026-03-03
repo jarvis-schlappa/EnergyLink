@@ -79,11 +79,12 @@ export interface IStorage {
 }
 
 export class MemStorage implements IStorage {
-  private settingsFilePath = join(process.cwd(), "data", "settings.json");
-  private controlStateFilePath = join(process.cwd(), "data", "control-state.json");
-  private plugTrackingFilePath = join(process.cwd(), "data", "plug-tracking.json");
-  private chargingContextFilePath = join(process.cwd(), "data", "charging-context.json");
-  private logSettingsFilePath = join(process.cwd(), "data", "log-settings.json");
+  private dataDir: string;
+  private settingsFilePath: string;
+  private controlStateFilePath: string;
+  private plugTrackingFilePath: string;
+  private chargingContextFilePath: string;
+  private logSettingsFilePath: string;
   private settings: Settings | null = null;
   private controlState: ControlState = {
     pvSurplus: false,
@@ -107,11 +108,17 @@ export class MemStorage implements IStorage {
   };
   private maxLogs = 1000;
 
-  constructor() {
+  constructor(dataDir?: string) {
     // Erstelle data-Verzeichnis falls nicht vorhanden
-    const dataDir = join(process.cwd(), "data");
-    if (!existsSync(dataDir)) {
-      mkdirSync(dataDir, { recursive: true });
+    this.dataDir = dataDir || process.env.DATA_DIR || join(process.cwd(), "data");
+    this.settingsFilePath = join(this.dataDir, "settings.json");
+    this.controlStateFilePath = join(this.dataDir, "control-state.json");
+    this.plugTrackingFilePath = join(this.dataDir, "plug-tracking.json");
+    this.chargingContextFilePath = join(this.dataDir, "charging-context.json");
+    this.logSettingsFilePath = join(this.dataDir, "log-settings.json");
+
+    if (!existsSync(this.dataDir)) {
+      mkdirSync(this.dataDir, { recursive: true });
     }
 
     // Lade Log-Settings ZUERST - damit logStorage das korrekte Level während Initialisierung verwendet
@@ -544,6 +551,28 @@ export class MemStorage implements IStorage {
     } catch (error) {
       // Silent fail - log settings are not critical for operation
     }
+  }
+  /**
+   * Reinitialize storage with a new data directory.
+   * For testing only – allows E2E tests to use isolated temp directories.
+   */
+  reinitialize(dataDir: string): void {
+    this.dataDir = dataDir;
+    this.settingsFilePath = join(dataDir, "settings.json");
+    this.controlStateFilePath = join(dataDir, "control-state.json");
+    this.plugTrackingFilePath = join(dataDir, "plug-tracking.json");
+    this.chargingContextFilePath = join(dataDir, "charging-context.json");
+    this.logSettingsFilePath = join(dataDir, "log-settings.json");
+    if (!existsSync(dataDir)) {
+      mkdirSync(dataDir, { recursive: true });
+    }
+    // Reload all data from new directory
+    this.logSettings = this.loadLogSettingsFromFile();
+    this.settings = this.loadSettingsFromFile();
+    this.controlState = this.loadControlStateFromFile();
+    this.plugStatusTracking = this.loadPlugTrackingFromFile();
+    this.chargingContext = this.loadChargingContextFromFile();
+    this.logs = [];
   }
 }
 
