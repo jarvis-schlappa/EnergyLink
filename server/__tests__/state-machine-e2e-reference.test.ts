@@ -299,7 +299,7 @@ describe("State Machine E2E Reference Tests", () => {
 
       const ctx = storage.getChargingContext();
       expect(ctx.isActive).toBe(true);
-      expect(ctx.currentAmpere).toBe(8); // (5000-3000)*0.9/230 = 7.8 → 8A
+      expect(ctx.currentAmpere).toBe(7.8); // Issue #92: (5000-3000)*0.9/230 = 7.826 → 100mA: 7.8A
     });
 
     it("SOC >= 95%: uses actual battery power → more surplus for car", async () => {
@@ -330,7 +330,7 @@ describe("State Machine E2E Reference Tests", () => {
 
       const ctx = storage.getChargingContext();
       expect(ctx.isActive).toBe(true);
-      expect(ctx.currentAmpere).toBe(19); // (5000-200)*0.9/230 = 18.78 → 19A
+      expect(ctx.currentAmpere).toBe(18.8); // Issue #92: (5000-200)*0.9/230 = 18.78 → 100mA: 18.8A
     });
   });
 

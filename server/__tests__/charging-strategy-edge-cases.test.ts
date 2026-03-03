@@ -168,18 +168,18 @@ describe("ChargingStrategyController - Edge Cases", () => {
       expect(result).toBeNull();
     });
 
-    it("rounds current correctly (1725W / 230V = 7.5 → 8A)", () => {
+    it("rounds current to 100mA steps (1725W / 230V = 7.5 → 7.5A)", () => {
       (storage as any)._setContext({ isActive: false, currentPhases: 1 });
       const result = callCalcTarget(controller, makeConfig(), 1725, makeLiveData());
-      // 1725 / 230 = 7.5 → Math.round = 8
-      expect(result).toEqual({ currentMa: 8000 });
+      // Issue #92: 1725/230 = 7.5 → Runde auf 100mA statt ganze A
+      expect(result).toEqual({ currentMa: 7500 });
     });
 
     it("floors to 6A minimum when surplus gives less than 6A", () => {
       (storage as any)._setContext({ isActive: false, currentPhases: 1 });
-      // 1400W / 230V = 6.08 → 6A (>= minPower 1380 so not null)
+      // 1400W / 230V = 6.087 → 6.1A (>= minPower 1380 so not null)
       const result = callCalcTarget(controller, makeConfig(), 1400, makeLiveData());
-      expect(result).toEqual({ currentMa: 6000 });
+      expect(result).toEqual({ currentMa: 6100 });
     });
   });
 
