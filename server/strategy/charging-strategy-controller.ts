@@ -739,7 +739,7 @@ async processStrategy(liveData: E3dcLiveData, wallboxIp: string): Promise<void> 
         
         // Bug #84: Wallbox deaktivieren wenn nicht aktiv laden soll
         try {
-          await this.ensureWallboxDisabled(wallboxIp);
+          await this.ensureWallboxDisabled(wallboxIp, report2["Enable sys"] ?? 0);
         } catch (error) {
           log("warning", "system", "[RECONCILE] ensureWallboxDisabled fehlgeschlagen", error instanceof Error ? error.message : String(error));
         }
@@ -774,7 +774,7 @@ async processStrategy(liveData: E3dcLiveData, wallboxIp: string): Promise<void> 
       const freshContext = storage.getChargingContext();
       if (!freshContext.isActive && !reallyCharging) {
         try {
-          await this.ensureWallboxDisabled(wallboxIp);
+          await this.ensureWallboxDisabled(wallboxIp, report2["Enable sys"] ?? 0);
         } catch (error) {
           log("warning", "system", "[RECONCILE] ensureWallboxDisabled fehlgeschlagen", error instanceof Error ? error.message : String(error));
         }
@@ -988,7 +988,12 @@ async processStrategy(liveData: E3dcLiveData, wallboxIp: string): Promise<void> 
    * 2. Nicht wenn aktiv ladend (isActive)
    * 3. Nicht wenn Night-Charging aktiv
    */
-  async ensureWallboxDisabled(wallboxIp: string): Promise<void> {
+  async ensureWallboxDisabled(wallboxIp: string, enableSys: number): Promise<void> {
+    // Guard 0: Wallbox bereits deaktiviert → nichts tun (Issue #90: verhindert ena 0 Spam)
+    if (enableSys !== 1) {
+      return;
+    }
+
     const settings = storage.getSettings();
     const context = storage.getChargingContext();
     const controlState = storage.getControlState();

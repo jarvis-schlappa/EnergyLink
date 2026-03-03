@@ -231,7 +231,7 @@ const handleBroadcast = async (data: any, rinfo: any) => {
             try {
               const settings = storage.getSettings();
               if (settings?.wallboxIp) {
-                await getOrCreateStrategyController().ensureWallboxDisabled(settings.wallboxIp);
+                await getOrCreateStrategyController().ensureWallboxDisabled(settings.wallboxIp, 1);
               }
             } catch (error) {
               log("warning", "system", "[Wallbox-Broadcast-Listener] ensureWallboxDisabled fehlgeschlagen", error instanceof Error ? error.message : String(error));
