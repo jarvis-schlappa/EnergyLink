@@ -678,7 +678,18 @@ async processStrategy(liveData: E3dcLiveData, wallboxIp: string): Promise<void> 
       // Auto wurde ab-/angesteckt → nächster Ladeversuch soll erlaubt sein
       if (currentPlugStatus !== polledPlugStatus && context.vehicleFinishedCharging) {
         log("info", "system", `[RECONCILE] Plug-Wechsel (${currentPlugStatus} → ${polledPlugStatus}) → vehicleFinishedCharging zurückgesetzt`);
-        storage.updateChargingContext({ vehicleFinishedCharging: false });
+        storage.updateChargingContext({ vehicleFinishedCharging: false, vehicleFinishedAt: undefined });
+      }
+      
+      // 12h Auto-Reset: vehicleFinishedCharging nach 12h zurücksetzen
+      // Ermöglicht erneutes Laden am nächsten Tag wenn Auto über Nacht eingesteckt bleibt
+      const VEHICLE_FINISHED_RESET_MS = 12 * 60 * 60 * 1000; // 12 Stunden
+      if (context.vehicleFinishedCharging && context.vehicleFinishedAt) {
+        const timeSinceFinished = Date.now() - new Date(context.vehicleFinishedAt).getTime();
+        if (timeSinceFinished > VEHICLE_FINISHED_RESET_MS) {
+          log("info", "system", `[RECONCILE] vehicleFinishedCharging nach ${Math.round(timeSinceFinished / 3600000)}h automatisch zurückgesetzt`);
+          storage.updateChargingContext({ vehicleFinishedCharging: false, vehicleFinishedAt: undefined });
+        }
       }
       
       // Wallbox lädt wirklich, wenn State=3 UND Power>0
@@ -723,8 +734,15 @@ async processStrategy(liveData: E3dcLiveData, wallboxIp: string): Promise<void> 
           currentAmpere: 0,
           targetAmpere: 0,
           currentPhases: detectedPhases,
-          ...(vehicleStillConnected ? { vehicleFinishedCharging: true } : {}),
+          ...(vehicleStillConnected ? { vehicleFinishedCharging: true, vehicleFinishedAt: new Date().toISOString() } : {}),
         });
+        
+        // Bug #84: Wallbox deaktivieren wenn nicht aktiv laden soll
+        try {
+          await this.ensureWallboxDisabled(wallboxIp);
+        } catch (error) {
+          log("warning", "system", "[RECONCILE] ensureWallboxDisabled fehlgeschlagen", error instanceof Error ? error.message : String(error));
+        }
       } else if (!context.isActive && reallyCharging) {
         log("info", "system", `[RECONCILE] Context sagt isActive=false, aber Wallbox lädt (State=${wallboxState}, Power=${wallboxPower}mW) → setze isActive=true`);
         const avgCurrent = Math.round((currents[0] + currents[1] + currents[2]) / 1000 / (detectedPhases || 1));
@@ -749,6 +767,17 @@ async processStrategy(liveData: E3dcLiveData, wallboxIp: string): Promise<void> 
       if (context.userCurrentLimitAmpere !== hardwareMaxAmpere) {
         storage.updateChargingContext({ userCurrentLimitAmpere: hardwareMaxAmpere });
         log("debug", "system", `[RECONCILE] User-Limit auf Hardware-Maximum gesetzt: ${hardwareMaxAmpere}A`);
+      }
+      
+      // Bug #84: Wenn !isActive und nicht ladend, sicherstellen dass Wallbox deaktiviert ist
+      // Fängt den Fall ab, dass Enable sys=1 hängen bleibt (z.B. nach vehicleFinishedCharging)
+      const freshContext = storage.getChargingContext();
+      if (!freshContext.isActive && !reallyCharging) {
+        try {
+          await this.ensureWallboxDisabled(wallboxIp);
+        } catch (error) {
+          log("warning", "system", "[RECONCILE] ensureWallboxDisabled fehlgeschlagen", error instanceof Error ? error.message : String(error));
+        }
       }
     } catch (error) {
       log("warning", "system", "Fehler beim Abgleich des Charging Context", error instanceof Error ? error.message : String(error));
@@ -950,9 +979,57 @@ async processStrategy(liveData: E3dcLiveData, wallboxIp: string): Promise<void> 
     }
   }
 
+  /**
+   * Stellt sicher, dass die Wallbox deaktiviert ist (ena 0), wenn sie nicht aktiv laden soll.
+   * Wird aufgerufen nach vehicleFinishedCharging-Erkennung und bei Plug→7 Events.
+   * 
+   * Guards:
+   * 1. Nur bei surplus_* oder off Strategie (Max-Power will sofort laden)
+   * 2. Nicht wenn aktiv ladend (isActive)
+   * 3. Nicht wenn Night-Charging aktiv
+   */
+  async ensureWallboxDisabled(wallboxIp: string): Promise<void> {
+    const settings = storage.getSettings();
+    const context = storage.getChargingContext();
+    const controlState = storage.getControlState();
+    const strategy = settings?.chargingStrategy?.activeStrategy ?? context.strategy;
+    
+    // Guard 1: Nur bei surplus_* oder off Strategie
+    const isSurplusOrOff = strategy === "surplus_battery_prio" || 
+                            strategy === "surplus_vehicle_prio" || 
+                            strategy === "off";
+    if (!isSurplusOrOff) {
+      log("debug", "system", `[ensureWallboxDisabled] Strategie ${strategy} will sofort laden - überspringe`);
+      return;
+    }
+    
+    // Guard 2: Nicht wenn aktiv ladend
+    if (context.isActive) {
+      log("debug", "system", "[ensureWallboxDisabled] Wallbox lädt aktiv - überspringe");
+      return;
+    }
+    
+    // Guard 3: Nicht wenn Night-Charging aktiv
+    if (controlState.nightCharging) {
+      log("debug", "system", "[ensureWallboxDisabled] Night-Charging aktiv - überspringe");
+      return;
+    }
+    
+    // Wallbox deaktivieren
+    log("info", "system", `[ensureWallboxDisabled] Sende ena 0 (Strategie: ${strategy}, !isActive, !nightCharging)`);
+    await this.sendUdpCommand(wallboxIp, "ena 0");
+  }
+
   async switchStrategy(newStrategy: ChargingStrategy, wallboxIp: string): Promise<void> {
     const context = storage.getChargingContext();
     const oldStrategy = context.strategy;
+    
+    // Strategie-Wechsel ist eine bewusste User-Aktion → vehicleFinishedCharging IMMER zurücksetzen
+    // (außer bei Wechsel nach "off", da dort sowieso nicht geladen wird)
+    if (context.vehicleFinishedCharging && newStrategy !== "off") {
+      log("info", "system", `[switchStrategy] vehicleFinishedCharging zurückgesetzt (Strategie-Wechsel nach ${newStrategy})`);
+      storage.updateChargingContext({ vehicleFinishedCharging: false, vehicleFinishedAt: undefined });
+    }
     
     if (oldStrategy === newStrategy) {
       log("debug", "system", `Strategie bereits aktiv: ${newStrategy}`);
@@ -960,12 +1037,6 @@ async processStrategy(liveData: E3dcLiveData, wallboxIp: string): Promise<void> 
     }
     
     log("info", "system", `Strategie-Wechsel: ${oldStrategy} → ${newStrategy}`);
-    
-    // Strategie-Wechsel → vehicleFinishedCharging zurücksetzen
-    if (context.vehicleFinishedCharging) {
-      log("info", "system", `[switchStrategy] vehicleFinishedCharging zurückgesetzt (Strategie-Wechsel)`);
-      storage.updateChargingContext({ vehicleFinishedCharging: false });
-    }
     
     // Bei Strategie-Wechsel IMMER stoppen (falls aktiv), dann neu starten
     if (context.isActive) {
