@@ -290,9 +290,9 @@ describe("ChargingStrategyController", () => {
     it("uses context phases when active", () => {
       (storage as any)._setContext({ isActive: true, currentPhases: 3 });
       const config = makeConfig({ activeStrategy: "surplus_vehicle_prio" });
-      // 4200W / (230V * 3) = ~6.08 → rounded to 6A
+      // Issue #92: 4200W / (230V * 3) = 6.087 → 100mA resolution: 6.1A
       const result = callCalcTarget(controller, config, 4200, makeLiveData());
-      expect(result).toEqual({ currentMa: 6000 });
+      expect(result).toEqual({ currentMa: 6100 });
     });
   });
 

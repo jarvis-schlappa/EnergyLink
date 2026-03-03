@@ -616,14 +616,16 @@ async processStrategy(liveData: E3dcLiveData, wallboxIp: string): Promise<void> 
     
     const maxCurrent = currentPhases === 1 ? MAX_CURRENT_1P_AMPERE : MAX_CURRENT_3P_AMPERE;
     
-    let currentAmpere = Math.round(surplus / (PHASE_VOLTAGE_1P * currentPhases));
+    // Issue #92: Runde auf 100mA statt ganze Ampere um Oszillation zu verhindern
+    // KEBA akzeptiert mA-Auflösung (curr-Befehl nimmt mA: curr 16700 = 16.7A)
+    let currentAmpere = Math.round(surplus / (PHASE_VOLTAGE_1P * currentPhases) * 10) / 10;
     currentAmpere = Math.max(MIN_CURRENT_AMPERE, Math.min(maxCurrent, currentAmpere));
     
     if (strategy === "surplus_vehicle_prio") {
       currentAmpere = this.applyBatteryProtection(currentAmpere, liveData);
     }
     
-    return { currentMa: currentAmpere * 1000 };
+    return { currentMa: Math.round(currentAmpere * 1000) };
   }
 
 
