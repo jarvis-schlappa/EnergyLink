@@ -9,7 +9,9 @@
  * - On origin/main (unfixed code): Bug-specific tests MUST FAIL
  * - After merging fix/wallbox-ena-bugs: ALL tests MUST PASS
  */
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterAll, vi } from "vitest";
+import fs from "fs";
+import path from "path";
 
 // Mock ONLY external side-effects (NOT storage!)
 vi.mock("../core/logger", () => ({
@@ -126,6 +128,14 @@ function createUdpMock() {
     getEnableSys: () => enableSys,
   };
 }
+
+// Clean up persisted data/*.json after all tests to prevent state leakage (#88)
+afterAll(() => {
+  const dataDir = path.join(process.cwd(), "data");
+  for (const file of ["settings.json", "charging-context.json", "control-state.json", "plug-status-tracking.json"]) {
+    try { fs.unlinkSync(path.join(dataDir, file)); } catch { /* ignore */ }
+  }
+});
 
 function resetStorage() {
   storage.saveChargingContext({
