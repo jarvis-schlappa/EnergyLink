@@ -225,7 +225,17 @@ const handleBroadcast = async (data: any, rinfo: any) => {
               "system",
               "[Wallbox-Broadcast-Listener] Auto hat Ladung beendet (State 3→" + state + " bei Plug=7, isActive=true) → vehicleFinishedCharging=true",
             );
-            storage.updateChargingContext({ vehicleFinishedCharging: true });
+            storage.updateChargingContext({ vehicleFinishedCharging: true, vehicleFinishedAt: new Date().toISOString() });
+            
+            // Bug #84: Wallbox deaktivieren damit ena nicht hängen bleibt
+            try {
+              const settings = storage.getSettings();
+              if (settings?.wallboxIp) {
+                await getOrCreateStrategyController().ensureWallboxDisabled(settings.wallboxIp);
+              }
+            } catch (error) {
+              log("warning", "system", "[Wallbox-Broadcast-Listener] ensureWallboxDisabled fehlgeschlagen", error instanceof Error ? error.message : String(error));
+            }
           }
         }
       }
