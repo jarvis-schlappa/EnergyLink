@@ -10,8 +10,9 @@
  * - After merging fix/wallbox-ena-bugs: ALL tests MUST PASS
  */
 import { describe, it, expect, beforeEach, afterAll, vi } from "vitest";
-import fs from "fs";
+import fs, { mkdtempSync, rmSync } from "fs";
 import path from "path";
+import os from "os";
 
 // Mock ONLY external side-effects (NOT storage!)
 vi.mock("../core/logger", () => ({
@@ -129,12 +130,18 @@ function createUdpMock() {
   };
 }
 
-// Clean up persisted data/*.json after all tests to prevent state leakage (#88)
+// Isolate test data to prevent state leakage between test files (#88)
+let tmpDataDir: string;
+const originalDataDir = path.join(process.cwd(), "data");
+
+beforeAll(() => {
+  tmpDataDir = mkdtempSync(path.join(os.tmpdir(), "energylink-test-wallbox-ena-"));
+  storage.reinitialize(tmpDataDir);
+});
+
 afterAll(() => {
-  const dataDir = path.join(process.cwd(), "data");
-  for (const file of ["settings.json", "charging-context.json", "control-state.json", "plug-status-tracking.json"]) {
-    try { fs.unlinkSync(path.join(dataDir, file)); } catch { /* ignore */ }
-  }
+  storage.reinitialize(originalDataDir);
+  try { rmSync(tmpDataDir, { recursive: true, force: true }); } catch { /* ignore */ }
 });
 
 function resetStorage() {

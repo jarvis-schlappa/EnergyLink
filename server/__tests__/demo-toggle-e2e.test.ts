@@ -1,4 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { mkdtempSync, rmSync } from "fs";
+import { join } from "path";
+import os from "os";
 import request from "supertest";
 import { createServer, type Server } from "http";
 import type { AddressInfo } from "net";
@@ -16,10 +19,14 @@ import type { AddressInfo } from "net";
 
 let server: Server;
 let baseUrl: string;
+let tmpDataDir: string;
+const originalDataDir = join(process.cwd(), "data");
 
 const SERVER_START_TIMEOUT = 30_000;
 
 beforeAll(async () => {
+  // Isolate test data to prevent state leakage between test files (#88)
+  tmpDataDir = mkdtempSync(join(os.tmpdir(), "energylink-test-demo-toggle-"));
   // CRITICAL: Do NOT set DEMO_AUTOSTART — we start in production mode
   delete process.env.DEMO_AUTOSTART;
   process.env.NODE_ENV = "production";
@@ -29,6 +36,7 @@ beforeAll(async () => {
   const { healthHandler } = await import("../core/health");
   const { registerRoutes } = await import("../routes/index");
   const { storage } = await import("../core/storage");
+  storage.reinitialize(tmpDataDir);
 
   const app = express();
   app.use(express.json());
@@ -74,6 +82,10 @@ afterAll(async () => {
 
     await new Promise<void>((resolve) => server.close(() => resolve()));
   }
+  // Restore original data dir and clean up temp (#88)
+  const { storage } = await import("../core/storage");
+  storage.reinitialize(originalDataDir);
+  try { rmSync(tmpDataDir, { recursive: true, force: true }); } catch { /* ignore */ }
 });
 
 describe("Demo mode toggle at runtime (#18)", () => {

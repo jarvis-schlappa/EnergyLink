@@ -1,4 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { mkdtempSync, rmSync } from "fs";
+import { join } from "path";
+import os from "os";
 import request from "supertest";
 import { createServer, type Server } from "http";
 import type { AddressInfo } from "net";
@@ -13,10 +16,14 @@ import type { AddressInfo } from "net";
 
 let server: Server;
 let baseUrl: string;
+let tmpDataDir: string;
+const originalDataDir = join(process.cwd(), "data");
 
 const SERVER_START_TIMEOUT = 30_000;
 
 beforeAll(async () => {
+  // Isolate test data to prevent state leakage between test files (#88)
+  tmpDataDir = mkdtempSync(join(os.tmpdir(), "energylink-test-route-"));
   process.env.DEMO_AUTOSTART = "true";
   process.env.NODE_ENV = "production";
   process.env.PORT = "0";
@@ -25,6 +32,7 @@ beforeAll(async () => {
   const { healthHandler } = await import("../core/health");
   const { registerRoutes } = await import("../routes/index");
   const { storage } = await import("../core/storage");
+  storage.reinitialize(tmpDataDir);
   const { startUnifiedMock } = await import("../demo/unified-mock");
 
   const app = express();
@@ -77,6 +85,10 @@ afterAll(async () => {
   } catch {
     // ignore
   }
+  // Restore original data dir and clean up temp (#88)
+  const { storage } = await import("../core/storage");
+  storage.reinitialize(originalDataDir);
+  try { rmSync(tmpDataDir, { recursive: true, force: true }); } catch { /* ignore */ }
 });
 
 // ─── Garage Routes ──────────────────────────────────────────────────────
