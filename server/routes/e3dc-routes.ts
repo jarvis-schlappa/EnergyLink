@@ -99,6 +99,89 @@ export function registerE3dcRoutes(app: Express): void {
     }
   });
 
+  /**
+   * GET /api/e3dc/history – Historische Daten von e3dcset
+   * Query-Parameter:
+   *   period: day|week|month|year (default: day)
+   *   date:   YYYY-MM-DD (optional, nur für period=day)
+   */
+  app.get("/api/e3dc/history", async (req, res) => {
+    try {
+      const settings = storage.getSettings();
+
+      // E3DC muss aktiviert sein
+      if (!settings?.e3dc?.enabled) {
+        return res.status(400).json({ error: "E3DC ist nicht aktiviert" });
+      }
+
+      // period validieren
+      const VALID_PERIODS = ["day", "week", "month", "year"] as const;
+      const period = (req.query.period as string) || "day";
+
+      if (!VALID_PERIODS.includes(period as typeof VALID_PERIODS[number])) {
+        return res.status(400).json({
+          error: `Ungültiger period-Wert: ${period}. Erlaubt: ${VALID_PERIODS.join(", ")}`,
+        });
+      }
+
+      // date validieren (optional)
+      const date = req.query.date as string | undefined;
+      if (date !== undefined) {
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+          return res.status(400).json({
+            error: `Ungültiges Datumsformat: ${date}. Erwartet: YYYY-MM-DD`,
+          });
+        }
+        // Prüfe ob es ein echtes Datum ist (z.B. 2026-02-30 abfangen)
+        const parsed = new Date(date + "T00:00:00");
+        if (isNaN(parsed.getTime())) {
+          return res.status(400).json({
+            error: `Ungültiges Datum: ${date}`,
+          });
+        }
+      }
+
+      // e3dcset-Befehl zusammenbauen
+      let command = `-H ${period} -j`;
+      if (date) {
+        command = `-H ${period} -D ${date} -j`;
+      }
+
+      // Ausführen via executeConsoleCommand (nutzt Whitelist-Validierung + Gateway)
+      const output = await e3dcClient.executeConsoleCommand(command);
+
+      // Fehler aus executeConsoleCommand erkennen
+      if (output.startsWith("Ungültiger Befehl:") || output.startsWith("Fehler:")) {
+        log("error", "system", "E3DC History: Befehl fehlgeschlagen", output);
+        return res.status(503).json({ error: "e3dcset nicht verfügbar oder Fehler bei Ausführung" });
+      }
+
+      // JSON-Output parsen
+      let data: unknown;
+      try {
+        data = JSON.parse(output);
+      } catch {
+        log("warning", "system", "E3DC History: Kein gültiger JSON-Output", output.substring(0, 200));
+        // Im Demo-Modus kommt kein JSON → leeres Objekt zurückgeben
+        data = {};
+      }
+
+      res.json({
+        period,
+        date: date || new Date().toISOString().split("T")[0],
+        data,
+      });
+    } catch (error) {
+      log(
+        "error",
+        "system",
+        "Fehler bei E3DC History-Abfrage",
+        error instanceof Error ? error.message : String(error),
+      );
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
   app.get("/api/grid-frequency-status", (req, res) => {
     try {
       const status = getGridFrequencyState();
