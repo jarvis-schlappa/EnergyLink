@@ -36,18 +36,18 @@ export class RealE3dcGateway implements E3dcGateway {
       ? `${this.prefix} ${command}`.trim()
       : command;
 
-    log('info', 'system', `E3DC: ${commandName}`, `Befehl: ${fullCommand}`);
+    log('debug', 'system', `E3DC: ${commandName}`, `Befehl: ${fullCommand}`);
 
     const { stdout, stderr } = await execAsync(fullCommand);
 
     if (stdout) {
-      log('info', 'system', `E3DC: ${commandName} - Ausgabe`, stdout.trim());
+      log('debug', 'system', `E3DC: ${commandName} - Ausgabe`, stdout.trim());
     }
     if (stderr) {
       log('warning', 'system', `E3DC: ${commandName} - Fehler-Ausgabe`, stderr.trim());
     }
 
-    log('info', 'system', `E3DC: ${commandName} erfolgreich ausgeführt`);
+    log('debug', 'system', `E3DC: ${commandName} erfolgreich ausgeführt`);
     return stdout || '';
   }
 }
@@ -58,16 +58,16 @@ export class RealE3dcGateway implements E3dcGateway {
  */
 export class MockE3dcGateway implements E3dcGateway {
   async executeCommand(command: string, commandName: string): Promise<string> {
-    log('info', 'system', `E3DC Mock: ${commandName}`, `Befehl: ${command}`);
+    log('debug', 'system', `E3DC Mock: ${commandName}`, `Befehl: ${command}`);
 
     const outputLines = await executeMockCommand(command);
     const stdout = outputLines.join('\n');
 
     if (stdout) {
-      log('info', 'system', `E3DC Mock: ${commandName} - Ausgabe`, stdout.trim());
+      log('debug', 'system', `E3DC Mock: ${commandName} - Ausgabe`, stdout.trim());
     }
 
-    log('info', 'system', `E3DC Mock: ${commandName} erfolgreich ausgeführt`);
+    log('debug', 'system', `E3DC Mock: ${commandName} erfolgreich ausgeführt`);
     return stdout;
   }
 }
