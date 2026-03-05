@@ -350,7 +350,7 @@ export default function StatusPage() {
         startDelaySeconds: settings.chargingStrategy?.startDelaySeconds ?? 120,
         stopDelaySeconds: settings.chargingStrategy?.stopDelaySeconds ?? 300,
         physicalPhaseSwitch: settings.chargingStrategy?.physicalPhaseSwitch ?? 3,
-        minCurrentChangeAmpere: settings.chargingStrategy?.minCurrentChangeAmpere ?? 1,
+        minCurrentChangeAmpere: settings.chargingStrategy?.minCurrentChangeAmpere ?? 0.5,
         minChangeIntervalSeconds: settings.chargingStrategy?.minChangeIntervalSeconds ?? 60,
         inputX1Strategy: settings.chargingStrategy?.inputX1Strategy ?? "max_without_battery",
         activeStrategy: strategy,
