@@ -52,7 +52,7 @@ const DEFAULT_SETTINGS: SettingsType = {
     stopThresholdWatt: 1000,
     startDelaySeconds: 120,
     stopDelaySeconds: 300,
-    minCurrentChangeAmpere: 1,
+    minCurrentChangeAmpere: 0.5,
     minChangeIntervalSeconds: 60,
     physicalPhaseSwitch: 3,
     inputX1Strategy: "max_without_battery",
