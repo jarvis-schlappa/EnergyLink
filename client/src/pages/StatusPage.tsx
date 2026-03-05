@@ -188,7 +188,7 @@ export default function StatusPage() {
   }, [chargingContext?.remainingStartDelay]);
 
   useEffect(() => {
-    if (chargingContext?.remainingStopDelay !== undefined && chargingContext.remainingStopDelay > 0) {
+    if (chargingContext?.belowThresholdSince && chargingContext?.remainingStopDelay !== undefined && chargingContext.remainingStopDelay > 0) {
       setLiveStopCountdown(chargingContext.remainingStopDelay);
       const interval = setInterval(() => {
         setLiveStopCountdown(prev => {
@@ -561,7 +561,7 @@ export default function StatusPage() {
                       }
                       
                       if (isSurplusStrategy) {
-                        if (isCharging && liveStopCountdown !== null && liveStopCountdown > 0) {
+                        if (isCharging && chargingContext?.belowThresholdSince && liveStopCountdown !== null && liveStopCountdown > 0) {
                           return `Stopp in ${liveStopCountdown}s`;
                         }
                         if (isCharging) return getBadgeLabel(strategy);
