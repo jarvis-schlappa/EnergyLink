@@ -347,11 +347,23 @@ async processStrategy(liveData: E3dcLiveData, wallboxIp: string): Promise<void> 
     // KRITISCH: Context mit echtem Wallbox-Status abgleichen
     await this.reconcileChargingContext(wallboxIp);
     
-    const context = storage.getChargingContext();
+    let context = storage.getChargingContext();
     
     // Context-Strategie mit Config synchronisieren
     if (context.strategy !== config.activeStrategy) {
-      storage.updateChargingContext({ strategy: config.activeStrategy });
+      // Issue #101: Strategiewechsel ist eine bewusste User-Aktion → vehicleFinishedCharging zurücksetzen
+      // Der Reset-Code in switchStrategy() wird von der API-Route nie aufgerufen,
+      // daher muss der Reset hier bei der Strategie-Synchronisierung passieren.
+      const resetVehicleFinished = context.vehicleFinishedCharging;
+      if (resetVehicleFinished) {
+        log("info", "system", `[processStrategy] vehicleFinishedCharging zurückgesetzt: Strategiewechsel ${context.strategy} → ${config.activeStrategy}`);
+      }
+      storage.updateChargingContext({
+        strategy: config.activeStrategy,
+        ...(resetVehicleFinished ? { vehicleFinishedCharging: false, vehicleFinishedAt: undefined } : {}),
+      });
+      // Re-read context after strategy sync to ensure deriveState() sees updated vehicleFinishedCharging
+      context = storage.getChargingContext();
     }
     
     const surplus = this.calculateSurplus(config.activeStrategy, liveData);
