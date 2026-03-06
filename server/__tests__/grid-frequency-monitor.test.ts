@@ -365,3 +365,69 @@ describe("Grid Frequency Monitor - State Transition Logic (Pure Logic)", () => {
     expect(state.tier3ChargingActive).toBe(true);
   });
 });
+
+// ── Regression Test: No Duplicate Logging (#103) ─────────────────────────
+
+describe("Grid Frequency Monitor - No Duplicate Logging (#103)", () => {
+  beforeEach(async () => {
+    vi.resetModules();
+  });
+
+  it("emits exactly one WARNING log (no INFO) when tier transitions to 2", async () => {
+    const { log } = await import("../core/logger");
+    const mockLog = log as ReturnType<typeof vi.fn>;
+    const { __subscribers } = await import("../e3dc/modbus") as any;
+
+    const {
+      startGridFrequencyMonitor,
+      stopGridFrequencyMonitor,
+      resetGridFrequencyState,
+    } = await import("../monitoring/grid-frequency-monitor");
+
+    resetGridFrequencyState();
+    startGridFrequencyMonitor();
+    mockLog.mockClear();
+
+    const makeLiveData = (freq: number) => ({
+      gridFrequency: freq,
+      batterySoc: 80,
+      powerPv: 0,
+      powerGrid: 0,
+      powerBattery: 0,
+      powerHome: 0,
+      autarky: 0,
+      selfConsumption: 0,
+    });
+
+    // Send 2 consecutive tier-2 readings (49.85 Hz → deviation 0.15) to pass hysteresis
+    for (const sub of __subscribers) {
+      sub(makeLiveData(49.85));
+    }
+    for (const sub of __subscribers) {
+      sub(makeLiveData(49.85));
+    }
+
+    // Wait for async handleTierTransition
+    await new Promise((r) => setTimeout(r, 50));
+
+    // Collect all grid-frequency log calls
+    const gridFreqCalls = mockLog.mock.calls.filter(
+      (c: any[]) => c[1] === "grid-frequency"
+    );
+
+    // Should have exactly one WARNING for Netzfrequenz-Warnung
+    const warningCalls = gridFreqCalls.filter(
+      (c: any[]) => c[0] === "warning" && (c[2] as string).includes("Netzfrequenz-Warnung")
+    );
+    expect(warningCalls).toHaveLength(1);
+
+    // Should have zero INFO logs about frequency tier (the duplicate that was removed)
+    const infoFreqCalls = gridFreqCalls.filter(
+      (c: any[]) => c[0] === "info" && (c[2] as string).includes("Frequenz")
+        && ((c[2] as string).includes("Warnung") || (c[2] as string).includes("KRITISCH"))
+    );
+    expect(infoFreqCalls).toHaveLength(0);
+
+    stopGridFrequencyMonitor();
+  });
+});
