@@ -141,13 +141,6 @@ function onLiveData(data: E3dcLiveData): void {
   
   state.currentFrequency = frequency;
   
-  const deviation = Math.abs(frequency - NOMINAL_FREQUENCY);
-  
-  if (newTier >= 2) {
-    const tierLabel = newTier === 3 ? "KRITISCH (Tier 3)" : "Warnung (Tier 2)";
-    log("info", "grid-frequency", `Frequenz ${tierLabel}: ${frequency.toFixed(2)} Hz (Abweichung: ${deviation.toFixed(3)} Hz)`);
-  }
-  
   if (newTier === state.pendingTier) {
     state.consecutiveTierReadings++;
   } else {
