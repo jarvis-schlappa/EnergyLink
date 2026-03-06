@@ -344,10 +344,23 @@ async processStrategy(liveData: E3dcLiveData, wallboxIp: string): Promise<void> 
       return;
     }
     
-    // KRITISCH: Context mit echtem Wallbox-Status abgleichen
-    await this.reconcileChargingContext(wallboxIp);
-    
+    // Issue #105: Check pre-reconcile state to detect WAIT_START → CHARGING fast path.
+    // When transitioning from WAIT_START → CHARGING, we send ena 1 + curr IMMEDIATELY
+    // before reconcile to avoid the ~2s delay from report 2 + report 3 queries.
     let context = storage.getChargingContext();
+    const preReconcileState = deriveState({
+      isActive: context.isActive,
+      vehicleFinishedCharging: context.vehicleFinishedCharging,
+      startDelayTrackerSince: context.startDelayTrackerSince,
+      belowThresholdSince: context.belowThresholdSince,
+    });
+    const skipReconcileBeforeStart = preReconcileState === "WAIT_START";
+    
+    if (!skipReconcileBeforeStart) {
+      // KRITISCH: Context mit echtem Wallbox-Status abgleichen (normal path)
+      await this.reconcileChargingContext(wallboxIp);
+      context = storage.getChargingContext();
+    }
     
     // Context-Strategie mit Config synchronisieren
     if (context.strategy !== config.activeStrategy) {
@@ -515,6 +528,13 @@ async processStrategy(liveData: E3dcLiveData, wallboxIp: string): Promise<void> 
           }
           break;
       }
+    }
+    
+    // Issue #105: Deferred reconcile after WAIT_START → CHARGING fast path.
+    // Start commands (ena 1 + curr) have already been sent; now reconcile
+    // to keep context in sync (phase detection, vehicleFinished, etc.)
+    if (skipReconcileBeforeStart) {
+      await this.reconcileChargingContext(wallboxIp);
     }
   }
 
@@ -833,7 +853,10 @@ async processStrategy(liveData: E3dcLiveData, wallboxIp: string): Promise<void> 
         
         // Sofortiges SSE-Update an GUI (kein Warten auf nächsten Poll-Zyklus)
         const plug = getAuthoritativePlugStatus();
-        broadcastPartialUpdate({ state: 3, enableSys: 1, ...(plug !== null ? { plug } : {}) });
+        // Issue #104: Don't broadcast state: 3 before wallbox physically transitions.
+        // Only signal that the start command was sent (enableSys: 1).
+        // The actual state: 3 will come from the next reconcile/report when the wallbox is physically charging.
+        broadcastPartialUpdate({ enableSys: 1, ...(plug !== null ? { plug } : {}) });
         
         // Prowl-Benachrichtigung (non-blocking, with initialization guard)
         triggerProwlEvent(settings, "chargingStarted", (notifier) =>
