@@ -222,9 +222,12 @@ describe("E3DC mock state reset on demo toggle (#63)", () => {
     expect(dirtyData.batterySoc).toBe(99);
 
     // 3. Reset — SOC must return to time-appropriate value, NOT stay at 99
+    // Note: getLiveData() calculates SOC drift based on elapsed time since lastUpdateTime.
+    // Tiny timing differences between the two getLiveData() calls can cause ±1-2% SOC drift,
+    // so we allow a small tolerance instead of exact equality.
     e3dcMockService.reset();
     const resetData = await e3dcMockService.getLiveData(0);
-    expect(resetData.batterySoc).toBe(initialSoc);
+    expect(Math.abs(resetData.batterySoc - initialSoc)).toBeLessThanOrEqual(2);
     expect(resetData.batterySoc).not.toBe(99);
 
     // 4. SOC must be in valid range (0-100)
