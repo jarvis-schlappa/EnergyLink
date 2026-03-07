@@ -338,10 +338,6 @@ async processStrategy(liveData: E3dcLiveData, wallboxIp: string): Promise<void> 
     
     const config = settings.chargingStrategy;
 
-    if (config.activeStrategy === "smart_buffer") {
-      return;
-    }
-    
     // WICHTIG: Prüfe "off"-Strategie VOR reconcile, um repetitive Stops zu vermeiden
     if (config.activeStrategy === "off") {
       await this.stopChargingForStrategyOff(wallboxIp);
@@ -606,6 +602,11 @@ async processStrategy(liveData: E3dcLiveData, wallboxIp: string): Promise<void> 
       case "max_without_battery":
         // Maximale Leistung OHNE Batterie: Nur PV - Hausverbrauch (ohne Wallbox!)
         return Math.max(0, liveData.pvPower - housePowerWithoutWallbox);
+
+      case "smart_buffer":
+        // Smart Buffer setzt bereits das Batterie-Limit.
+        // Für die Wallbox wird daher der aktuell verfügbare PV-Überschuss ohne Batterie-Reservierung genutzt.
+        return Math.max(0, liveData.pvPower - housePowerWithoutWallbox);
       
       default:
         return 0;
@@ -628,7 +629,10 @@ async processStrategy(liveData: E3dcLiveData, wallboxIp: string): Promise<void> 
     //    - Im Demo-Modus: nutze mockWallboxPhases für alle Strategien
     // 2. Wenn aktiv → nutze context.currentPhases (echte erkannte Phasen aus Strömen)
     const isMaxPowerStrategy = strategy === "max_with_battery" || strategy === "max_without_battery";
-    const isSurplusStrategy = strategy === "surplus_battery_prio" || strategy === "surplus_vehicle_prio";
+    const isSurplusStrategy =
+      strategy === "surplus_battery_prio" ||
+      strategy === "surplus_vehicle_prio" ||
+      strategy === "smart_buffer";
     
     const currentPhases = context.isActive 
       ? context.currentPhases 
@@ -1040,9 +1044,10 @@ async processStrategy(liveData: E3dcLiveData, wallboxIp: string): Promise<void> 
     const controlState = storage.getControlState();
     const strategy = settings?.chargingStrategy?.activeStrategy ?? context.strategy;
     
-    // Guard 1: Nur bei surplus_* oder off Strategie
+    // Guard 1: Nur bei surplus_*, smart_buffer oder off Strategie
     const isSurplusOrOff = strategy === "surplus_battery_prio" || 
                             strategy === "surplus_vehicle_prio" || 
+                            strategy === "smart_buffer" ||
                             strategy === "off";
     if (!isSurplusOrOff) {
       log("debug", "system", `[ensureWallboxDisabled] Strategie ${strategy} will sofort laden - überspringe`);

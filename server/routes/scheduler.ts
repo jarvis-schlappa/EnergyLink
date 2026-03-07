@@ -543,14 +543,11 @@ const checkChargingStrategy = async () => {
     );
 
     if (strategyConfig.activeStrategy === "smart_buffer") {
+      // Smart Buffer steuert zuerst das Batterie-Limit, danach läuft die normale Wallbox-Surplus-Logik.
       await smartBufferController.processLiveData(e3dcLiveData);
-      return;
     }
 
-    await controller.processStrategy(
-      e3dcLiveData,
-      settings.wallboxIp,
-    );
+    await controller.processStrategy(e3dcLiveData, settings.wallboxIp);
   } catch (error) {
     log(
       "error",

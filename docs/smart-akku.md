@@ -25,6 +25,13 @@ Smart-Akku läuft als Zustandsmaschine mit vier Phasen:
 4. **Akku voll (`FULL`)**  
    Bei erreichtem Ziel-SOC geht der Akku zurück in Automatik; bei Bedarf kann erneut in andere Phasen gewechselt werden.
 
+Wallbox-Verhalten in allen Phasen:
+
+- **`MORNING_HOLD`**: Überschussladen für das Fahrzeug ist aktiv, wenn genug PV-Überschuss vorhanden ist.
+- **`CLIPPING_GUARD`**: Fahrzeugladung nutzt vollen Überschuss; Abregelverluste werden priorisiert vermieden.
+- **`FILL_UP`**: Fahrzeug lädt mit Überschuss, während das Smart-Buffer-Akku-Limit weiterhin den Akku-Vorrang bei niedrigem SOC steuert.
+- **`FULL`/`STANDBY`**: Normale Überschusslogik der Wallbox bleibt aktiv.
+
 ## Automatische Anpassung
 
 - **Dynamische Berechnung:** Die Ziel-Ladeleistung wird laufend aus aktuellem SOC, Batteriekapazität und Restzeit berechnet.
@@ -38,6 +45,8 @@ Smart-Akku berücksichtigt, ob das Fahrzeug gerade lädt:
 
 - **Auto-Modus (Fahrzeug lädt):** Der verfügbare PV-Anteil für den Hausakku wird begrenzt, damit Fahrzeugladung und Akku gemeinsam arbeiten.
 - **Kein-Auto-Modus (kein Fahrzeugladen):** Das berechnete Fill-Up-Ziel kann vollständig für den Akku genutzt werden (bis `maxBatteryChargePower`).
+
+Technisch gilt: Smart-Akku setzt zuerst das Batterie-Limit (`setMaxChargePower`), anschließend läuft die bestehende Wallbox-Surplus-Strategie weiter (`ena 1`/`curr`/`ena 0`).
 
 ## PV-Anlage mit 3 Dachflächen
 
