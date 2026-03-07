@@ -15,6 +15,7 @@ Intelligente Wallbox-Steuerung für KEBA Ladestationen mit E3DC S10 Integration.
 ## Features
 
 - ⚡ **4 Ladestrategien** – PV-Überschuss (Batterie/Fahrzeug priorisiert), Maximum (mit/ohne Batterie)
+- 🧠 **Smart-Akku (Smart Buffer)** – Abregelschutz + dynamische Akku-Ladeleistung für volles SOC am Abend
 - 🔋 **E3DC S10 Integration** – Live-Monitoring via Modbus TCP, Batteriesteuerung via CLI
 - ⏰ **Zeitgesteuerte Ladung** – Nachtstrom-Tarife automatisch nutzen
 - 📊 **Echtzeit-Dashboard** – Ladeleistung, PV, Batterie-SOC, Netzfluss
@@ -52,6 +53,7 @@ NODE_ENV=production node dist/index.js
 | [Getting Started](docs/getting-started.md) | Installation, Deployment, PWA-Setup |
 | [Konfiguration](docs/configuration.md) | Settings, E3DC, FHEM, Strategieparameter |
 | [Ladestrategien](docs/charging-strategies.md) | Die 4 Strategien im Detail |
+| [Smart-Akku](docs/smart-akku.md) | Smart Buffer: Phasenmodell, Dynamik, Sicherheit, UI |
 | [Architektur](docs/architecture.md) | Systemaufbau, Interfaces, Tests |
 | [Use Cases](docs/use-cases.md) | Praxisszenarien mit Event-Flows |
 | [Design Guidelines](docs/design-guidelines.md) | UI/UX-Richtlinien |
