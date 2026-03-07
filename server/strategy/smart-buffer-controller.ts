@@ -3,6 +3,7 @@ import { storage } from "../core/storage";
 import { log } from "../core/logger";
 import { e3dcClient } from "../e3dc/client";
 import { getE3dcLiveDataHub } from "../e3dc/modbus";
+import { getAuthoritativePlugStatus } from "../wallbox/broadcast-listener";
 import { broadcastSmartBufferStatus } from "../wallbox/sse";
 
 type SmartBufferDefaults = Omit<SmartBufferConfig, "latitude" | "longitude">;
@@ -357,7 +358,7 @@ export class SmartBufferController {
         this.status.regelzeitEnde = ruleEnd.toISOString();
 
         const fillUpTarget = this.calculateFillUpTargetWatt(liveData, config, now);
-        const carConnected = liveData.wallboxPower > 100;
+        const carConnected = (getAuthoritativePlugStatus() ?? 1) === 7;
         const phaseCount = settings.chargingStrategy?.physicalPhaseSwitch ?? 3;
         const wallboxCurrentAmpere = phaseCount > 0 ? Number((Math.max(0, liveData.wallboxPower) / (230 * phaseCount)).toFixed(1)) : 0;
         const availableForBattery = Math.max(0, liveData.pvPower - liveData.housePower);

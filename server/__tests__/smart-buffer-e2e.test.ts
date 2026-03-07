@@ -10,6 +10,7 @@ const mockTriggerProwlEvent = vi.fn();
 let mockSettings: any;
 let mockControlState: any;
 let mockChargingContext: any;
+let mockPlugStatus: number | null = 7;
 
 const mockSetMaxChargePower = vi.fn(async () => {});
 const mockSetAutomaticMode = vi.fn(async () => {});
@@ -51,7 +52,7 @@ vi.mock("../e3dc/modbus", () => ({
 }));
 
 vi.mock("../wallbox/broadcast-listener", () => ({
-  getAuthoritativePlugStatus: vi.fn(() => 7),
+  getAuthoritativePlugStatus: vi.fn(() => mockPlugStatus),
 }));
 
 vi.mock("../monitoring/prowl-notifier", () => ({
@@ -99,6 +100,7 @@ describe("SmartBufferController E2E scenarios (Issue #109)", () => {
     vi.resetModules();
     vi.useFakeTimers();
     setNow("2026-03-07T10:00:00.000Z");
+    mockPlugStatus = 7;
 
     mockSettings = {
       chargingStrategy: {
@@ -163,6 +165,7 @@ describe("SmartBufferController E2E scenarios (Issue #109)", () => {
   });
 
   it("2) Bewölkter Tag ohne Auto: dynamische Ladeleistung steigt bei sinkender Restzeit", async () => {
+    mockPlugStatus = 1;
     const { SmartBufferController } = await import("../strategy/smart-buffer-controller");
     const controller = new SmartBufferController();
 
@@ -211,6 +214,7 @@ describe("SmartBufferController E2E scenarios (Issue #109)", () => {
   });
 
   it("5) PV-Einbruch am Nachmittag: targetChargePower steigt automatisch", async () => {
+    mockPlugStatus = 1;
     const { SmartBufferController } = await import("../strategy/smart-buffer-controller");
     const controller = new SmartBufferController();
 

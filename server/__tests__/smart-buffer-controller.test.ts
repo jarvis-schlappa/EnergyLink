@@ -2,6 +2,7 @@ import { beforeEach, afterEach, describe, expect, it, vi } from "vitest";
 
 const mockBroadcastSmartBufferStatus = vi.fn();
 const mockLog = vi.fn();
+let mockPlugStatus: number | null = 1;
 
 let mockSettings: any;
 let mockControlState: any;
@@ -39,11 +40,16 @@ vi.mock("../e3dc/modbus", () => ({
   }),
 }));
 
+vi.mock("../wallbox/broadcast-listener", () => ({
+  getAuthoritativePlugStatus: () => mockPlugStatus,
+}));
+
 describe("SmartBufferController", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-03-07T10:00:00.000Z"));
+    mockPlugStatus = 1;
 
     mockSettings = {
       chargingStrategy: { activeStrategy: "smart_buffer" },
@@ -101,7 +107,7 @@ describe("SmartBufferController", () => {
     await controller.processLiveData({
       pvPower: 1500,
       batteryPower: 0,
-      batterySoc: 70,
+      batterySoc: 20,
       housePower: 500,
       gridPower: -500,
       wallboxPower: 0,
@@ -284,5 +290,40 @@ describe("SmartBufferController", () => {
       (call: any[]) => call[0] === "info" && String(call[2]).includes("Akku-Limit angepasst"),
     );
     expect(batteryLimitLogs).toHaveLength(1);
+  });
+
+  it("treats Plug=7 as connected car even when wallboxPower is 0", async () => {
+    mockPlugStatus = 7;
+    vi.setSystemTime(new Date("2026-03-07T13:30:00.000Z"));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({
+        ok: true,
+        json: async () => ({
+          minutely_15: {
+            time: [Math.floor(new Date("2026-03-07T10:00:00.000Z").getTime() / 1000)],
+            global_tilted_irradiance_instant: [1000],
+          },
+        }),
+      })),
+    );
+
+    const { SmartBufferController } = await import("../strategy/smart-buffer-controller");
+    const controller = new SmartBufferController();
+
+    await controller.processLiveData({
+      pvPower: 1500,
+      batteryPower: 0,
+      batterySoc: 70,
+      housePower: 500,
+      gridPower: -500,
+      wallboxPower: 0,
+      autarky: 90,
+      selfConsumption: 80,
+      timestamp: new Date().toISOString(),
+    });
+
+    // Bei erkanntem Auto wird die Soll-Leistung auf den real verfügbaren Anteil begrenzt.
+    expect(controller.getStatus().targetChargePowerWatt).toBe(1000);
   });
 });

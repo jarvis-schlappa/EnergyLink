@@ -6,6 +6,10 @@ import { deriveState, evaluate } from "../strategy/charging-state-machine";
 import type { StateInput, StateConfig } from "../strategy/charging-state-machine";
 import type { E3dcLiveData } from "@shared/schema";
 
+let mockSmartBufferStatus = {
+  targetChargePowerWatt: 0,
+};
+
 // Reuse mocks from charging-strategy.test.ts
 vi.mock("../core/storage", () => {
   const defaultContext = {
@@ -57,6 +61,11 @@ vi.mock("../e3dc/client", () => ({
 }));
 vi.mock("../e3dc/modbus", () => ({ getE3dcLiveDataHub: vi.fn(() => ({ subscribe: vi.fn(() => vi.fn()) })) }));
 vi.mock("../monitoring/prowl-notifier", () => ({ triggerProwlEvent: vi.fn() }));
+vi.mock("../strategy/smart-buffer-controller", () => ({
+  getSmartBufferController: () => ({
+    getStatus: () => mockSmartBufferStatus,
+  }),
+}));
 
 import { storage } from "../core/storage";
 
@@ -75,6 +84,7 @@ describe("ChargingStrategyController - Edge Cases", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     (storage as any)._reset();
+    mockSmartBufferStatus = { targetChargePowerWatt: 0 };
     controller = new ChargingStrategyController(vi.fn().mockResolvedValue({}), new RealPhaseProvider());
   });
 
@@ -138,6 +148,14 @@ describe("ChargingStrategyController - Edge Cases", () => {
       // housePowerWithoutWallbox = -1000 → surplus = 5000 - (-1000) = 6000
       const result = callCalculateSurplus(controller, "max_without_battery", data);
       expect(result).toBe(6000);
+    });
+
+    it("smart_buffer subtracts targetChargePower reserve from total surplus", () => {
+      mockSmartBufferStatus = { targetChargePowerWatt: 900 };
+      const data = makeLiveData({ pvPower: 4000, housePower: 1200, wallboxPower: 0 });
+      // totalSurplus = 2800, reserve = 900 => 1900
+      const result = callCalculateSurplus(controller, "smart_buffer", data);
+      expect(result).toBe(1900);
     });
   });
 

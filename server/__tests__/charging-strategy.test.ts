@@ -4,6 +4,10 @@ import { ChargingStrategyController } from "../strategy/charging-strategy-contro
 import { RealPhaseProvider } from "../strategy/phase-provider";
 import type { E3dcLiveData, ChargingStrategy, ChargingStrategyConfig } from "@shared/schema";
 
+let mockSmartBufferStatus = {
+  targetChargePowerWatt: 0,
+};
+
 // Mock all external dependencies
 vi.mock("../core/storage", () => {
   const defaultContext = {
@@ -72,6 +76,12 @@ vi.mock("../monitoring/prowl-notifier", () => ({
   triggerProwlEvent: vi.fn(),
 }));
 
+vi.mock("../strategy/smart-buffer-controller", () => ({
+  getSmartBufferController: () => ({
+    getStatus: () => mockSmartBufferStatus,
+  }),
+}));
+
 import { storage } from "../core/storage";
 
 function makeLiveData(overrides: Partial<E3dcLiveData> = {}): E3dcLiveData {
@@ -96,6 +106,7 @@ describe("ChargingStrategyController", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     (storage as any)._reset();
+    mockSmartBufferStatus = { targetChargePowerWatt: 0 };
     mockSendUdp = vi.fn().mockResolvedValue({});
     controller = new ChargingStrategyController(mockSendUdp, new RealPhaseProvider());
   });
@@ -197,6 +208,24 @@ describe("ChargingStrategyController", () => {
       it("returns 0 when house consumption exceeds PV", () => {
         const data = makeLiveData({ pvPower: 500, housePower: 2000, wallboxPower: 0 });
         const result = callCalculateSurplus(controller, "max_without_battery", data);
+        expect(result).toBe(0);
+      });
+    });
+
+    describe("smart_buffer", () => {
+      it("reduces wallbox surplus by smart-buffer battery reserve", () => {
+        mockSmartBufferStatus = { targetChargePowerWatt: 1200 };
+        const data = makeLiveData({ pvPower: 5000, housePower: 1000, wallboxPower: 0 });
+        // totalSurplus = 5000 - 1000 = 4000, minus reserve 1200 => 2800
+        const result = callCalculateSurplus(controller, "smart_buffer", data);
+        expect(result).toBe(2800);
+      });
+
+      it("floors to 0 when battery reserve exceeds total surplus", () => {
+        mockSmartBufferStatus = { targetChargePowerWatt: 5000 };
+        const data = makeLiveData({ pvPower: 3000, housePower: 1000, wallboxPower: 0 });
+        // totalSurplus = 2000, reserve 5000 => 0
+        const result = callCalculateSurplus(controller, "smart_buffer", data);
         expect(result).toBe(0);
       });
     });

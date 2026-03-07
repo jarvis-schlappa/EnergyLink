@@ -7,6 +7,7 @@ import { triggerProwlEvent } from "../monitoring/prowl-notifier";
 import { broadcastPartialUpdate } from "../wallbox/sse";
 import { getAuthoritativePlugStatus } from "../wallbox/broadcast-listener";
 import { DEFAULT_WALLBOX_IP } from "../core/defaults";
+import { getSmartBufferController } from "./smart-buffer-controller";
 import type { PhaseProvider } from "./phase-provider";
 import { deriveState, evaluate, type StateInput, type StateConfig, type StateAction, type ChargingState } from "./charging-state-machine";
 
@@ -603,10 +604,19 @@ async processStrategy(liveData: E3dcLiveData, wallboxIp: string): Promise<void> 
         // Maximale Leistung OHNE Batterie: Nur PV - Hausverbrauch (ohne Wallbox!)
         return Math.max(0, liveData.pvPower - housePowerWithoutWallbox);
 
-      case "smart_buffer":
-        // Smart Buffer setzt bereits das Batterie-Limit.
-        // Für die Wallbox wird daher der aktuell verfügbare PV-Überschuss ohne Batterie-Reservierung genutzt.
-        return Math.max(0, liveData.pvPower - housePowerWithoutWallbox);
+      case "smart_buffer": {
+        const totalSurplus = liveData.pvPower - housePowerWithoutWallbox;
+        const smartBufferStatus = getSmartBufferController().getStatus();
+        const batteryReserve = Math.max(0, smartBufferStatus.targetChargePowerWatt);
+        const wallboxSurplus = Math.max(0, totalSurplus - batteryReserve);
+
+        log("debug", "system",
+          `[smart_buffer] PV=${liveData.pvPower}W, Haus(ohne WB)=${housePowerWithoutWallbox}W, ` +
+          `Total=${totalSurplus}W, Batterie-Reserve=${batteryReserve}W, Surplus=${wallboxSurplus}W`
+        );
+
+        return wallboxSurplus;
+      }
       
       default:
         return 0;
