@@ -1,0 +1,59 @@
+{
+  "wallboxIp": "192.168.40.16",
+  "nightChargingSchedule": {
+    "enabled": false,
+    "startTime": "00:00",
+    "endTime": "05:00"
+  },
+  "smartBuffer": {
+    "latitude": 0,
+    "longitude": 0,
+    "pvArrays": [
+      {
+        "name": "Wohnhaus SO",
+        "azimuthDeg": 140,
+        "tiltDeg": 43,
+        "kwp": 6.08
+      },
+      {
+        "name": "Wohnhaus NW",
+        "azimuthDeg": 320,
+        "tiltDeg": 43,
+        "kwp": 2.56
+      },
+      {
+        "name": "Gauben SW",
+        "azimuthDeg": 229,
+        "tiltDeg": 43,
+        "kwp": 1.28
+      }
+    ],
+    "pvPeakKwp": 9.92,
+    "batteryCapacityKwh": 13.8,
+    "feedInLimitWatt": 4960,
+    "clippingGuardEntryWatt": 4300,
+    "clippingGuardExitWatt": 3800,
+    "clippingGuardTargetWatt": 4500,
+    "maxBatteryChargePower": 3000,
+    "targetSocEvening": 100,
+    "forecastRefreshIntervalMin": 15,
+    "winterRuleEndTimeUtc": "12:45",
+    "summerRuleEndTimeUtc": "15:00"
+  },
+  "fhemSync": {
+    "enabled": false,
+    "host": "192.168.40.11",
+    "port": 7072,
+    "autoCloseGarageOnPlug": false
+  },
+  "mockWallboxPhases": 3,
+  "mockWallboxPlugStatus": 7,
+  "webPush": {
+    "enabled": false
+  },
+  "tls": {
+    "enabled": false,
+    "certPath": "certs/cert.pem",
+    "keyPath": "certs/key.pem"
+  }
+}

@@ -5,9 +5,9 @@ import { e3dcClient } from "../e3dc/client";
 import { getE3dcLiveDataHub } from "../e3dc/modbus";
 import { broadcastSmartBufferStatus } from "../wallbox/sse";
 
-const DEFAULT_SMART_BUFFER_CONFIG: SmartBufferConfig = {
-  latitude: 48.4,
-  longitude: 10.0,
+type SmartBufferDefaults = Omit<SmartBufferConfig, "latitude" | "longitude">;
+
+const DEFAULT_SMART_BUFFER_CONFIG: SmartBufferDefaults = {
   pvArrays: [
     { name: "Wohnhaus SO", azimuthDeg: 140, tiltDeg: 43, kwp: 6.08 },
     { name: "Wohnhaus NW", azimuthDeg: 320, tiltDeg: 43, kwp: 2.56 },
@@ -98,9 +98,16 @@ export class SmartBufferController {
   }
 
   private resolveConfig(settings: Settings): SmartBufferConfig {
+    const configured = settings.smartBuffer;
+    if (!configured || !Number.isFinite(configured.latitude) || !Number.isFinite(configured.longitude)) {
+      throw new Error("Smart Buffer Konfiguration unvollständig: latitude/longitude müssen gesetzt sein");
+    }
+
     return {
       ...DEFAULT_SMART_BUFFER_CONFIG,
-      ...(settings.smartBuffer || {}),
+      ...configured,
+      latitude: configured.latitude,
+      longitude: configured.longitude,
     };
   }
 

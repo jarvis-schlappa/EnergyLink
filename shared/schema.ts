@@ -97,7 +97,6 @@ export const smartBufferConfigSchema = z.object({
   forecastRefreshIntervalMin: z.number().min(5).max(120).default(15),
   winterRuleEndTimeUtc: z.string().default("12:45"),
   summerRuleEndTimeUtc: z.string().default("15:00"),
-  e3dcsetBinaryPath: z.string().optional(),
 });
 
 export type SmartBufferConfig = z.infer<typeof smartBufferConfigSchema>;
