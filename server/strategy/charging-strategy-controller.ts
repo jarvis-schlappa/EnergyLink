@@ -1,6 +1,7 @@
 import type { ChargingStrategy, ChargingStrategyConfig, ChargingContext, E3dcLiveData } from "@shared/schema";
 import { storage } from "../core/storage";
 import { log } from "../core/logger";
+import { getNow } from "../core/clock";
 import { e3dcClient } from "../e3dc/client";
 import { getE3dcLiveDataHub } from "../e3dc/modbus";
 import { triggerProwlEvent } from "../monitoring/prowl-notifier";
@@ -21,6 +22,7 @@ export class ChargingStrategyController {
   private sendUdpCommand: (ip: string, command: string) => Promise<any>;
   private lastE3dcData: E3dcLiveData | null = null;
   private batteryDischargeSince: Date | null = null;
+  private hasObservedRealChargingSinceStartup = false;
   private unsubscribeFromHub: (() => void) | null = null;
   private runningStrategyPromise: Promise<void> | null = null;
   private wallboxIp: string = DEFAULT_WALLBOX_IP;
@@ -107,7 +109,7 @@ export class ChargingStrategyController {
       // 2. Context aktualisieren - OHNE strategy!
       // Strategie wird vom wallbox-broadcast-listener finally-Block gesetzt
       // Dies verhindert Race Conditions zwischen Context-Update und Strategie-Persistierung
-      const now = new Date();
+      const now = getNow();
       storage.updateChargingContext({
         isActive: true,
         currentAmpere: effectiveAmpere,
@@ -337,6 +339,16 @@ async processStrategy(liveData: E3dcLiveData, wallboxIp: string): Promise<void> 
       return;
     }
     
+    // Demo-Startup-Cleanup:
+    // Persistierter CAR_FINISHED-Status aus vorheriger Session blockiert sonst Neustarts.
+    // In Demo können Wallbox/Context beim Neustart kurz inkonsistent sein, daher stale Flag hier zurücksetzen.
+    let context = storage.getChargingContext();
+    if (settings.demoMode && context.vehicleFinishedCharging && !this.hasObservedRealChargingSinceStartup) {
+      log("info", "system", "[processStrategy] Demo-Startup: stale vehicleFinishedCharging zurückgesetzt");
+      storage.updateChargingContext({ vehicleFinishedCharging: false, vehicleFinishedAt: undefined });
+      context = storage.getChargingContext();
+    }
+    
     const config = settings.chargingStrategy;
 
     // WICHTIG: Prüfe "off"-Strategie VOR reconcile, um repetitive Stops zu vermeiden
@@ -348,7 +360,6 @@ async processStrategy(liveData: E3dcLiveData, wallboxIp: string): Promise<void> 
     // Issue #105: Check pre-reconcile state to detect WAIT_START → CHARGING fast path.
     // When transitioning from WAIT_START → CHARGING, we send ena 1 + curr IMMEDIATELY
     // before reconcile to avoid the ~2s delay from report 2 + report 3 queries.
-    let context = storage.getChargingContext();
     const preReconcileState = deriveState({
       isActive: context.isActive,
       vehicleFinishedCharging: context.vehicleFinishedCharging,
@@ -432,6 +443,7 @@ async processStrategy(liveData: E3dcLiveData, wallboxIp: string): Promise<void> 
       belowThresholdSince: context.belowThresholdSince,
       lastStartedAt: context.lastStartedAt,
       stabilizationPeriodMs,
+      nowMs: getNow().getTime(),
     });
     
     log("debug", "system", `[StateMachine] ${currentState} → ${transition.newState} (actions: ${transition.actions.map(a => a.type).join(', ')})`);
@@ -458,7 +470,7 @@ async processStrategy(liveData: E3dcLiveData, wallboxIp: string): Promise<void> 
         }
         
         case "START_DELAY_BEGIN": {
-          const now = new Date();
+          const now = getNow();
           storage.updateChargingContext({
             startDelayTrackerSince: now.toISOString(),
             remainingStartDelay: config.startDelaySeconds,
@@ -486,7 +498,7 @@ async processStrategy(liveData: E3dcLiveData, wallboxIp: string): Promise<void> 
         }
         
         case "STOP_DELAY_BEGIN": {
-          const now = new Date();
+          const now = getNow();
           storage.updateChargingContext({
             belowThresholdSince: now.toISOString(),
             remainingStopDelay: config.stopDelaySeconds,
@@ -685,10 +697,10 @@ async processStrategy(liveData: E3dcLiveData, wallboxIp: string): Promise<void> 
     
     if (liveData.batteryPower < DISCHARGE_THRESHOLD) {
       if (!this.batteryDischargeSince) {
-        this.batteryDischargeSince = new Date();
+        this.batteryDischargeSince = getNow();
       }
       
-      const dischargeDuration = Date.now() - this.batteryDischargeSince.getTime();
+      const dischargeDuration = getNow().getTime() - this.batteryDischargeSince.getTime();
       
       if (dischargeDuration > DISCHARGE_DURATION_THRESHOLD) {
         const reductionAmpere = 2;
@@ -737,7 +749,7 @@ async processStrategy(liveData: E3dcLiveData, wallboxIp: string): Promise<void> 
       // Ermöglicht erneutes Laden am nächsten Tag wenn Auto über Nacht eingesteckt bleibt
       const VEHICLE_FINISHED_RESET_MS = 12 * 60 * 60 * 1000; // 12 Stunden
       if (context.vehicleFinishedCharging && context.vehicleFinishedAt) {
-        const timeSinceFinished = Date.now() - new Date(context.vehicleFinishedAt).getTime();
+        const timeSinceFinished = getNow().getTime() - new Date(context.vehicleFinishedAt).getTime();
         if (timeSinceFinished > VEHICLE_FINISHED_RESET_MS) {
           log("info", "system", `[RECONCILE] vehicleFinishedCharging nach ${Math.round(timeSinceFinished / 3600000)}h automatisch zurückgesetzt`);
           storage.updateChargingContext({ vehicleFinishedCharging: false, vehicleFinishedAt: undefined });
@@ -746,6 +758,9 @@ async processStrategy(liveData: E3dcLiveData, wallboxIp: string): Promise<void> 
       
       // Wallbox lädt wirklich, wenn State=3 UND Power>0
       const reallyCharging = wallboxState === 3 && wallboxPower > 1000;  // >1W
+      if (reallyCharging) {
+        this.hasObservedRealChargingSinceStartup = true;
+      }
       
       // WICHTIG: Phasenerkennung nur bei Max-Power-Strategien!
       // Bei Surplus-Strategien: IMMER 1P (das ist das Design)
@@ -767,7 +782,7 @@ async processStrategy(liveData: E3dcLiveData, wallboxIp: string): Promise<void> 
         // Wallbox braucht physisch ein paar Sekunden bis State=3 und Power>0
         const RECONCILE_GRACE_PERIOD_MS = 30000; // 30s Grace Period
         if (context.lastStartedAt) {
-          const timeSinceStart = Date.now() - new Date(context.lastStartedAt).getTime();
+          const timeSinceStart = getNow().getTime() - new Date(context.lastStartedAt).getTime();
           if (timeSinceStart < RECONCILE_GRACE_PERIOD_MS) {
             log("debug", "system", `[RECONCILE] Context sagt isActive=true, Wallbox noch nicht aktiv (State=${wallboxState}) - Grace Period: ${Math.ceil((RECONCILE_GRACE_PERIOD_MS - timeSinceStart) / 1000)}s verbleibend`);
             return; // Nicht überschreiben - Wallbox startet gerade
@@ -777,8 +792,11 @@ async processStrategy(liveData: E3dcLiveData, wallboxIp: string): Promise<void> 
         // Auto hat Ladung beendet: Plug=7 (noch verbunden) aber Wallbox lädt nicht
         // → vehicleFinishedCharging setzen um Restart-Loop zu verhindern
         const vehicleStillConnected = (getAuthoritativePlugStatus() ?? polledPlugStatus) === 7;
-        if (vehicleStillConnected) {
+        const shouldMarkVehicleFinished = vehicleStillConnected && this.hasObservedRealChargingSinceStartup;
+        if (vehicleStillConnected && shouldMarkVehicleFinished) {
           log("info", "system", `[RECONCILE] Auto noch verbunden (Plug=7) aber Wallbox gestoppt → vehicleFinishedCharging=true (verhindert Restart-Loop)`);
+        } else if (vehicleStillConnected && !shouldMarkVehicleFinished) {
+          log("debug", "system", "[RECONCILE] Startup/Stale-Context erkannt: isActive=true aber kein beobachteter Ladezyklus in dieser Runtime - vehicleFinishedCharging bleibt false");
         }
         log("info", "system", `[RECONCILE] Context sagt isActive=true, aber Wallbox lädt nicht (State=${wallboxState}, Power=${wallboxPower}mW) → setze isActive=false`);
         storage.updateChargingContext({
@@ -786,7 +804,7 @@ async processStrategy(liveData: E3dcLiveData, wallboxIp: string): Promise<void> 
           currentAmpere: 0,
           targetAmpere: 0,
           currentPhases: detectedPhases,
-          ...(vehicleStillConnected ? { vehicleFinishedCharging: true, vehicleFinishedAt: new Date().toISOString() } : {}),
+          ...(shouldMarkVehicleFinished ? { vehicleFinishedCharging: true, vehicleFinishedAt: getNow().toISOString() } : {}),
         });
         
         // Bug #84: Wallbox deaktivieren wenn nicht aktiv laden soll
@@ -798,7 +816,7 @@ async processStrategy(liveData: E3dcLiveData, wallboxIp: string): Promise<void> 
       } else if (!context.isActive && reallyCharging) {
         log("info", "system", `[RECONCILE] Context sagt isActive=false, aber Wallbox lädt (State=${wallboxState}, Power=${wallboxPower}mW) → setze isActive=true`);
         const avgCurrent = Math.round((currents[0] + currents[1] + currents[2]) / 1000 / (detectedPhases || 1));
-        const now = new Date();
+        const now = getNow();
         storage.updateChargingContext({
           isActive: true,
           currentAmpere: avgCurrent,
@@ -852,7 +870,7 @@ async processStrategy(liveData: E3dcLiveData, wallboxIp: string): Promise<void> 
       await this.sendUdpCommand(wallboxIp, "ena 1");
       await this.sendUdpCommand(wallboxIp, `curr ${targetCurrentMa}`);
       
-      const now = new Date();
+      const now = getNow();
       storage.updateChargingContext({
         isActive: true,
         currentAmpere: finalAmpere,
@@ -905,7 +923,7 @@ async processStrategy(liveData: E3dcLiveData, wallboxIp: string): Promise<void> 
       // KRITISCH: Prüfe Debounce-Zeit BEVOR Stromanpassung!
       const debounceSeconds = config.minChangeIntervalSeconds || 30;
       const lastAdjustmentTime = context.lastAdjustment ? new Date(context.lastAdjustment).getTime() : 0;
-      const now = Date.now();
+      const now = getNow().getTime();
       const timeSinceLastAdjustmentSeconds = (now - lastAdjustmentTime) / 1000;
       
       if (timeSinceLastAdjustmentSeconds < debounceSeconds) {
@@ -924,7 +942,7 @@ async processStrategy(liveData: E3dcLiveData, wallboxIp: string): Promise<void> 
       try {
         await this.sendUdpCommand(wallboxIp, `curr ${targetCurrentMa}`);
         
-        const nowDate = new Date();
+        const nowDate = getNow();
         storage.updateChargingContext({
           currentAmpere: finalAmpere,
           targetAmpere: finalAmpere,
@@ -1284,7 +1302,7 @@ async processStrategy(liveData: E3dcLiveData, wallboxIp: string): Promise<void> 
       config: settings?.chargingStrategy || null,
       batteryDischarging: this.batteryDischargeSince !== null,
       batteryDischargeDurationMs: this.batteryDischargeSince 
-        ? Date.now() - this.batteryDischargeSince.getTime() 
+        ? getNow().getTime() - this.batteryDischargeSince.getTime() 
         : 0,
     };
   }

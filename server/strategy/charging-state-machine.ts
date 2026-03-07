@@ -115,9 +115,10 @@ export function evaluate(
     belowThresholdSince?: string;
     lastStartedAt?: string;
     stabilizationPeriodMs: number;
+    nowMs?: number;
   },
 ): TransitionResult {
-  const now = Date.now();
+  const now = timers.nowMs ?? Date.now();
 
   switch (currentState) {
     // ─── IDLE ────────────────────────────────────────────────────────

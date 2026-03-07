@@ -326,4 +326,91 @@ describe("SmartBufferController", () => {
     // Bei erkanntem Auto wird die Soll-Leistung auf den real verfügbaren Anteil begrenzt.
     expect(controller.getStatus().targetChargePowerWatt).toBe(1000);
   });
+
+  it("applies grid import activation and recovery delays before toggling fill-up power", async () => {
+    mockPlugStatus = 7;
+    vi.setSystemTime(new Date("2026-03-07T13:30:00.000Z"));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({
+        ok: true,
+        json: async () => ({
+          minutely_15: {
+            time: [Math.floor(new Date("2026-03-07T10:00:00.000Z").getTime() / 1000)],
+            global_tilted_irradiance_instant: [1000],
+          },
+        }),
+      })),
+    );
+
+    const { SmartBufferController } = await import("../strategy/smart-buffer-controller");
+    const controller = new SmartBufferController();
+
+    await controller.processLiveData({
+      pvPower: 1500,
+      batteryPower: 0,
+      batterySoc: 70,
+      housePower: 500,
+      gridPower: -500,
+      wallboxPower: 0,
+      autarky: 90,
+      selfConsumption: 80,
+      timestamp: new Date().toISOString(),
+    });
+    expect(controller.getStatus().targetChargePowerWatt).toBe(1000);
+
+    await controller.processLiveData({
+      pvPower: 1500,
+      batteryPower: 0,
+      batterySoc: 70,
+      housePower: 500,
+      gridPower: 50,
+      wallboxPower: 0,
+      autarky: 90,
+      selfConsumption: 80,
+      timestamp: new Date().toISOString(),
+    });
+    expect(controller.getStatus().targetChargePowerWatt).toBe(1000);
+
+    vi.advanceTimersByTime(21_000);
+    await controller.processLiveData({
+      pvPower: 1500,
+      batteryPower: 0,
+      batterySoc: 70,
+      housePower: 500,
+      gridPower: 50,
+      wallboxPower: 0,
+      autarky: 90,
+      selfConsumption: 80,
+      timestamp: new Date().toISOString(),
+    });
+    expect(controller.getStatus().targetChargePowerWatt).toBe(0);
+
+    await controller.processLiveData({
+      pvPower: 1500,
+      batteryPower: 0,
+      batterySoc: 70,
+      housePower: 500,
+      gridPower: -500,
+      wallboxPower: 0,
+      autarky: 90,
+      selfConsumption: 80,
+      timestamp: new Date().toISOString(),
+    });
+    expect(controller.getStatus().targetChargePowerWatt).toBe(0);
+
+    vi.advanceTimersByTime(46_000);
+    await controller.processLiveData({
+      pvPower: 1500,
+      batteryPower: 0,
+      batterySoc: 70,
+      housePower: 500,
+      gridPower: -500,
+      wallboxPower: 0,
+      autarky: 90,
+      selfConsumption: 80,
+      timestamp: new Date().toISOString(),
+    });
+    expect(controller.getStatus().targetChargePowerWatt).toBe(1000);
+  });
 });
