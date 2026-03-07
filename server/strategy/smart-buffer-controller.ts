@@ -1,6 +1,7 @@
 import type { E3dcLiveData, Settings, SmartBufferConfig, SmartBufferPhase, SmartBufferStatus } from "@shared/schema";
 import { storage } from "../core/storage";
 import { log } from "../core/logger";
+import { getNow } from "../core/clock";
 import { e3dcClient } from "../e3dc/client";
 import { getE3dcLiveDataHub } from "../e3dc/modbus";
 import { getAuthoritativePlugStatus } from "../wallbox/broadcast-listener";
@@ -26,7 +27,9 @@ const DEFAULT_SMART_BUFFER_CONFIG: SmartBufferDefaults = {
   winterRuleEndTimeUtc: "12:45",
   summerRuleEndTimeUtc: "15:00",
 };
-const BATTERY_LIMIT_LOG_DEADBAND_WATT = 100;
+const BATTERY_LIMIT_LOG_DEADBAND_WATT = 250;
+const GRID_IMPORT_ACTIVATION_DELAY_MS = 20_000;
+const GRID_IMPORT_RECOVERY_DELAY_MS = 45_000;
 
 function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
@@ -54,7 +57,7 @@ export class SmartBufferController {
     phase: "MORNING_HOLD",
     soc: 0,
     targetSoc: 100,
-    regelzeitEnde: new Date().toISOString(),
+    regelzeitEnde: getNow().toISOString(),
     targetChargePowerWatt: 0,
     batteryChargeLimitWatt: 0,
     forecastKwh: 0,
@@ -72,6 +75,9 @@ export class SmartBufferController {
   private actualKwhDay = "";
   private lastProcessedAt = 0;
   private lastStatusBroadcastKey = "";
+  private gridImportSince: Date | null = null;
+  private gridImportRecoverySince: Date | null = null;
+  private gridImportLimitActive = false;
 
   getStatus(): SmartBufferStatus {
     return this.status;
@@ -239,7 +245,7 @@ export class SmartBufferController {
     this.status.phaseChanges = [
       ...this.status.phaseChanges,
       {
-        time: new Date().toISOString(),
+        time: getNow().toISOString(),
         from,
         to: nextPhase,
         reason,
@@ -304,6 +310,47 @@ export class SmartBufferController {
     return settings?.chargingStrategy?.activeStrategy === "smart_buffer";
   }
 
+  private applyGridImportGuard(desiredFillUpPower: number, gridPower: number, now: Date): number {
+    const hasGridImport = gridPower > 0;
+
+    if (hasGridImport) {
+      this.gridImportRecoverySince = null;
+      if (!this.gridImportSince) {
+        this.gridImportSince = now;
+      }
+
+      const importDurationMs = now.getTime() - this.gridImportSince.getTime();
+      if (this.gridImportLimitActive || importDurationMs >= GRID_IMPORT_ACTIVATION_DELAY_MS) {
+        if (!this.gridImportLimitActive) {
+          this.gridImportLimitActive = true;
+          log("info", "strategy", "Smart Buffer: Netzbezug stabil > 20s - Akku-Limit temporär auf 0W");
+        }
+        return 0;
+      }
+      return desiredFillUpPower;
+    }
+
+    this.gridImportSince = null;
+    if (!this.gridImportLimitActive) {
+      return desiredFillUpPower;
+    }
+
+    if (!this.gridImportRecoverySince) {
+      this.gridImportRecoverySince = now;
+      return 0;
+    }
+
+    const recoveryDurationMs = now.getTime() - this.gridImportRecoverySince.getTime();
+    if (recoveryDurationMs < GRID_IMPORT_RECOVERY_DELAY_MS) {
+      return 0;
+    }
+
+    this.gridImportLimitActive = false;
+    this.gridImportRecoverySince = null;
+    log("info", "strategy", "Smart Buffer: Kein Netzbezug seit 45s - Akku-Limit wieder freigegeben");
+    return desiredFillUpPower;
+  }
+
   private async deactivate(reason: string): Promise<void> {
     if (!this.status.enabled && this.status.batteryChargeLimitWatt === 0) {
       return;
@@ -312,6 +359,9 @@ export class SmartBufferController {
     this.status.enabled = false;
     this.pushPhaseChange("MORNING_HOLD", reason);
     this.belowExitSince = null;
+    this.gridImportSince = null;
+    this.gridImportRecoverySince = null;
+    this.gridImportLimitActive = false;
 
     try {
       await this.applyBatteryLimit(0);
@@ -343,7 +393,7 @@ export class SmartBufferController {
 
         this.status.enabled = true;
 
-        const now = new Date();
+        const now = getNow();
         const config = this.resolveConfig(settings);
         const ruleEnd = this.getRuleEnd(now, config);
         const isAfterRuleEnd = now.getTime() >= ruleEnd.getTime();
@@ -362,11 +412,8 @@ export class SmartBufferController {
         const phaseCount = settings.chargingStrategy?.physicalPhaseSwitch ?? 3;
         const wallboxCurrentAmpere = phaseCount > 0 ? Number((Math.max(0, liveData.wallboxPower) / (230 * phaseCount)).toFixed(1)) : 0;
         const availableForBattery = Math.max(0, liveData.pvPower - liveData.housePower);
-        let desiredFillUpPower = carConnected ? Math.min(fillUpTarget, availableForBattery) : fillUpTarget;
-
-        if (liveData.gridPower > 0) {
-          desiredFillUpPower = 0;
-        }
+        const requestedFillUpPower = carConnected ? Math.min(fillUpTarget, availableForBattery) : fillUpTarget;
+        const desiredFillUpPower = this.applyGridImportGuard(requestedFillUpPower, liveData.gridPower, now);
 
         const previousTargetChargePower = this.status.targetChargePowerWatt;
         this.status.targetChargePowerWatt = Math.round(desiredFillUpPower);

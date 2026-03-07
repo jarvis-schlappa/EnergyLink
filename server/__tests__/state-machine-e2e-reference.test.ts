@@ -404,6 +404,9 @@ describe("State Machine E2E Reference Tests", () => {
         lastStartedAt: new Date(Date.now() - 60000).toISOString(),
       });
 
+      // Simulate that we observed real charging in this runtime
+      (controller as any).hasObservedRealChargingSinceStartup = true;
+
       mockSendUdp
         .mockResolvedValueOnce({ State: 2, Plug: 7 })
         .mockResolvedValueOnce({ P: 0, I1: 0, I2: 0, I3: 0 });

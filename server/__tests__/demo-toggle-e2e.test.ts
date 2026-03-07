@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import { mkdtempSync, rmSync } from "fs";
 import { join } from "path";
 import os from "os";
@@ -209,26 +209,39 @@ describe("Mock wallbox plug status broadcast (#18)", () => {
 
 describe("E3DC mock state reset on demo toggle (#63)", () => {
   it("should reset SOC state when demo is restarted via reset()", async () => {
-    const { e3dcMockService } = await import("../demo/e3dc-mock");
+    // Freeze time at 12:00 Berlin (deterministic SOC, avoids hour-boundary races
+    // and the Math.random() branch in getInitialSocForTime for night hours).
+    // hour=12 → getInitialSocForTime(12) = 30 + ((12-6)/8)*50 = 67.5 → rounded = 68
+    const frozenDate = new Date("2026-03-07T11:00:00Z"); // 12:00 Berlin (CET = UTC+1)
+    vi.useFakeTimers({ shouldAdvanceTime: false });
+    vi.setSystemTime(frozenDate);
 
-    // 1. Reset to get a clean time-appropriate initial SOC
-    e3dcMockService.reset();
-    const freshData = await e3dcMockService.getLiveData(0);
-    const initialSoc = freshData.batterySoc;
+    try {
+      const { e3dcMockService } = await import("../demo/e3dc-mock");
 
-    // 2. Dirty the singleton state directly (simulates SOC drift during long demo session)
-    (e3dcMockService as any).currentSoc = 99;
-    const dirtyData = await e3dcMockService.getLiveData(0);
-    expect(dirtyData.batterySoc).toBe(99);
+      // 1. Reset to get a clean time-appropriate initial SOC
+      e3dcMockService.reset();
+      const freshData = await e3dcMockService.getLiveData(0);
+      const initialSoc = freshData.batterySoc;
+      // With frozen clock at hour=12: SOC should be 68 (deterministic)
+      expect(initialSoc).toBe(68);
 
-    // 3. Reset — SOC must return to time-appropriate value, NOT stay at 99
-    e3dcMockService.reset();
-    const resetData = await e3dcMockService.getLiveData(0);
-    expect(resetData.batterySoc).toBe(initialSoc);
-    expect(resetData.batterySoc).not.toBe(99);
+      // 2. Dirty the singleton state directly (simulates SOC drift during long demo session)
+      (e3dcMockService as any).currentSoc = 99;
+      const dirtyData = await e3dcMockService.getLiveData(0);
+      expect(dirtyData.batterySoc).toBe(99);
 
-    // 4. SOC must be in valid range (0-100)
-    expect(resetData.batterySoc).toBeGreaterThanOrEqual(0);
-    expect(resetData.batterySoc).toBeLessThanOrEqual(100);
+      // 3. Reset — SOC must return to exact time-appropriate value
+      e3dcMockService.reset();
+      const resetData = await e3dcMockService.getLiveData(0);
+      expect(resetData.batterySoc).toBe(initialSoc);
+      expect(resetData.batterySoc).not.toBe(99);
+
+      // 4. SOC must be in valid range (0-100)
+      expect(resetData.batterySoc).toBeGreaterThanOrEqual(0);
+      expect(resetData.batterySoc).toBeLessThanOrEqual(100);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

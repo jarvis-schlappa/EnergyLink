@@ -35,6 +35,22 @@ let sendUdpCommand: ((ip: string, command: string) => Promise<any>) | null =
 let epresCountSinceFullStatus = 0;
 const EPRES_FULL_STATUS_INTERVAL = 5;
 
+function resetVehicleFinishedOnPlugChange(previousPlug: number | null | undefined, nextPlug: number): void {
+  if (previousPlug === null || previousPlug === undefined || previousPlug === nextPlug) {
+    return;
+  }
+
+  const context = storage.getChargingContext();
+  if (context.vehicleFinishedCharging) {
+    log(
+      "info",
+      "system",
+      `[Wallbox-Broadcast-Listener] Plug-Wechsel ${previousPlug} → ${nextPlug} erkannt → vehicleFinishedCharging zurückgesetzt`,
+    );
+    storage.updateChargingContext({ vehicleFinishedCharging: false, vehicleFinishedAt: undefined });
+  }
+}
+
 // Handler für Broadcast-Nachrichten (async für stopChargingForStrategyOff)
 const handleBroadcast = async (data: any, rinfo: any) => {
   // IP-Filter: Nur Broadcasts von der konfigurierten Wallbox-IP verarbeiten (Fixes #40)
@@ -70,6 +86,7 @@ const handleBroadcast = async (data: any, rinfo: any) => {
               "system",
               `[Wallbox-Broadcast-Listener] Plug-Status geändert (seit letztem Start): ${savedStatus} → ${plugStatus} (von ${rinfo.address})`,
             );
+            resetVehicleFinishedOnPlugChange(savedStatus, plugStatus);
             
             // Speichere neuen Status
             storage.savePlugStatusTracking({
@@ -120,6 +137,7 @@ const handleBroadcast = async (data: any, rinfo: any) => {
           "system",
           `[Wallbox-Broadcast-Listener] Plug-Status geändert: ${lastPlugStatus} → ${plugStatus} (von ${rinfo.address})`,
         );
+        resetVehicleFinishedOnPlugChange(lastPlugStatus, plugStatus);
 
         // Aktualisiere Plug-Tracking mit Zeitstempel
         try {

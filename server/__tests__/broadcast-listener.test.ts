@@ -197,6 +197,29 @@ describe("Broadcast Listener", () => {
       );
       expect(plugLogs).toHaveLength(0);
     });
+
+    it("resets vehicleFinishedCharging on normal plug change", async () => {
+      mockChargingContext = { ...mockChargingContext, vehicleFinishedCharging: true, vehicleFinishedAt: "2026-03-07T20:00:00.000Z" };
+      await broadcastHandler({ Plug: 7 }, fakeRinfo); // initial
+      await broadcastHandler({ Plug: 1 }, fakeRinfo); // change
+
+      const { storage } = await import("../core/storage");
+      expect(storage.updateChargingContext).toHaveBeenCalledWith(
+        expect.objectContaining({ vehicleFinishedCharging: false, vehicleFinishedAt: undefined }),
+      );
+    });
+
+    it("resets vehicleFinishedCharging on first broadcast when saved plug state changed", async () => {
+      mockChargingContext = { ...mockChargingContext, vehicleFinishedCharging: true, vehicleFinishedAt: "2026-03-07T20:00:00.000Z" };
+      mockPlugTracking = { lastPlugStatus: 7 };
+
+      await broadcastHandler({ Plug: 1 }, fakeRinfo); // first broadcast with saved-state diff
+
+      const { storage } = await import("../core/storage");
+      expect(storage.updateChargingContext).toHaveBeenCalledWith(
+        expect.objectContaining({ vehicleFinishedCharging: false, vehicleFinishedAt: undefined }),
+      );
+    });
   });
 
   describe("E pres Broadcasts", () => {

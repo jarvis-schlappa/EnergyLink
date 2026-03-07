@@ -95,6 +95,11 @@ describe("Car Full → Restart Loop Prevention", () => {
       lastStartedAt: new Date(Date.now() - 60000).toISOString(), // Started 60s ago (past grace period)
     });
 
+    // Simulate that we observed real charging in this runtime
+    // (required since demo-clock PR: reconcile only sets vehicleFinishedCharging
+    // when hasObservedRealChargingSinceStartup is true)
+    (controller as any).hasObservedRealChargingSinceStartup = true;
+
     // Step 2: Car becomes full → Wallbox stops (State=2, Power=0)
     // reconcileChargingContext sees: isActive=true but wallbox not charging
     mockSendUdp
@@ -255,6 +260,9 @@ describe("Car Full → Restart Loop Prevention", () => {
       currentPhases: 1,
       lastStartedAt: new Date(Date.now() - 60000).toISOString(),
     });
+
+    // Simulate that we observed real charging in this runtime
+    (controller as any).hasObservedRealChargingSinceStartup = true;
 
     // Wallbox stopped (car full)
     mockSendUdp

@@ -297,6 +297,10 @@ describe("Bug #85: vehicleFinishedCharging never auto-reset after 12h", () => {
       vehicleFinishedAt: sixHoursAgo,
     });
 
+    // Simulate that we observed real charging in this runtime
+    // (prevents demo-startup-cleanup from clearing the flag)
+    (controller as any).hasObservedRealChargingSinceStartup = true;
+
     const liveData = makeLiveData({ pvPower: 5000, housePower: 800 });
     await controller.processStrategy(liveData, WALLBOX_IP);
 

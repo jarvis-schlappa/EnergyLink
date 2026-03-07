@@ -294,12 +294,17 @@ describe("Bug 2 (#85): CAR_FINISHED auto-reset after 12h", () => {
       lastStartedAt: new Date(Date.now() - 60000).toISOString(),
     });
 
-    // Wallbox stopped (car full)
+    // 1) First reconcile: observe real charging in this runtime
     mockSendUdp
+      .mockResolvedValueOnce({ State: 3, Plug: 7 })
+      .mockResolvedValueOnce({ P: 2500000, I1: 10000, I2: 0, I3: 0 })
+      .mockResolvedValue({})
+      // 2) Wallbox stopped (car full)
       .mockResolvedValueOnce({ State: 2, Plug: 7 })
       .mockResolvedValueOnce({ P: 0, I1: 0, I2: 0, I3: 0 })
       .mockResolvedValue({});
 
+    await (controller as any).reconcileChargingContext(ip);
     await (controller as any).reconcileChargingContext(ip);
 
     const context = storage.getChargingContext();
@@ -308,6 +313,61 @@ describe("Bug 2 (#85): CAR_FINISHED auto-reset after 12h", () => {
     // vehicleFinishedAt should be a recent timestamp (within last 5s)
     const finishedAt = new Date(context.vehicleFinishedAt!).getTime();
     expect(Date.now() - finishedAt).toBeLessThan(5000);
+  });
+
+  it("should NOT set vehicleFinishedCharging for stale isActive startup context without observed charging", async () => {
+    const ip = DEFAULT_WALLBOX_IP;
+
+    (storage as any)._setContext({
+      strategy: "surplus_vehicle_prio",
+      isActive: true,
+      currentAmpere: 10,
+      targetAmpere: 10,
+      currentPhases: 1,
+      lastStartedAt: new Date(Date.now() - 60 * 60 * 1000).toISOString(),
+    });
+
+    // Startup/stale case: wallbox is idle and not charging, but cable still connected
+    mockSendUdp
+      .mockResolvedValueOnce({ State: 2, Plug: 7, "Enable sys": 1 })
+      .mockResolvedValueOnce({ P: 0, I1: 0, I2: 0, I3: 0 })
+      .mockResolvedValue({});
+
+    await (controller as any).reconcileChargingContext(ip);
+
+    const context = storage.getChargingContext();
+    expect(context.isActive).toBe(false);
+    expect(context.vehicleFinishedCharging).not.toBe(true);
+    expect(context.vehicleFinishedAt).toBeUndefined();
+  });
+
+  it("should reset stale vehicleFinishedCharging on demo startup before state evaluation", async () => {
+    const ip = DEFAULT_WALLBOX_IP;
+    const settings = storage.getSettings();
+    (storage as any)._setSettings({
+      ...settings,
+      demoMode: true,
+    });
+
+    (storage as any)._setContext({
+      strategy: "surplus_vehicle_prio",
+      isActive: false,
+      currentAmpere: 0,
+      targetAmpere: 0,
+      currentPhases: 1,
+      vehicleFinishedCharging: true,
+      vehicleFinishedAt: new Date(Date.now() - 60 * 60 * 1000).toISOString(),
+    });
+
+    mockSendUdp
+      .mockResolvedValueOnce({ State: 2, Plug: 7, "Enable sys": 0 })
+      .mockResolvedValueOnce({ P: 0, I1: 0, I2: 0, I3: 0 });
+
+    await controller.processStrategy(makeLiveData(), ip);
+
+    const context = storage.getChargingContext();
+    expect(context.vehicleFinishedCharging).toBe(false);
+    expect(context.vehicleFinishedAt).toBeUndefined();
   });
 });
 
