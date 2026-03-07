@@ -186,4 +186,103 @@ describe("SmartBufferController", () => {
     expect(mockSetAutomaticMode).toHaveBeenCalled();
     expect(controller.getStatus().enabled).toBe(false);
   });
+
+  it("writes structured debug cycle log with all analysis fields", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({
+        ok: true,
+        json: async () => ({
+          minutely_15: {
+            time: [Math.floor(new Date("2026-03-07T10:00:00.000Z").getTime() / 1000)],
+            global_tilted_irradiance_instant: [1000],
+          },
+        }),
+      })),
+    );
+
+    const { SmartBufferController } = await import("../strategy/smart-buffer-controller");
+    const controller = new SmartBufferController();
+
+    await controller.processLiveData({
+      pvPower: 2200,
+      batteryPower: 0,
+      batterySoc: 70,
+      housePower: 500,
+      gridPower: -600,
+      wallboxPower: 0,
+      autarky: 0,
+      selfConsumption: 0,
+      timestamp: new Date().toISOString(),
+    });
+
+    const debugCycleCall = mockLog.mock.calls.find((call: any[]) => call[0] === "debug" && call[2] === "Smart Buffer Zyklus");
+    expect(debugCycleCall).toBeTruthy();
+
+    const details = String(debugCycleCall?.[3] ?? "");
+    expect(details).toContain("timestamp=");
+    expect(details).toContain("phase=");
+    expect(details).toContain("soc=");
+    expect(details).toContain("soc_ziel=");
+    expect(details).toContain("pv_leistung=");
+    expect(details).toContain("hauslast=");
+    expect(details).toContain("einspeisung=");
+    expect(details).toContain("ladeleistung_soll=");
+    expect(details).toContain("akku_limit_ist=");
+    expect(details).toContain("wallbox_strom=");
+    expect(details).toContain("wallbox_leistung=");
+    expect(details).toContain("auto_anwesend=");
+    expect(details).toContain("regelzeit_ende=");
+    expect(details).toContain("phase_change=true");
+    expect(details).toContain("phase_change_grund=");
+  });
+
+  it("logs battery limit adjustment only outside deadband", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({
+        ok: true,
+        json: async () => ({
+          minutely_15: {
+            time: [Math.floor(new Date("2026-03-07T10:00:00.000Z").getTime() / 1000)],
+            global_tilted_irradiance_instant: [500],
+          },
+        }),
+      })),
+    );
+
+    const { SmartBufferController } = await import("../strategy/smart-buffer-controller");
+    const controller = new SmartBufferController();
+
+    await controller.processLiveData({
+      pvPower: 1300,
+      batteryPower: 0,
+      batterySoc: 90,
+      housePower: 200,
+      gridPower: -300,
+      wallboxPower: 0,
+      autarky: 0,
+      selfConsumption: 0,
+      timestamp: new Date().toISOString(),
+    });
+
+    vi.advanceTimersByTime(10_000);
+
+    await controller.processLiveData({
+      pvPower: 1300,
+      batteryPower: 0,
+      batterySoc: 90,
+      housePower: 200,
+      gridPower: -300,
+      wallboxPower: 0,
+      autarky: 0,
+      selfConsumption: 0,
+      timestamp: new Date().toISOString(),
+    });
+
+    const batteryLimitLogs = mockLog.mock.calls.filter(
+      (call: any[]) => call[0] === "info" && String(call[2]).includes("Akku-Limit angepasst"),
+    );
+    expect(batteryLimitLogs).toHaveLength(1);
+  });
 });

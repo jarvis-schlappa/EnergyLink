@@ -25,6 +25,7 @@ const DEFAULT_SMART_BUFFER_CONFIG: SmartBufferDefaults = {
   winterRuleEndTimeUtc: "12:45",
   summerRuleEndTimeUtc: "15:00",
 };
+const BATTERY_LIMIT_LOG_DEADBAND_WATT = 100;
 
 function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
@@ -36,6 +37,13 @@ function parseUtcHm(hm: string): { hour: number; minute: number } {
     hour: Number.isFinite(h) ? clamp(h, 0, 23) : 12,
     minute: Number.isFinite(m) ? clamp(m, 0, 59) : 0,
   };
+}
+
+function formatLogValue(value: string | number | boolean): string {
+  if (typeof value === "string") {
+    return value.includes(" ") ? `"${value}"` : value;
+  }
+  return String(value);
 }
 
 export class SmartBufferController {
@@ -156,6 +164,7 @@ export class SmartBufferController {
     this.lastForecastDay = dayKey;
 
     try {
+      const previousForecastKwh = this.status.forecastKwh;
       const responses = await Promise.all(
         config.pvArrays.map(async (array) => {
           const params = new URLSearchParams({
@@ -210,7 +219,9 @@ export class SmartBufferController {
         totalKwh += totalKw * 0.25;
       }
 
-      this.status.forecastKwh = Number(totalKwh.toFixed(2));
+      const nextForecastKwh = Number(totalKwh.toFixed(2));
+      this.status.forecastKwh = nextForecastKwh;
+      log("info", "strategy", `Smart Buffer: Neuer Forecast: ${previousForecastKwh.toFixed(2)}kWh -> ${nextForecastKwh.toFixed(2)}kWh`);
     } catch (error) {
       log("warning", "strategy", "Smart Buffer: Open-Meteo Forecast fehlgeschlagen", error instanceof Error ? error.message : String(error));
     }
@@ -244,22 +255,25 @@ export class SmartBufferController {
     }
 
     const rounded = Math.round(desiredLimitWatt);
+    const previousLimit = this.status.batteryChargeLimitWatt;
 
     if (rounded <= 0) {
-      if (this.status.batteryChargeLimitWatt !== 0) {
+      if (previousLimit !== 0) {
         await e3dcClient.setAutomaticMode();
         this.status.batteryChargeLimitWatt = 0;
+        log("info", "strategy", `Smart Buffer: Akku-Limit angepasst: ${previousLimit}W -> 0W`);
       }
       return;
     }
 
-    const delta = Math.abs(rounded - this.status.batteryChargeLimitWatt);
-    if (delta < 100) {
+    const delta = Math.abs(rounded - previousLimit);
+    if (delta <= BATTERY_LIMIT_LOG_DEADBAND_WATT) {
       return;
     }
 
     await e3dcClient.setMaxChargePower(rounded);
     this.status.batteryChargeLimitWatt = rounded;
+    log("info", "strategy", `Smart Buffer: Akku-Limit angepasst: ${previousLimit}W -> ${rounded}W`);
   }
 
   private updateActualPvEnergy(liveData: E3dcLiveData, now: Date): void {
@@ -344,6 +358,8 @@ export class SmartBufferController {
 
         const fillUpTarget = this.calculateFillUpTargetWatt(liveData, config, now);
         const carConnected = liveData.wallboxPower > 100;
+        const phaseCount = settings.chargingStrategy?.physicalPhaseSwitch ?? 3;
+        const wallboxCurrentAmpere = phaseCount > 0 ? Number((Math.max(0, liveData.wallboxPower) / (230 * phaseCount)).toFixed(1)) : 0;
         const availableForBattery = Math.max(0, liveData.pvPower - liveData.housePower);
         let desiredFillUpPower = carConnected ? Math.min(fillUpTarget, availableForBattery) : fillUpTarget;
 
@@ -351,7 +367,13 @@ export class SmartBufferController {
           desiredFillUpPower = 0;
         }
 
+        const previousTargetChargePower = this.status.targetChargePowerWatt;
         this.status.targetChargePowerWatt = Math.round(desiredFillUpPower);
+        if (this.status.targetChargePowerWatt !== previousTargetChargePower) {
+          log("info", "strategy", `Smart Buffer: Soll-Ladeleistung angepasst: ${previousTargetChargePower}W -> ${this.status.targetChargePowerWatt}W`);
+        }
+
+        const phaseBeforeTransition = this.phase;
 
         if (isAfterRuleEnd) {
           this.pushPhaseChange("STANDBY", "Regelzeit beendet");
@@ -397,6 +419,8 @@ export class SmartBufferController {
           }
         }
 
+        const phaseChanged = this.phase !== phaseBeforeTransition;
+        const phaseChangeReason = phaseChanged ? (this.status.phaseChanges.at(-1)?.reason ?? "-") : "-";
         let desiredLimit = 0;
 
         if (this.phase === "CLIPPING_GUARD") {
@@ -418,6 +442,27 @@ export class SmartBufferController {
         }
 
         await this.applyBatteryLimit(desiredLimit);
+        const cycleLogFields: Record<string, string | number | boolean> = {
+          timestamp: now.toISOString(),
+          phase: this.phase,
+          soc: this.status.soc,
+          soc_ziel: this.status.targetSoc,
+          pv_leistung: Math.round(liveData.pvPower),
+          hauslast: Math.round(liveData.housePower),
+          einspeisung: this.status.feedInWatt,
+          ladeleistung_soll: this.status.targetChargePowerWatt,
+          akku_limit_ist: this.status.batteryChargeLimitWatt,
+          wallbox_strom: wallboxCurrentAmpere,
+          wallbox_leistung: Math.round(liveData.wallboxPower),
+          auto_anwesend: carConnected,
+          regelzeit_ende: this.status.regelzeitEnde,
+          phase_change: phaseChanged,
+          phase_change_grund: phaseChangeReason,
+        };
+        const cycleDetails = Object.entries(cycleLogFields)
+          .map(([key, value]) => `${key}=${formatLogValue(value)}`)
+          .join(" ");
+        log("debug", "strategy", "Smart Buffer Zyklus", cycleDetails);
         this.emitStatusUpdate();
       } catch (error) {
         log("error", "strategy", "Smart Buffer Verarbeitung fehlgeschlagen", error instanceof Error ? error.message : String(error));
