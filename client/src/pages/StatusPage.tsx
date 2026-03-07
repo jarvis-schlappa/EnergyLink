@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from "react";
-import { Battery, Plug, Zap, AlertCircle, Gauge, Sparkles, Clock, Warehouse, Loader2 } from "lucide-react";
+import { Battery, Plug, Zap, AlertCircle, Gauge, Sparkles, Clock, Warehouse, Loader2, Settings as SettingsIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Slider } from "@/components/ui/slider";
@@ -455,9 +455,19 @@ export default function StatusPage() {
         return "Akku auffüllen";
       case "FULL":
         return "Akku voll";
+      case "STANDBY":
+        return "Standby (Automatik)";
       default:
         return "Smart Buffer";
     }
+  };
+
+  const formatWatt = (value: number) => {
+    return new Intl.NumberFormat("de-DE").format(Math.round(value));
+  };
+
+  const formatKwh = (value: number) => {
+    return new Intl.NumberFormat("de-DE", { minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(value);
   };
 
   const getStatusIcons = () => {
@@ -683,17 +693,41 @@ export default function StatusPage() {
             )}
 
             {isSmartBufferStrategy ? (
-              <StatusCard
-                icon={Battery}
-                title="Smart Buffer"
-                value={isLoading ? "..." : String(Math.round(smartBufferStatus?.targetChargePowerWatt || 0))}
-                unit="W Soll"
-                status={isCharging ? "charging" : "ready"}
-                badge={getSmartBufferPhaseLabel(smartBufferStatus?.phase)}
-                additionalInfo={`SOC ${Math.round(smartBufferStatus?.soc || 0)}% -> Ziel ${Math.round(smartBufferStatus?.targetSoc || 100)}%`}
+              <Card
+                className="p-6 relative min-h-[18.5rem] cursor-pointer hover-elevate active-elevate-2"
+                data-testid="card-smart-buffer"
                 onClick={() => setShowSmartBufferDrawer(true)}
-                showConfigIcon={true}
-              />
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-center gap-2">
+                    <Battery className="w-5 h-5 text-yellow-600 dark:text-yellow-400" />
+                    <span className="text-base font-semibold">Smart Buffer</span>
+                  </div>
+                  <SettingsIcon className="w-4 h-4 text-muted-foreground mt-0.5 flex-shrink-0" data-testid="icon-config-indicator" />
+                </div>
+
+                <div className="mt-3">
+                  <Badge variant={smartBufferStatus?.phase === "STANDBY" ? "outline" : "secondary"} className="max-w-full whitespace-normal break-words">
+                    {getSmartBufferPhaseLabel(smartBufferStatus?.phase)}
+                  </Badge>
+                </div>
+
+                <div className="mt-5 space-y-2.5 text-sm">
+                  <div className="text-muted-foreground">
+                    SOC: {Math.round(smartBufferStatus?.soc || 0)}% -&gt; Ziel {Math.round(smartBufferStatus?.targetSoc || 100)}%
+                    {smartBufferStatus?.regelzeitEnde ? ` (${format(new Date(smartBufferStatus.regelzeitEnde), "HH:mm", { locale: de })})` : ""}
+                  </div>
+                  <div className="font-semibold text-foreground">
+                    Soll-Ladeleistung: {isLoading ? "..." : smartBufferStatus?.phase === "STANDBY" ? "Automatik" : `${formatWatt(smartBufferStatus?.targetChargePowerWatt || 0)} W`}
+                  </div>
+                  <div className="text-muted-foreground">
+                    Akku-Limit: {isLoading ? "..." : `${formatWatt(smartBufferStatus?.batteryChargeLimitWatt || 0)} W`}
+                  </div>
+                  <div className="text-muted-foreground">
+                    Prognose: {formatKwh(smartBufferStatus?.forecastKwh || 0)} kWh | Ist: {formatKwh(smartBufferStatus?.actualKwh || 0)} kWh
+                  </div>
+                </div>
+              </Card>
             ) : (
               <StatusCard
                 icon={Battery}

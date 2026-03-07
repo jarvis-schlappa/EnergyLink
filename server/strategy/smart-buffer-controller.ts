@@ -130,7 +130,7 @@ export class SmartBufferController {
     }
 
     if (remainingHours <= 0) {
-      return config.maxBatteryChargePower;
+      return 0;
     }
 
     const deltaKwh = (deltaSoc / 100) * config.batteryCapacityKwh;
@@ -323,6 +323,8 @@ export class SmartBufferController {
 
         const now = new Date();
         const config = this.resolveConfig(settings);
+        const ruleEnd = this.getRuleEnd(now, config);
+        const isAfterRuleEnd = now.getTime() >= ruleEnd.getTime();
 
         this.updateActualPvEnergy(liveData, now);
         await this.refreshForecastIfNeeded(config, now);
@@ -331,7 +333,7 @@ export class SmartBufferController {
         this.status.feedInWatt = Math.round(feedInWatt);
         this.status.soc = Math.round(liveData.batterySoc);
         this.status.targetSoc = config.targetSocEvening;
-        this.status.regelzeitEnde = this.getRuleEnd(now, config).toISOString();
+        this.status.regelzeitEnde = ruleEnd.toISOString();
 
         const fillUpTarget = this.calculateFillUpTargetWatt(liveData, config, now);
         const carConnected = liveData.wallboxPower > 100;
@@ -344,39 +346,47 @@ export class SmartBufferController {
 
         this.status.targetChargePowerWatt = Math.round(desiredFillUpPower);
 
-        if (this.phase === "MORNING_HOLD") {
-          if (feedInWatt > config.clippingGuardEntryWatt) {
-            this.pushPhaseChange("CLIPPING_GUARD", `Einspeisung ${Math.round(feedInWatt)}W > ${config.clippingGuardEntryWatt}W`);
-          } else if (desiredFillUpPower > 200) {
-            this.pushPhaseChange("FILL_UP", "SOC-Ziel erfordert Nachladung");
-          } else if (liveData.batterySoc >= 99) {
-            this.pushPhaseChange("FULL", "SOC >= 99%");
+        if (isAfterRuleEnd) {
+          this.pushPhaseChange("STANDBY", "Regelzeit beendet");
+        } else {
+          if (this.phase === "STANDBY") {
+            this.pushPhaseChange("MORNING_HOLD", "Regelzeit aktiv");
           }
-        } else if (this.phase === "CLIPPING_GUARD") {
-          if (liveData.batterySoc >= 95) {
-            this.pushPhaseChange("FILL_UP", "SOC >= 95%");
-            this.belowExitSince = null;
-          } else if (feedInWatt < config.clippingGuardExitWatt) {
-            if (!this.belowExitSince) {
-              this.belowExitSince = now;
-            } else if (now.getTime() - this.belowExitSince.getTime() >= 60_000) {
-              this.pushPhaseChange("MORNING_HOLD", `Einspeisung seit 60s < ${config.clippingGuardExitWatt}W`);
+
+          if (this.phase === "MORNING_HOLD") {
+            if (feedInWatt > config.clippingGuardEntryWatt) {
+              this.pushPhaseChange("CLIPPING_GUARD", `Einspeisung ${Math.round(feedInWatt)}W > ${config.clippingGuardEntryWatt}W`);
+            } else if (desiredFillUpPower > 200) {
+              this.pushPhaseChange("FILL_UP", "SOC-Ziel erfordert Nachladung");
+            } else if (liveData.batterySoc >= 99) {
+              this.pushPhaseChange("FULL", "SOC >= 99%");
+            }
+          } else if (this.phase === "CLIPPING_GUARD") {
+            if (liveData.batterySoc >= 95) {
+              this.pushPhaseChange("FILL_UP", "SOC >= 95%");
+              this.belowExitSince = null;
+            } else if (feedInWatt < config.clippingGuardExitWatt) {
+              if (!this.belowExitSince) {
+                this.belowExitSince = now;
+              } else if (now.getTime() - this.belowExitSince.getTime() >= 60_000) {
+                this.pushPhaseChange("MORNING_HOLD", `Einspeisung seit 60s < ${config.clippingGuardExitWatt}W`);
+                this.belowExitSince = null;
+              }
+            } else {
               this.belowExitSince = null;
             }
-          } else {
-            this.belowExitSince = null;
-          }
-        } else if (this.phase === "FILL_UP") {
-          if (liveData.batterySoc >= 99) {
-            this.pushPhaseChange("FULL", "SOC >= 99%");
-          } else if (feedInWatt > config.clippingGuardEntryWatt) {
-            this.pushPhaseChange("CLIPPING_GUARD", "Abregelschutz priorisiert");
-          }
-        } else if (this.phase === "FULL") {
-          if (feedInWatt > config.clippingGuardEntryWatt) {
-            this.pushPhaseChange("CLIPPING_GUARD", "Notfall-Abregelschutz");
-          } else if (liveData.batterySoc < 95 && desiredFillUpPower > 200) {
-            this.pushPhaseChange("FILL_UP", "SOC wieder unter Zielbereich");
+          } else if (this.phase === "FILL_UP") {
+            if (liveData.batterySoc >= 99) {
+              this.pushPhaseChange("FULL", "SOC >= 99%");
+            } else if (feedInWatt > config.clippingGuardEntryWatt) {
+              this.pushPhaseChange("CLIPPING_GUARD", "Abregelschutz priorisiert");
+            }
+          } else if (this.phase === "FULL") {
+            if (feedInWatt > config.clippingGuardEntryWatt) {
+              this.pushPhaseChange("CLIPPING_GUARD", "Notfall-Abregelschutz");
+            } else if (liveData.batterySoc < 95 && desiredFillUpPower > 200) {
+              this.pushPhaseChange("FILL_UP", "SOC wieder unter Zielbereich");
+            }
           }
         }
 

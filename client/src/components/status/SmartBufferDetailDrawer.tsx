@@ -21,6 +21,7 @@ const phaseLabel: Record<SmartBufferStatus["phase"], string> = {
   CLIPPING_GUARD: "Abregelschutz aktiv",
   FILL_UP: "Akku auffüllen",
   FULL: "Akku voll",
+  STANDBY: "Standby (Automatik)",
 };
 
 export default function SmartBufferDetailDrawer({ open, onOpenChange, status }: SmartBufferDetailDrawerProps) {
@@ -41,7 +42,10 @@ export default function SmartBufferDetailDrawer({ open, onOpenChange, status }: 
                 <span>{status ? phaseLabel[status.phase] : "Kein Status"}</span>
               </div>
               <div className="text-muted-foreground">SOC {status?.soc ?? 0}% / Ziel {status?.targetSoc ?? 100}%</div>
-              <div className="text-muted-foreground">Soll-Ladeleistung {Math.round(status?.targetChargePowerWatt ?? 0)}W</div>
+              <div className="text-muted-foreground">
+                Soll-Ladeleistung{" "}
+                {status?.phase === "STANDBY" ? "Automatik" : `${Math.round(status?.targetChargePowerWatt ?? 0)}W`}
+              </div>
               <div className="text-muted-foreground">Akku-Limit {Math.round(status?.batteryChargeLimitWatt ?? 0)}W</div>
             </div>
 

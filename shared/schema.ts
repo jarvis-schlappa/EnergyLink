@@ -107,6 +107,7 @@ export const smartBufferPhaseSchema = z.enum([
   "CLIPPING_GUARD",
   "FILL_UP",
   "FULL",
+  "STANDBY",
 ]);
 
 export type SmartBufferPhase = z.infer<typeof smartBufferPhaseSchema>;

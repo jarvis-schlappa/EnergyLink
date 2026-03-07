@@ -133,7 +133,8 @@ describe("SmartBufferController E2E scenarios (Issue #109)", () => {
     await controller.processLiveData(makeLiveData({ pvPower: 1800, housePower: 700, gridPower: -500, wallboxPower: 0, batterySoc: 40 }));
     const earlyTarget = controller.getStatus().targetChargePowerWatt;
 
-    setNow("2026-03-07T14:00:00.000Z");
+    // Beide Zeitpunkte liegen vor Regelzeitende, damit die Dynamik in FILL_UP vergleichbar bleibt.
+    setNow("2026-03-07T12:00:00.000Z");
     await controller.processLiveData(makeLiveData({ pvPower: 1500, housePower: 700, gridPower: -300, wallboxPower: 0, batterySoc: 40 }));
     const lateTarget = controller.getStatus().targetChargePowerWatt;
 
@@ -187,14 +188,17 @@ describe("SmartBufferController E2E scenarios (Issue #109)", () => {
     expect(afterDropTarget).toBeGreaterThan(morningTarget);
   });
 
-  it("6) Kein Auto, SOC 40% um 15:00: hohe Soll-Ladeleistung", async () => {
+  it("6) Nach Regelzeitende: STANDBY ohne irreführende Soll-Ladeleistung", async () => {
     const { SmartBufferController } = await import("../strategy/smart-buffer-controller");
     const controller = new SmartBufferController();
 
     setNow("2026-03-07T15:00:00.000Z");
     await controller.processLiveData(makeLiveData({ pvPower: 2500, housePower: 800, gridPower: -300, wallboxPower: 0, batterySoc: 40 }));
 
-    expect(controller.getStatus().targetChargePowerWatt).toBeGreaterThan(2000);
+    const status = controller.getStatus();
+    expect(status.phase).toBe("STANDBY");
+    expect(status.targetChargePowerWatt).toBe(0);
+    expect(status.batteryChargeLimitWatt).toBe(0);
   });
 
   it("7) FILL_UP bei Netzbezug: Ladeleistung geht auf 0W", async () => {
