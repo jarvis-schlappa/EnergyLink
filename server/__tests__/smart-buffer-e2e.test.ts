@@ -1,11 +1,15 @@
 import { beforeEach, afterEach, describe, expect, it, vi } from "vitest";
 import type { E3dcLiveData } from "@shared/schema";
+import { DEFAULT_WALLBOX_IP } from "../core/defaults";
 
 const mockBroadcastSmartBufferStatus = vi.fn();
+const mockBroadcastPartialUpdate = vi.fn();
 const mockLog = vi.fn();
+const mockTriggerProwlEvent = vi.fn();
 
 let mockSettings: any;
 let mockControlState: any;
+let mockChargingContext: any;
 
 const mockSetMaxChargePower = vi.fn(async () => {});
 const mockSetAutomaticMode = vi.fn(async () => {});
@@ -13,6 +17,7 @@ const mockIsConfigured = vi.fn(() => true);
 
 vi.mock("../wallbox/sse", () => ({
   broadcastSmartBufferStatus: (...args: any[]) => mockBroadcastSmartBufferStatus(...args),
+  broadcastPartialUpdate: (...args: any[]) => mockBroadcastPartialUpdate(...args),
 }));
 
 vi.mock("../core/logger", () => ({
@@ -22,7 +27,12 @@ vi.mock("../core/logger", () => ({
 vi.mock("../core/storage", () => ({
   storage: {
     getSettings: vi.fn(() => mockSettings),
+    saveSettings: vi.fn((next: any) => { mockSettings = next; }),
     getControlState: vi.fn(() => mockControlState),
+    saveControlState: vi.fn((next: any) => { mockControlState = next; }),
+    getChargingContext: vi.fn(() => mockChargingContext),
+    updateChargingContext: vi.fn((updates: any) => { mockChargingContext = { ...mockChargingContext, ...updates }; }),
+    saveChargingContext: vi.fn((next: any) => { mockChargingContext = next; }),
   },
 }));
 
@@ -38,6 +48,14 @@ vi.mock("../e3dc/modbus", () => ({
   getE3dcLiveDataHub: () => ({
     subscribe: () => () => {},
   }),
+}));
+
+vi.mock("../wallbox/broadcast-listener", () => ({
+  getAuthoritativePlugStatus: vi.fn(() => 7),
+}));
+
+vi.mock("../monitoring/prowl-notifier", () => ({
+  triggerProwlEvent: (...args: any[]) => mockTriggerProwlEvent(...args),
 }));
 
 function makeLiveData(overrides: Partial<E3dcLiveData> = {}): E3dcLiveData {
@@ -83,7 +101,17 @@ describe("SmartBufferController E2E scenarios (Issue #109)", () => {
     setNow("2026-03-07T10:00:00.000Z");
 
     mockSettings = {
-      chargingStrategy: { activeStrategy: "smart_buffer" },
+      chargingStrategy: {
+        activeStrategy: "smart_buffer",
+        minStartPowerWatt: 1400,
+        stopThresholdWatt: 500,
+        startDelaySeconds: 60,
+        stopDelaySeconds: 60,
+        physicalPhaseSwitch: 1,
+        minCurrentChangeAmpere: 1,
+        minChangeIntervalSeconds: 30,
+        inputX1Strategy: "max_without_battery",
+      },
       smartBuffer: {
         latitude: 48.4,
         longitude: 10.0,
@@ -103,7 +131,16 @@ describe("SmartBufferController E2E scenarios (Issue #109)", () => {
       e3dc: { enabled: true },
     };
 
-    mockControlState = { nightCharging: false };
+    mockControlState = { nightCharging: false, batteryLock: false, gridCharging: false };
+    mockChargingContext = {
+      strategy: "smart_buffer",
+      isActive: false,
+      currentAmpere: 0,
+      targetAmpere: 0,
+      currentPhases: 1,
+      userCurrentLimitAmpere: 32,
+      adjustmentCount: 0,
+    };
     stubForecastOk();
   });
 
@@ -254,5 +291,69 @@ describe("SmartBufferController E2E scenarios (Issue #109)", () => {
     await controller.processLiveData(makeLiveData({ pvPower: 6500, housePower: 1000, gridPower: -4500, batterySoc: 50 }));
 
     expect(controller.getStatus().enabled).toBe(false);
+  });
+
+  it("12) Smart Buffer startet Wallbox über Surplus-Logik (ena 1 + curr)", async () => {
+    const { ChargingStrategyController } = await import("../strategy/charging-strategy-controller");
+    const { RealPhaseProvider } = await import("../strategy/phase-provider");
+    const sendUdp = vi.fn(async (_ip: string, command: string) => {
+      if (command === "report 2") {
+        return { ID: 2, State: 2, Plug: 7, "Enable sys": 0, "Curr user": 32000 };
+      }
+      if (command === "report 3") {
+        return { ID: 3, P: 0, I1: 0, I2: 0, I3: 0, U1: 230, U2: 0, U3: 0 };
+      }
+      return { "TCH-OK": "done" };
+    });
+
+    const controller = new ChargingStrategyController(sendUdp, new RealPhaseProvider());
+    mockChargingContext = {
+      ...mockChargingContext,
+      isActive: false,
+      startDelayTrackerSince: new Date(Date.now() - 61_000).toISOString(),
+      remainingStartDelay: 0,
+    };
+
+    await controller.processStrategy(
+      makeLiveData({ pvPower: 6200, housePower: 1200, wallboxPower: 0, gridPower: -2500 }),
+      DEFAULT_WALLBOX_IP,
+    );
+
+    const commands = sendUdp.mock.calls.map((call) => call[1]);
+    expect(commands).toContain("ena 1");
+    expect(commands.some((cmd: string) => cmd.startsWith("curr "))).toBe(true);
+  });
+
+  it("13) Smart Buffer stoppt Wallbox bei zu wenig Überschuss (ena 0)", async () => {
+    const { ChargingStrategyController } = await import("../strategy/charging-strategy-controller");
+    const { RealPhaseProvider } = await import("../strategy/phase-provider");
+    const sendUdp = vi.fn(async (_ip: string, command: string) => {
+      if (command === "report 2") {
+        return { ID: 2, State: 3, Plug: 7, "Enable sys": 1, "Curr user": 8000 };
+      }
+      if (command === "report 3") {
+        return { ID: 3, P: 1800000, I1: 8000, I2: 0, I3: 0, U1: 230, U2: 0, U3: 0 };
+      }
+      return { "TCH-OK": "done" };
+    });
+
+    const controller = new ChargingStrategyController(sendUdp, new RealPhaseProvider());
+    mockChargingContext = {
+      ...mockChargingContext,
+      isActive: true,
+      currentAmpere: 8,
+      targetAmpere: 8,
+      currentPhases: 1,
+      belowThresholdSince: new Date(Date.now() - 120_000).toISOString(),
+      lastStartedAt: new Date(Date.now() - 120_000).toISOString(),
+    };
+
+    await controller.processStrategy(
+      makeLiveData({ pvPower: 1200, housePower: 3000, wallboxPower: 1800, gridPower: 900 }),
+      DEFAULT_WALLBOX_IP,
+    );
+
+    const commands = sendUdp.mock.calls.map((call) => call[1]);
+    expect(commands).toContain("ena 0");
   });
 });
