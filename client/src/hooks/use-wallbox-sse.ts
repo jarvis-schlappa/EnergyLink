@@ -6,11 +6,12 @@
  */
 
 import { useEffect, useState, useRef } from "react";
-import type { WallboxStatus } from "@shared/schema";
+import type { WallboxStatus, SmartBufferStatus } from "@shared/schema";
 
 interface UseWallboxSSEOptions {
   enabled?: boolean;
   onStatusUpdate?: (status: WallboxStatus) => void;
+  onSmartBufferUpdate?: (status: SmartBufferStatus) => void;
   onError?: (error: Error) => void;
 }
 
@@ -24,10 +25,12 @@ export function useWallboxSSE(options: UseWallboxSSEOptions = {}) {
   
   // Stabilisiere Callbacks mit useRef, damit sie das useEffect nicht triggern
   const onStatusUpdateRef = useRef(options.onStatusUpdate);
+  const onSmartBufferUpdateRef = useRef(options.onSmartBufferUpdate);
   const onErrorRef = useRef(options.onError);
   
   // Aktualisiere Refs bei Änderungen - läuft bei jedem Render (kein useEffect!)
   onStatusUpdateRef.current = options.onStatusUpdate;
+  onSmartBufferUpdateRef.current = options.onSmartBufferUpdate;
   onErrorRef.current = options.onError;
 
   useEffect(() => {
@@ -65,6 +68,8 @@ export function useWallboxSSE(options: UseWallboxSSEOptions = {}) {
                 onStatusUpdateRef.current?.(merged);
                 return merged;
               });
+            } else if (message.type === "smart-buffer-status" && message.data) {
+              onSmartBufferUpdateRef.current?.(message.data);
             }
           } catch (parseError) {
             console.error("[SSE] Fehler beim Parsing der Nachricht:", parseError);

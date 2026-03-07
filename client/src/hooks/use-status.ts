@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
-import type { Settings, ControlState, PlugStatusTracking, ChargingContext, BuildInfo } from "@shared/schema";
+import type { Settings, ControlState, PlugStatusTracking, ChargingContext, BuildInfo, SmartBufferStatus } from "@shared/schema";
 
 /**
  * Consolidated status response from /api/status.
@@ -13,6 +13,7 @@ export interface ConsolidatedStatus {
   chargingContext: ChargingContext;
   e3dcLiveData: Record<string, unknown> | null;
   gridFrequency: Record<string, unknown> | null;
+  smartBufferStatus: SmartBufferStatus;
   buildInfo: BuildInfo;
   timestamp: string;
 }

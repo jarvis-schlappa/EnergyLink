@@ -9,11 +9,12 @@ import BuildInfoDialog from "@/components/BuildInfoDialog";
 import CableDetailDrawer from "@/components/status/CableDetailDrawer";
 import EnergyDetailDrawer from "@/components/status/EnergyDetailDrawer";
 import GarageDetailDrawer from "@/components/status/GarageDetailDrawer";
+import SmartBufferDetailDrawer from "@/components/status/SmartBufferDetailDrawer";
 import ChargingControlDrawer, { STRATEGY_OPTIONS } from "@/components/status/ChargingControlDrawer";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import type { WallboxStatus, ControlState, Settings, PlugStatusTracking, ChargingContext, ChargingStrategy, BuildInfo, GarageStatus } from "@shared/schema";
+import type { WallboxStatus, ControlState, Settings, PlugStatusTracking, ChargingContext, ChargingStrategy, BuildInfo, GarageStatus, SmartBufferStatus } from "@shared/schema";
 import { useWallboxSSE } from "@/hooks/use-wallbox-sse";
 import { useStatus } from "@/hooks/use-status";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -32,6 +33,7 @@ export default function StatusPage() {
   const [showCableDrawer, setShowCableDrawer] = useState(false);
   const [showEnergyDrawer, setShowEnergyDrawer] = useState(false);
   const [showGarageDrawer, setShowGarageDrawer] = useState(false);
+  const [showSmartBufferDrawer, setShowSmartBufferDrawer] = useState(false);
   const [showChargingControlDrawer, setShowChargingControlDrawer] = useState(false);
   const [showBuildInfoDialog, setShowBuildInfoDialog] = useState(false);
   const [garageMovingState, setGarageMovingState] = useState<"moving" | null>(null);
@@ -50,7 +52,13 @@ export default function StatusPage() {
   const { status: sseStatus, isConnected: sseConnected } = useWallboxSSE({
     onStatusUpdate: (newStatus) => {
       queryClient.setQueryData(["/api/wallbox/status"], newStatus);
-    }
+    },
+    onSmartBufferUpdate: (smartStatus: SmartBufferStatus) => {
+      queryClient.setQueryData(["/api/status"], (prev: any) => {
+        if (!prev) return prev;
+        return { ...prev, smartBufferStatus: smartStatus };
+      });
+    },
   });
 
   const { data: status, isLoading, error } = useQuery<WallboxStatus>({
@@ -67,6 +75,7 @@ export default function StatusPage() {
   const settings = consolidatedStatus?.settings;
   const plugTracking = consolidatedStatus?.plugTracking;
   const chargingContext = consolidatedStatus?.chargingContext;
+  const smartBufferStatus = consolidatedStatus?.smartBufferStatus;
   const buildInfo = consolidatedStatus?.buildInfo;
 
   // Garage: Check if FHEM host is configured
@@ -414,6 +423,7 @@ export default function StatusPage() {
   const energyTotal = (displayStatus?.eTotal || 0) / 1000;
   const energy = energySession;
   const phases = displayStatus?.phases || 0;
+  const isSmartBufferStrategy = settings?.chargingStrategy?.activeStrategy === "smart_buffer";
 
   const getStrategyLabel = (strategy: string | undefined) => {
     const option = STRATEGY_OPTIONS.find(opt => opt.value === strategy);
@@ -428,8 +438,25 @@ export default function StatusPage() {
       case "max_with_battery":
       case "max_without_battery":
         return "Max Power";
+      case "smart_buffer":
+        return "Smart Buffer";
       default:
         return "Aus";
+    }
+  };
+
+  const getSmartBufferPhaseLabel = (phase: string | undefined) => {
+    switch (phase) {
+      case "MORNING_HOLD":
+        return "Puffer halten";
+      case "CLIPPING_GUARD":
+        return "Abregelschutz aktiv";
+      case "FILL_UP":
+        return "Akku auffüllen";
+      case "FULL":
+        return "Akku voll";
+      default:
+        return "Smart Buffer";
     }
   };
 
@@ -570,6 +597,10 @@ export default function StatusPage() {
                         }
                         return "Warte auf Überschuss";
                       }
+
+                      if (strategy === "smart_buffer") {
+                        return getSmartBufferPhaseLabel(smartBufferStatus?.phase);
+                      }
                       
                       if (strategy && strategy !== "off") return getBadgeLabel(strategy);
                       return getStatusBadge(status?.state || 0);
@@ -581,6 +612,7 @@ export default function StatusPage() {
               showConfigIcon={true}
             />
 
+            {!isSmartBufferStrategy && (
             <Card data-testid="card-current-control">
               <CardHeader className="pb-3">
                 <div className="flex items-center justify-between gap-2">
@@ -648,15 +680,30 @@ export default function StatusPage() {
                 </div>
               </CardContent>
             </Card>
+            )}
 
-            <StatusCard
-              icon={Battery}
-              title="Geladene Energie"
-              value={isLoading ? "..." : energy.toFixed(1)}
-              unit="kWh"
-              status={isCharging ? "charging" : "stopped"}
-              onClick={() => setShowEnergyDrawer(true)}
-            />
+            {isSmartBufferStrategy ? (
+              <StatusCard
+                icon={Battery}
+                title="Smart Buffer"
+                value={isLoading ? "..." : String(Math.round(smartBufferStatus?.targetChargePowerWatt || 0))}
+                unit="W Soll"
+                status={isCharging ? "charging" : "ready"}
+                badge={getSmartBufferPhaseLabel(smartBufferStatus?.phase)}
+                additionalInfo={`SOC ${Math.round(smartBufferStatus?.soc || 0)}% -> Ziel ${Math.round(smartBufferStatus?.targetSoc || 100)}%`}
+                onClick={() => setShowSmartBufferDrawer(true)}
+                showConfigIcon={true}
+              />
+            ) : (
+              <StatusCard
+                icon={Battery}
+                title="Geladene Energie"
+                value={isLoading ? "..." : energy.toFixed(1)}
+                unit="kWh"
+                status={isCharging ? "charging" : "stopped"}
+                onClick={() => setShowEnergyDrawer(true)}
+              />
+            )}
 
             {/* Side-by-Side Grid: Kabel + Garage */}
             <div className={`grid gap-3 ${hasFhemHost ? "grid-cols-2" : "grid-cols-1"}`}>
@@ -730,6 +777,12 @@ export default function StatusPage() {
         onOpenChange={setShowEnergyDrawer}
         energySession={energySession}
         energyTotal={energyTotal}
+      />
+
+      <SmartBufferDetailDrawer
+        open={showSmartBufferDrawer}
+        onOpenChange={setShowSmartBufferDrawer}
+        status={smartBufferStatus}
       />
 
       <GarageDetailDrawer

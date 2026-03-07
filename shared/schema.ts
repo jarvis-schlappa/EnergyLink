@@ -54,6 +54,7 @@ export const chargingStrategySchema = z.enum([
   "surplus_vehicle_prio",
   "max_with_battery",
   "max_without_battery",
+  "smart_buffer",
 ]);
 
 export type ChargingStrategy = z.infer<typeof chargingStrategySchema>;
@@ -71,6 +72,67 @@ export const chargingStrategyConfigSchema = z.object({
 });
 
 export type ChargingStrategyConfig = z.infer<typeof chargingStrategyConfigSchema>;
+
+export const pvArrayConfigSchema = z.object({
+  name: z.string(),
+  azimuthDeg: z.number().min(0).max(360),
+  tiltDeg: z.number().min(0).max(90),
+  kwp: z.number().min(0.1).max(100),
+});
+
+export type PvArrayConfig = z.infer<typeof pvArrayConfigSchema>;
+
+export const smartBufferConfigSchema = z.object({
+  latitude: z.number().min(-90).max(90),
+  longitude: z.number().min(-180).max(180),
+  pvArrays: z.array(pvArrayConfigSchema).min(1),
+  pvPeakKwp: z.number().min(0.1).max(100),
+  batteryCapacityKwh: z.number().min(0.1).max(100),
+  feedInLimitWatt: z.number().min(1000).max(50000).default(4960),
+  clippingGuardEntryWatt: z.number().min(1000).max(50000).default(4300),
+  clippingGuardExitWatt: z.number().min(1000).max(50000).default(3800),
+  clippingGuardTargetWatt: z.number().min(1000).max(50000).default(4500),
+  maxBatteryChargePower: z.number().min(100).max(10000).default(3000),
+  targetSocEvening: z.number().min(1).max(100).default(100),
+  forecastRefreshIntervalMin: z.number().min(5).max(120).default(15),
+  winterRuleEndTimeUtc: z.string().default("12:45"),
+  summerRuleEndTimeUtc: z.string().default("15:00"),
+  e3dcsetBinaryPath: z.string().optional(),
+});
+
+export type SmartBufferConfig = z.infer<typeof smartBufferConfigSchema>;
+
+export const smartBufferPhaseSchema = z.enum([
+  "MORNING_HOLD",
+  "CLIPPING_GUARD",
+  "FILL_UP",
+  "FULL",
+]);
+
+export type SmartBufferPhase = z.infer<typeof smartBufferPhaseSchema>;
+
+export const smartBufferPhaseChangeSchema = z.object({
+  time: z.string(),
+  from: smartBufferPhaseSchema,
+  to: smartBufferPhaseSchema,
+  reason: z.string(),
+});
+
+export const smartBufferStatusSchema = z.object({
+  enabled: z.boolean(),
+  phase: smartBufferPhaseSchema,
+  soc: z.number(),
+  targetSoc: z.number(),
+  regelzeitEnde: z.string(),
+  targetChargePowerWatt: z.number(),
+  batteryChargeLimitWatt: z.number(),
+  forecastKwh: z.number(),
+  actualKwh: z.number(),
+  feedInWatt: z.number(),
+  phaseChanges: z.array(smartBufferPhaseChangeSchema),
+});
+
+export type SmartBufferStatus = z.infer<typeof smartBufferStatusSchema>;
 
 export const fhemSyncSchema = z.object({
   enabled: z.boolean(),
@@ -167,6 +229,7 @@ export const settingsSchema = z.object({
   nightChargingSchedule: nightChargingScheduleSchema.optional(),
   e3dc: e3dcConfigSchema.optional(),
   chargingStrategy: chargingStrategyConfigSchema.optional(),
+  smartBuffer: smartBufferConfigSchema.optional(),
   fhemSync: fhemSyncSchema.optional(),
   prowl: prowlSchema.optional(),
   gridFrequencyMonitor: gridFrequencyMonitorConfigSchema.optional(),

@@ -267,7 +267,7 @@ export class ChargingStrategyController {
         throw error;
       }
     } else if (newStrategy === "off" || newStrategy === "surplus_battery_prio" || 
-               newStrategy === "surplus_vehicle_prio" || newStrategy === "max_with_battery") {
+               newStrategy === "surplus_vehicle_prio" || newStrategy === "max_with_battery" || newStrategy === "smart_buffer") {
       // Prüfe ob Lock bereits deaktiviert ist
       if (!currentBatteryLock) {
         log('debug', 'system', 'Battery Lock bereits deaktiviert - überspringe');
@@ -337,6 +337,10 @@ async processStrategy(liveData: E3dcLiveData, wallboxIp: string): Promise<void> 
     }
     
     const config = settings.chargingStrategy;
+
+    if (config.activeStrategy === "smart_buffer") {
+      return;
+    }
     
     // WICHTIG: Prüfe "off"-Strategie VOR reconcile, um repetitive Stops zu vermeiden
     if (config.activeStrategy === "off") {

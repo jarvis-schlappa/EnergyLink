@@ -332,4 +332,91 @@ describe("useWallboxSSE hook", () => {
 
     expect(result.current.isConnected).toBe(true);
   });
+
+  it("calls onSmartBufferUpdate callback on smart-buffer-status events", async () => {
+    const onSmartBufferUpdate = vi.fn();
+    renderHook(() => useWallboxSSE({ onSmartBufferUpdate }));
+
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 10));
+    });
+
+    const es = MockEventSource.instances[0];
+
+    act(() => {
+      es.simulateMessage({
+        type: "smart-buffer-status",
+        data: {
+          enabled: true,
+          phase: "CLIPPING_GUARD",
+          soc: 55,
+          targetSoc: 100,
+          regelzeitEnde: "2026-03-07T16:40:00.000Z",
+          targetChargePowerWatt: 1200,
+          batteryChargeLimitWatt: 2000,
+          forecastKwh: 12.4,
+          actualKwh: 4.1,
+          feedInWatt: 4420,
+          phaseChanges: [],
+        },
+      });
+    });
+
+    expect(onSmartBufferUpdate).toHaveBeenCalledTimes(1);
+    expect(onSmartBufferUpdate.mock.calls[0][0].phase).toBe("CLIPPING_GUARD");
+    expect(onSmartBufferUpdate.mock.calls[0][0].targetChargePowerWatt).toBe(1200);
+  });
+
+  it("does not change wallbox status when receiving smart-buffer-status", async () => {
+    const { result } = renderHook(() => useWallboxSSE());
+
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 10));
+    });
+
+    const es = MockEventSource.instances[0];
+
+    act(() => {
+      es.simulateMessage({
+        type: "wallbox-status",
+        data: {
+          state: 3,
+          plug: 7,
+          enableSys: 1,
+          maxCurr: 16,
+          ePres: 5000,
+          eTotal: 100000,
+          power: 3.68,
+          phases: 1,
+          lastUpdated: "2026-02-26T13:00:00.000Z",
+        },
+      });
+    });
+
+    expect(result.current.status?.state).toBe(3);
+    expect(result.current.status?.plug).toBe(7);
+
+    act(() => {
+      es.simulateMessage({
+        type: "smart-buffer-status",
+        data: {
+          enabled: true,
+          phase: "FILL_UP",
+          soc: 61,
+          targetSoc: 100,
+          regelzeitEnde: "2026-03-07T16:40:00.000Z",
+          targetChargePowerWatt: 1800,
+          batteryChargeLimitWatt: 1800,
+          forecastKwh: 14.2,
+          actualKwh: 5.3,
+          feedInWatt: 3200,
+          phaseChanges: [],
+        },
+      });
+    });
+
+    expect(result.current.status?.state).toBe(3);
+    expect(result.current.status?.plug).toBe(7);
+    expect(result.current.status?.power).toBe(3.68);
+  });
 });

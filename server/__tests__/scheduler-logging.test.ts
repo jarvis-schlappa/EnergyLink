@@ -98,6 +98,17 @@ vi.mock("../routes/shared-state", () => ({
   getOrCreateStrategyController: vi.fn(() => mockStrategyController),
 }));
 
+vi.mock("../strategy/smart-buffer-controller", () => ({
+  getSmartBufferController: () => ({
+    startEventListener: vi.fn(),
+    stopEventListener: vi.fn(),
+    processLiveData: vi.fn(),
+    shouldRunFallback: vi.fn(() => false),
+    getStatus: vi.fn(() => ({ enabled: false })),
+    handleStrategySwitch: vi.fn(),
+  }),
+}));
+
 // --- Hardware/external stubs (no-op, never asserted) ---
 
 vi.mock("../wallbox/transport", () => ({

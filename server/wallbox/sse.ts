@@ -7,7 +7,7 @@
 
 import { Response } from "express";
 import { log } from "../core/logger";
-import type { WallboxStatus } from "@shared/schema";
+import type { WallboxStatus, SmartBufferStatus } from "@shared/schema";
 
 interface SSEClient {
   id: string;
@@ -127,6 +127,32 @@ export function broadcastPartialUpdate(partialStatus: Partial<WallboxStatus>): v
     try {
       client.res.write(`data: ${data}\n\n`);
     } catch (error) {
+      failedClients.push(client.id);
+    }
+  });
+
+  failedClients.forEach((id) => connectedClients.delete(id));
+}
+
+/**
+ * Sendet Smart-Buffer-Status an alle verbundenen Clients.
+ */
+export function broadcastSmartBufferStatus(status: SmartBufferStatus): void {
+  if (connectedClients.size === 0) {
+    return;
+  }
+
+  const data = JSON.stringify({
+    type: "smart-buffer-status",
+    data: status,
+    timestamp: Date.now(),
+  });
+
+  const failedClients: string[] = [];
+  connectedClients.forEach((client) => {
+    try {
+      client.res.write(`data: ${data}\n\n`);
+    } catch {
       failedClients.push(client.id);
     }
   });

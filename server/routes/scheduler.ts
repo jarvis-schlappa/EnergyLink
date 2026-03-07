@@ -10,6 +10,7 @@ import { startE3dcPoller, stopE3dcPoller, getE3dcBackoffLevel } from "../e3dc/po
 import { triggerProwlEvent, extractTargetWh } from "../monitoring/prowl-notifier";
 import { startGridFrequencyMonitor, stopGridFrequencyMonitor } from "../monitoring/grid-frequency-monitor";
 import { getCurrentTimeInTimezone, isTimeInRange } from "./helpers";
+import { getSmartBufferController } from "../strategy/smart-buffer-controller";
 import {
   chargingStrategyInterval,
   nightChargingSchedulerInterval,
@@ -35,6 +36,8 @@ export async function shutdownSchedulers(): Promise<void> {
     await strategyController.stopEventListener();
     log("info", "system", "Charging-Strategy-Event-Listener gestoppt");
   }
+  await getSmartBufferController().stopEventListener();
+  log("info", "system", "Smart-Buffer-Event-Listener gestoppt");
   
   // Stoppe Scheduler
   if (chargingStrategyInterval) {
@@ -463,6 +466,12 @@ const checkChargingStrategy = async () => {
     }
 
     const controller = getOrCreateStrategyController();
+    const smartBufferController = getSmartBufferController();
+
+    if (strategyConfig.activeStrategy === "smart_buffer" && !smartBufferController.shouldRunFallback()) {
+      log("debug", "strategy", "Smart Buffer Fallback-Timer: übersprungen (Event-Stream aktuell)");
+      return;
+    }
 
     // Hole E3DC Live-Daten (mit Wallbox-Leistung 0 für Überschuss-Berechnung)
     if (!settings.e3dcIp) {
@@ -532,6 +541,12 @@ const checkChargingStrategy = async () => {
       "system",
       `Strategy Check: ${strategyConfig.activeStrategy}`,
     );
+
+    if (strategyConfig.activeStrategy === "smart_buffer") {
+      await smartBufferController.processLiveData(e3dcLiveData);
+      return;
+    }
+
     await controller.processStrategy(
       e3dcLiveData,
       settings.wallboxIp,
@@ -607,8 +622,10 @@ export async function startSchedulers(): Promise<void> {
   const wallboxIp = currentSettings?.wallboxIp || DEFAULT_WALLBOX_IP;
   
   const controller = getOrCreateStrategyController();
+  const smartBufferController = getSmartBufferController();
   
   await controller.startEventListener(wallboxIp);
+  await smartBufferController.startEventListener(wallboxIp);
   
   log(
     "info",

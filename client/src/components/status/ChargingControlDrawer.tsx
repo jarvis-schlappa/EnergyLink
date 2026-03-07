@@ -21,6 +21,7 @@ const STRATEGY_OPTIONS: Array<{ value: ChargingStrategy; label: string; descript
   { value: "surplus_vehicle_prio", label: "Überschuss (Fahrzeug priorisiert)", description: "Fahrzeug nur mit PV Überschuss laden" },
   { value: "max_with_battery", label: "Max Power (mit Batterieentladung)", description: "Volle Leistung mit Entladung der Hausbatterie" },
   { value: "max_without_battery", label: "Max Power (ohne Batterieentladung)", description: "Volle Leistung ohne Entladung der Hausbatterie" },
+  { value: "smart_buffer", label: "Smart Buffer", description: "Abregelschutz + dynamische Akkuladung" },
 ];
 
 export { STRATEGY_OPTIONS };
