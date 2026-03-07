@@ -322,6 +322,21 @@ class E3dcClient {
     );
   }
 
+  async setMaxChargePower(watt: number): Promise<void> {
+    if (!this.config) {
+      throw new Error('E3DC not configured');
+    }
+    const clamped = Math.max(0, Math.round(watt));
+    await this.executeCommandWithPause(`-c ${clamped}`, `Maximale Ladeleistung setzen (${clamped}W)`);
+  }
+
+  async setAutomaticMode(): Promise<void> {
+    if (!this.config) {
+      throw new Error('E3DC not configured');
+    }
+    await this.executeCommandWithPause('-a', 'Automatikmodus aktivieren');
+  }
+
   isConfigured(): boolean {
     return this.config !== null && this.config.enabled === true;
   }

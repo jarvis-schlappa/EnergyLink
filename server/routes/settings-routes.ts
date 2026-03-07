@@ -19,6 +19,7 @@ import { MockE3dcGateway, RealE3dcGateway } from "../e3dc/gateway";
 import { sendUdpCommand } from "../wallbox/transport";
 import { getBuildInfo } from "../core/build-info";
 import { triggerProwlEvent, getProwlNotifier } from "../monitoring/prowl-notifier";
+import { getSmartBufferController } from "../strategy/smart-buffer-controller";
 import {
   getOrCreateStrategyController,
   strategyController,
@@ -192,9 +193,11 @@ export function registerSettingsRoutes(app: Express): void {
       // WICHTIG: Wenn Strategie geändert wurde, Battery Lock aktivieren/deaktivieren
       if (strategyChanged && newStrategy) {
         const controller = getOrCreateStrategyController();
+        const smartBufferController = getSmartBufferController();
 
         try {
           log("info", "system", `Ladestrategie gewechselt auf: ${newStrategy}`);
+          await smartBufferController.handleStrategySwitch(oldStrategy, newStrategy);
           await controller.handleStrategyChange(newStrategy);
           
           // Prowl-Benachrichtigung für Strategie-Wechsel
@@ -412,6 +415,8 @@ export function registerSettingsRoutes(app: Express): void {
         ...settings,
         chargingStrategy: updatedConfig,
       });
+
+      await getSmartBufferController().handleStrategySwitch(oldStrategy, strategy);
 
       // WICHTIG: Optimierte Reihenfolge für schnelle Wallbox-Reaktion
       if (strategyController) {

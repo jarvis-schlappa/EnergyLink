@@ -5,6 +5,7 @@ import { getE3dcModbusService } from "../e3dc/modbus";
 import { getGridFrequencyState } from "../monitoring/grid-frequency-monitor";
 import { getBuildInfo } from "../core/build-info";
 import { getLastCachedWallboxStatus } from "./wallbox-routes";
+import { getSmartBufferController } from "../strategy/smart-buffer-controller";
 
 // Issue #71: FRONTEND-STATE Trace-Log – Change-Detection State
 // Speichert den letzten geloggten Snapshot als kompakten String zum Vergleich.
@@ -29,6 +30,7 @@ export function registerStatusRoutes(app: Express): void {
 
       // Netzfrequenz-Status
       const gridFrequency = getGridFrequencyState();
+      const smartBufferStatus = getSmartBufferController().getStatus();
 
       // Issue #71: FRONTEND-STATE Trace-Log
       // Einmal pro Poll-Zyklus, nur bei Änderung – zeigt was das Frontend gerade sieht.
@@ -65,6 +67,7 @@ export function registerStatusRoutes(app: Express): void {
         chargingContext,
         e3dcLiveData,
         gridFrequency,
+        smartBufferStatus,
         buildInfo,
         timestamp: new Date().toISOString(),
       });

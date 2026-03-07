@@ -115,6 +115,19 @@ app.use((req, res, next) => {
   const settings = storage.getSettings();
   initializeProwlNotifier(settings);
 
+  // Crash-Recovery: E3DC beim Start auf Automatik zurücksetzen, damit kein altes -c Limit hängen bleibt.
+  if (settings?.e3dc?.enabled) {
+    try {
+      if (!e3dcClient.isConfigured()) {
+        e3dcClient.configure(settings.e3dc);
+      }
+      await e3dcClient.setAutomaticMode();
+      log("info", "system", "✅ E3DC auf Automatik zurückgesetzt (Crash-Recovery)");
+    } catch (error) {
+      log("warning", "system", "⚠️ E3DC Crash-Recovery konnte nicht ausgeführt werden", error instanceof Error ? error.message : String(error));
+    }
+  }
+
   // Prowl-Benachrichtigung: App gestartet (nach erfolgreicher Initialisierung)
   triggerProwlEvent(settings, "appStarted", (notifier) =>
     notifier.sendAppStarted()

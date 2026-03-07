@@ -22,6 +22,7 @@ describe("Schema Validation", () => {
       expect(chargingStrategySchema.parse("surplus_vehicle_prio")).toBe("surplus_vehicle_prio");
       expect(chargingStrategySchema.parse("max_with_battery")).toBe("max_with_battery");
       expect(chargingStrategySchema.parse("max_without_battery")).toBe("max_without_battery");
+      expect(chargingStrategySchema.parse("smart_buffer")).toBe("smart_buffer");
     });
 
     it("rejects invalid strategies", () => {
