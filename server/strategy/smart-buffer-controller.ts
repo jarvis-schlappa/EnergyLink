@@ -418,7 +418,7 @@ export class SmartBufferController {
         const previousTargetChargePower = this.status.targetChargePowerWatt;
         this.status.targetChargePowerWatt = Math.round(desiredFillUpPower);
         if (this.status.targetChargePowerWatt !== previousTargetChargePower) {
-          log("info", "strategy", `Smart Buffer: Soll-Ladeleistung angepasst: ${previousTargetChargePower}W -> ${this.status.targetChargePowerWatt}W`);
+          log("debug", "strategy", `Smart Buffer: Soll-Ladeleistung angepasst: ${previousTargetChargePower}W -> ${this.status.targetChargePowerWatt}W`);
         }
 
         const phaseBeforeTransition = this.phase;

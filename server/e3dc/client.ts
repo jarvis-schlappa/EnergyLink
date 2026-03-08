@@ -157,7 +157,7 @@ class E3dcClient {
     
     if (this.lastCommandTime > 0 && timeSinceLastCommand < this.RATE_LIMIT_MS) {
       const waitTime = this.RATE_LIMIT_MS - timeSinceLastCommand;
-      log('info', 'system', `E3DC: Rate Limiting - Warte ${(waitTime / 1000).toFixed(1)}s vor nächstem Befehl`);
+      log('debug', 'system', `E3DC: Rate Limiting - Warte ${(waitTime / 1000).toFixed(1)}s vor nächstem Befehl`);
       await new Promise(resolve => setTimeout(resolve, waitTime));
     }
 

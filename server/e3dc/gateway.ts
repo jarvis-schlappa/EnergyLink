@@ -36,7 +36,7 @@ export class RealE3dcGateway implements E3dcGateway {
       ? `${this.prefix} ${command}`.trim()
       : command;
 
-    log('debug', 'system', `E3DC: ${commandName}`, `Befehl: ${fullCommand}`);
+    log('info', 'system', `E3DC: ${commandName}`, `Befehl: ${fullCommand}`);
 
     const { stdout, stderr } = await execAsync(fullCommand);
 
@@ -47,7 +47,7 @@ export class RealE3dcGateway implements E3dcGateway {
       log('warning', 'system', `E3DC: ${commandName} - Fehler-Ausgabe`, stderr.trim());
     }
 
-    log('debug', 'system', `E3DC: ${commandName} erfolgreich ausgeführt`);
+    log('info', 'system', `E3DC: ${commandName} erfolgreich ausgeführt`);
     return stdout || '';
   }
 }

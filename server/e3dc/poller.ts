@@ -218,9 +218,9 @@ async function scheduleNextPoll(): Promise<void> {
   const nextIntervalMs = nextIntervalSeconds * 1000;
   
   if (isIdle && !wasIdle) {
-    log("info", "e3dc-poller", `Idle-Modus aktiv → E3DC-Polling gedrosselt auf ${nextIntervalSeconds}s`);
+    log("debug", "e3dc-poller", `Idle-Modus aktiv → E3DC-Polling gedrosselt auf ${nextIntervalSeconds}s`);
   } else if (!isIdle && wasIdle) {
-    log("info", "e3dc-poller", `Idle-Modus beendet → E3DC-Polling zurück auf ${backoffInterval}s`);
+    log("debug", "e3dc-poller", `Idle-Modus beendet → E3DC-Polling zurück auf ${backoffInterval}s`);
   }
 
   // Starte nächsten Poll nach Intervall
